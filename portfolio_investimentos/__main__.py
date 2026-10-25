@@ -35,6 +35,18 @@ def main():
         return
 
     url = f"http://127.0.0.1:{args.port}/"
+    if _port_in_use(args.host, args.port):
+        if _is_this_app(url):
+            # outra janela (ou uma sessão do Termux em segundo plano) já tem a aplicação aberta: usa essa
+            print(f"O Portfolio Investimentos já está a correr em {url}")
+            print("Para o parares: fecha a outra janela, ou corre  pkill -f portfolio_investimentos")
+            if not args.no_browser:
+                webbrowser.open(url)
+            return
+        print(f"A porta {args.port} está ocupada por outro programa. Usa outra porta, por exemplo:")
+        print(f"  python -m portfolio_investimentos --port {args.port + 1}"
+              f"      (no Android: PORT={args.port + 1} bash iniciar-android.sh)")
+        raise SystemExit(1)
     print(f"Portfolio Investimentos a correr em {url}")
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print(f"Aberta na rede em {args.host}:{args.port}. Os outros dispositivos só entram depois de definires "
@@ -49,6 +61,26 @@ def main():
         serve(app, host=args.host, port=args.port, threads=4)
     except ImportError:
         app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
+
+
+def _port_in_use(host, port):
+    import socket
+    with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((host, port))
+        except OSError:
+            return True
+    return False
+
+
+def _is_this_app(url):
+    """A porta ocupada é desta aplicação? (o manifesto é público, mesmo com palavra-passe)"""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(url + "static/manifest.webmanifest", timeout=3) as resp:
+            return b"Portfolio Investimentos" in resp.read(4096)
+    except (OSError, ValueError):
+        return False
 
 
 def _import_files(paths, broker=None):
