@@ -614,15 +614,26 @@ class Portfolio:
     def sparkline(self, ticker, n=30):
         return self.book.closes(ticker, n)
 
+    def _bench_closes(self, bench, dates):
+        """Fechos do índice convertidos para euros ao câmbio de cada dia.
+
+        A carteira é medida em euros; comparar com o índice na moeda dele (ex.: S&P 500 em dólares)
+        atribuía à carteira o efeito cambial, como se fosse mérito ou demérito.
+        """
+        out = []
+        for d in dates:
+            price = self.book.price(bench.ticker, d)
+            out.append(price / self.book.fx(bench.currency, d) if price is not None else None)
+        return out
+
     def benchmark_day_change(self, bench):
-        """Variação do índice nos mesmos dias que a variação da carteira (para a comparação ser justa)."""
+        """Variação do índice, em euros, nos mesmos dias que a variação da carteira."""
         if not self.book.last_date(bench.ticker):
             return None
         k, j = self._market_days()
         if k is None:
             return None
-        p = self.book.price(bench.ticker, self.series.dates[k])
-        prev = self.book.price(bench.ticker, self.series.dates[j])
+        p, prev = self._bench_closes(bench, [self.series.dates[k], self.series.dates[j]])
         return p / prev - 1 if p and prev else None
 
     # ----------------------------------------------------------- dividendos
@@ -771,7 +782,7 @@ class Portfolio:
         for b in self.benchmarks:
             if benchmarks is not None and b.ticker not in benchmarks:
                 continue
-            closes = [self.book.price(b.ticker, d) for d in dates]
+            closes = self._bench_closes(b, dates)
             if not closes or closes[0] is None:
                 continue
             bidx = [c / closes[0] for c in closes]
@@ -790,12 +801,12 @@ class Portfolio:
         best_y = max(yearly, key=lambda m: m[1]) if yearly else None
         worst_y = min(yearly, key=lambda m: m[1]) if yearly else None
 
-        risk = risk_metrics(index, cagr, drawdown(index), yearly)
+        risk = risk_metrics(index, cagr, drawdown(index), yearly, dates)
         ref = next((b for b in bench_data if b["ticker"] == MERIT_BENCHMARK), None)
         if ref is None:
             ref_asset = next((b for b in self.benchmarks if b.ticker == MERIT_BENCHMARK), None)
             if ref_asset:
-                closes = [self.book.price(ref_asset.ticker, d) for d in dates]
+                closes = self._bench_closes(ref_asset, dates)
                 if closes and closes[0]:
                     bidx = [c / closes[0] for c in closes]
                     b_total = bidx[-1] - 1
@@ -809,7 +820,7 @@ class Portfolio:
             ref_monthly = period_returns(dates, bidx, "month")
             merit = merit_metrics(monthly, ref_monthly, yearly, ref["yearly"], cagr, ref["cagr"])
             merit["name"] = ref["name"]
-            merit["volatility"] = annualized_vol(bidx)
+            merit["volatility"] = annualized_vol(bidx, dates)
 
         return {
             "risk": risk, "merit": merit,
@@ -915,7 +926,14 @@ def xirr(flows):
     return (lo + hi) / 2
 
 
-def daily_returns(index):
+def daily_returns(index, dates=None):
+    """Retornos entre pontos consecutivos; com `dates`, só entre dias úteis.
+
+    A série tem pontos ao fim de semana quando há movimentos (ex.: juros diários da Trading 212 e da
+    XTB): sem bolsa, entram com variação ~0 e, anualizados com 252 dias, baixavam a volatilidade.
+    """
+    if dates is not None:
+        index = [v for d, v in zip(dates, index) if d.weekday() < 5]
     return [b / a - 1 for a, b in zip(index, index[1:]) if a > EPS]
 
 
@@ -930,12 +948,12 @@ def _std(xs):
     return (sum((x - m) ** 2 for x in xs) / (len(xs) - 1)) ** 0.5
 
 
-def annualized_vol(index):
-    return _std(daily_returns(index)) * TRADING_DAYS ** 0.5
+def annualized_vol(index, dates=None):
+    return _std(daily_returns(index, dates)) * TRADING_DAYS ** 0.5
 
 
-def risk_metrics(index, cagr, dd, yearly):
-    rets = daily_returns(index)
+def risk_metrics(index, cagr, dd, yearly, dates=None):
+    rets = daily_returns(index, dates)
     vol = _std(rets) * TRADING_DAYS ** 0.5
     downside = [min(r, 0.0) for r in rets]
     down_dev = (sum(r * r for r in downside) / len(downside)) ** 0.5 * TRADING_DAYS ** 0.5 if downside else 0.0

@@ -245,3 +245,33 @@ def test_lisbon_fallback_matches_zoneinfo():
     while t < datetime(2028, 1, 1, tzinfo=timezone.utc):
         assert t.astimezone(fallback).replace(tzinfo=None) == t.astimezone(real).replace(tzinfo=None), t
         t += timedelta(minutes=30)
+
+
+def test_benchmarks_compared_in_euros():
+    # carteira = um fundo do S&P 500 em USD; índice e fundo parados em USD, dólar cai 20% face ao euro
+    fund = Instrument("SPYX", "Fundo S&P 500", currency="USD")
+    d0, d1 = date(2025, 1, 2), date(2025, 12, 31)
+    days = list(weekdays(d0, d1))
+    n = len(days) - 1
+    prices = {"SPYX": [(d, 100.0) for d in days], "^GSPC": [(d, 5000.0) for d in days]}
+    fx = {"USD": [(d, 1.0 + 0.25 * i / n) for i, d in enumerate(days)]}
+    txs = [Tx(d0, "DEPOSIT", amount=1000), Tx(d0, "BUY", fund, quantity=10, price=100, currency="USD")]
+    p = Portfolio(txs, PriceBook(prices, fx), benchmarks=[SPX], as_of=d1)
+    perf = p.performance("MAX")
+    assert perf["twr_total"] == pytest.approx(-0.2, abs=1e-3)
+    assert perf["benchmarks"][0]["total"] == pytest.approx(-0.2, abs=1e-3)  # o índice também, em euros
+    assert perf["merit"]["excess_cagr"] == pytest.approx(0.0, abs=1e-3)      # sem mérito nem demérito
+
+
+def test_volatility_ignores_weekend_points():
+    from portfolio_investimentos.engine.portfolio import annualized_vol
+    d0 = date(2025, 1, 6)  # segunda-feira
+    dates = [d0 + timedelta(days=i) for i in range(28)]
+    index, v = [], 1.0
+    for d in dates:  # +1% / −1% alternados nos dias úteis; fim de semana sem variação (só juros)
+        if d.weekday() < 5:
+            v *= 1.01 if len([x for x in dates if x <= d and x.weekday() < 5]) % 2 else 0.99
+        index.append(v)
+    weekdays_only = [x for d, x in zip(dates, index) if d.weekday() < 5]
+    assert annualized_vol(index, dates) == pytest.approx(annualized_vol(weekdays_only))
+    assert annualized_vol(index, dates) > annualized_vol(index)  # com os fins de semana ficava mais baixa

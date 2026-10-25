@@ -203,6 +203,8 @@ Tipos aceites: `BUY`, `SELL`, `DIVIDEND`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `INTER
 - **Custo FIFO** com comissões incluídas; as vendas consomem os lotes mais antigos. É também o método usado no IRS.
 - **Depósitos implícitos:** se uma compra não tiver dinheiro em caixa, o valor em falta conta como depósito. Assim, quem só importa compras e vendas continua a ter retornos corretos.
 - **TWR** encadeia os retornos diários, descontando os fluxos externos. **IRR** é a XIRR dos depósitos e levantamentos mais o valor final.
+- **Índices de referência** (S&P 500, Nasdaq 100, MSCI World) convertidos para euros ao câmbio de cada dia, como a carteira. Assim a variação do dólar não aparece como mérito ou demérito.
+- **Volatilidade, Sharpe e Sortino** calculados só com dias úteis (os juros lançados ao fim de semana não contam como dias de bolsa), anualizados com 252 dias.
 
 ## Estrutura
 
