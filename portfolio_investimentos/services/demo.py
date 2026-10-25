@@ -1,6 +1,6 @@
 """Dados de demonstração: empresas fictícias com preços sintéticos.
 
-    python -m portfolio_manager --demo
+    python -m portfolio_investimentos --demo
 
 Apaga as transações existentes e cria uma carteira de exemplo. Os preços dos índices de
 referência só são gerados se ainda não existirem cotações reais para eles.

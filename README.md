@@ -1,4 +1,4 @@
-# Portfolio Manager
+# Portfolio Investimentos
 
 Gestor de carteira de investimentos local: desempenho, dividendos, fiscalidade (PT) e importação de extratos da Trading 212, XTB e Trade Republic. **Corre no teu computador**, com alertas de preço e lista de observação.
 
@@ -23,10 +23,10 @@ Para experimentar sem os teus dados, clica em **Ver demonstração**. São carre
 
 ### Instalar como aplicação (PWA)
 
-No **Chrome** ou no **Edge**, com a aplicação aberta em `http://127.0.0.1:5000`, carrega no ícone de instalar na barra de endereço (ou **Menu → Instalar Portfolio Manager**). A aplicação passa a abrir na sua própria janela, com ícone no menu Iniciar, na barra de tarefas ou na Dock, e atalhos para Carteira, Desempenho e Importar.
+No **Chrome** ou no **Edge**, com a aplicação aberta em `http://127.0.0.1:5000`, carrega no ícone de instalar na barra de endereço (ou **Menu → Instalar Portfolio Investimentos**). A aplicação passa a abrir na sua própria janela, com ícone no menu Iniciar, na barra de tarefas ou na Dock, e atalhos para Carteira, Desempenho e Importar.
 
 - A janela instalada é uma porta para a aplicação local, por isso o servidor tem de estar a correr (`iniciar.bat`, `iniciar.command` ou `./iniciar.sh`). Se não estiver, a janela mostra como o iniciar e volta sozinha quando ele arrancar.
-- Para o servidor não abrir também um separador no browser, arranca com `python -m portfolio_manager --no-browser`.
+- Para o servidor não abrir também um separador no browser, arranca com `python -m portfolio_investimentos --no-browser`.
 - Usa sempre a mesma porta: a aplicação instalada fica associada a `127.0.0.1:5000`.
 - Só os ficheiros estáticos (Bootstrap, ícones) ficam em cache. Os teus dados financeiros nunca ficam guardados pelo browser.
 - Noutros dispositivos da rede (`--host 0.0.0.0`), o browser só permite instalar através de HTTPS.
@@ -46,7 +46,7 @@ bash iniciar-android.sh --atualizar   # descarrega a versão mais recente e arra
 O script abre a aplicação no browser do telemóvel. No Chrome, **menu ⋮ → Adicionar ao ecrã principal** para a abrires como uma aplicação. Enquanto está aberta, o Termux fica acordado (`termux-wake-lock`). Para terminar, carrega em Ctrl+C no Termux.
 
 - O `yfinance` não é instalado, porque precisa de pandas e numpy, que raramente compilam no Android. A aplicação funciona com as cotações já guardadas, mas sem o botão de atualizar.
-- Para ter cotações atuais, atualiza-as no computador, faz **Definições → Cópia de segurança** e copia o ficheiro para `~/.portfolio-manager/portfolio.db` no Termux.
+- Para ter cotações atuais, atualiza-as no computador, faz **Definições → Cópia de segurança** e copia o ficheiro para `~/.portfolio-investimentos/portfolio.db` no Termux.
 - Os dados do telemóvel e do computador são independentes. Se preferires uma só cópia, corre a aplicação no computador com `--host 0.0.0.0` e palavra-passe, e abre-a no telemóvel.
 
 ### Onde ficam os dados
@@ -54,7 +54,7 @@ O script abre a aplicação no browser do telemóvel. No Chrome, **menu ⋮ → 
 | Sistema | Pasta |
 | --- | --- |
 | Windows | `%APPDATA%\PortfolioInvestimentos\portfolio.db` (a pasta `PortfolioManager` das versões anteriores muda de nome sozinha) |
-| macOS / Linux | `~/.portfolio-manager/portfolio.db` |
+| macOS / Linux | `~/.portfolio-investimentos/portfolio.db` (a pasta `~/.portfolio-manager` das versões anteriores muda de nome sozinha) |
 
 Podes escolher outra pasta com a variável `PORTFOLIO_DATA_DIR` (por exemplo, uma pasta sincronizada com a cloud). Em **Definições** há botões para descarregar uma cópia de segurança (`.db`), exportar as transações em CSV e apagar todos os dados.
 
@@ -65,19 +65,19 @@ A aplicação só aceita ligações do próprio computador (`127.0.0.1`), e as a
 Em **Definições → Segurança** podes definir uma palavra-passe. A partir daí, a aplicação pede-a para entrar, e o botão **Sair** fica no fundo da barra lateral. A sessão dura 30 dias.
 
 - **Sem palavra-passe**, a aplicação só abre no computador onde corre. Qualquer acesso de outro dispositivo, ou através de um proxy, mostra uma página a pedir que definas a palavra-passe primeiro.
-- **Para abrir na rede local** (ex.: no telemóvel): define a palavra-passe e arranca com `python -m portfolio_manager --host 0.0.0.0`.
+- **Para abrir na rede local** (ex.: no telemóvel): define a palavra-passe e arranca com `python -m portfolio_investimentos --host 0.0.0.0`.
 - **Num servidor ou na cloud**: usa `wsgi.py` (ex.: `gunicorn wsgi:app`) e define a palavra-passe na variável de ambiente `PORTFOLIO_PASSWORD`. Se o site usar HTTPS, define também `PORTFOLIO_HTTPS=1`, para o cookie de sessão só seguir por ligações cifradas.
 - Ao mudar a palavra-passe, as sessões abertas noutros dispositivos terminam. Depois de 5 tentativas erradas, o login fica bloqueado durante 5 minutos.
 
 ### Opções da linha de comandos
 
 ```bash
-python -m portfolio_manager              # inicia e abre o browser
-python -m portfolio_manager --port 8080  # usa outra porta
-python -m portfolio_manager --host 0.0.0.0 # abre na rede local (exige palavra-passe)
-python -m portfolio_manager --no-browser # não abre o browser
-python -m portfolio_manager --demo       # carrega os dados de demonstração e sai
-python -m portfolio_manager --refresh    # atualiza as cotações e sai
+python -m portfolio_investimentos              # inicia e abre o browser
+python -m portfolio_investimentos --port 8080  # usa outra porta
+python -m portfolio_investimentos --host 0.0.0.0 # abre na rede local (exige palavra-passe)
+python -m portfolio_investimentos --no-browser # não abre o browser
+python -m portfolio_investimentos --demo       # carrega os dados de demonstração e sai
+python -m portfolio_investimentos --refresh    # atualiza as cotações e sai
 ```
 
 ## Capturas de ecrã
@@ -196,7 +196,7 @@ Tipos aceites: `BUY`, `SELL`, `DIVIDEND`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `INTER
 ## Estrutura
 
 ```
-portfolio_manager/
+portfolio_investimentos/
 ├── engine/        # motor de cálculo em Python puro (FIFO, TWR, IRR, risco, dividendos, fiscal)
 ├── services/      # ligação à base de dados, importação, mercado (yfinance), demonstração
 ├── templates/     # páginas Jinja + Bootstrap 5.3
@@ -215,7 +215,7 @@ iniciar.bat | iniciar.command | iniciar.sh
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt pytest
 python -m pytest tests
-python -m portfolio_manager
+python -m portfolio_investimentos
 ```
 
 ## Próximos passos

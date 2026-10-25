@@ -1,5 +1,5 @@
 @echo off
-REM Inicia o Portfolio Manager (Windows). Na primeira vez prepara o ambiente Python.
+REM Inicia o Portfolio Investimentos (Windows). Na primeira vez prepara o ambiente Python.
 cd /d "%~dp0"
 where py >nul 2>nul && (set PY=py -3) || (set PY=python)
 if not exist .venv (
@@ -8,5 +8,5 @@ if not exist .venv (
   .venv\Scripts\python -m pip install --upgrade pip
   .venv\Scripts\python -m pip install -r requirements.txt || .venv\Scripts\python -m pip install Flask Flask-SQLAlchemy waitress openpyxl
 )
-.venv\Scripts\python -m portfolio_manager %*
+.venv\Scripts\python -m portfolio_investimentos %*
 pause

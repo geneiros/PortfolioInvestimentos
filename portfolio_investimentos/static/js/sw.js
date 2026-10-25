@@ -1,9 +1,9 @@
-/* Service worker do Portfolio Manager (aplicação instalável).
+/* Service worker do Portfolio Investimentos (aplicação instalável).
  *
  * Só guarda em cache os ficheiros estáticos (Bootstrap, ícones, Chart.js) e a página "aplicação parada".
  * As páginas e a API vão sempre à aplicação local: os dados financeiros nunca ficam em cache.
  */
-const VERSION = "pm-v1";
+const VERSION = "pi-v2";
 const PRECACHE = [
   "/static/offline.html",
   "/static/vendor/bootstrap/bootstrap.min.css",

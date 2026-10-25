@@ -3,7 +3,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from portfolio_manager.engine.portfolio import (
+from portfolio_investimentos.engine.portfolio import (
     Instrument, Portfolio, PriceBook, Tx, drawdown, period_returns, streak, xirr,
 )
 

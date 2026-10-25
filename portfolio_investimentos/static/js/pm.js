@@ -1,4 +1,4 @@
-/* Portfolio Manager — utilitários comuns às páginas /portfolio */
+/* Portfolio Investimentos — utilitários comuns às páginas /portfolio */
 (function () {
   const pm = (window.pm = window.pm || {});
 

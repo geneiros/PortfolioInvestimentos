@@ -2,6 +2,6 @@
 
 Define PORTFOLIO_PASSWORD (ou uma palavra-passe em Definições) antes de abrir a aplicação na internet.
 """
-from portfolio_manager import create_app
+from portfolio_investimentos import create_app
 
 app = create_app()

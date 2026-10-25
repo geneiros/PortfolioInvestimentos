@@ -1,5 +1,5 @@
 [project]
-name = "portfolio-manager"
+name = "portfolio-investimentos"
 authors = [{ name = "Helder Meneses", email = "helder.meneses@gmail.com" }]
 description = "Gestor de carteira de investimentos que corre localmente: desempenho, dividendos, fiscalidade e alertas"
 requires-python = ">=3.10"
@@ -19,11 +19,11 @@ market = ["yfinance>=0.2"]
 test = ["pytest>=8.0"]
 
 [project.scripts]
-portfolio-manager = "portfolio_manager.__main__:main"
+portfolio-investimentos = "portfolio_investimentos.__main__:main"
 
 [build-system]
 requires = ["flit_core >=3.4,<4"]
 build-backend = "flit_core.buildapi"
 
 [tool.flit.module]
-name = "portfolio_manager"
+name = "portfolio_investimentos"

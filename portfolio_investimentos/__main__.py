@@ -1,4 +1,4 @@
-"""Arranque local: `python -m portfolio_manager` abre a aplicação no browser."""
+"""Arranque local: `python -m portfolio_investimentos` abre a aplicação no browser."""
 import argparse
 import threading
 import webbrowser
@@ -7,7 +7,7 @@ from . import create_app, data_dir
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="portfolio_manager", description="Gestor de carteira (local)")
+    parser = argparse.ArgumentParser(prog="portfolio_investimentos", description="Gestor de carteira (local)")
     parser.add_argument("--port", type=int, default=5000, help="porta (por omissão 5000)")
     parser.add_argument("--host", default="127.0.0.1",
                         help="endereço (por omissão 127.0.0.1; 0.0.0.0 abre-a na rede local e exige palavra-passe)")
@@ -28,7 +28,7 @@ def main():
         return
 
     url = f"http://127.0.0.1:{args.port}/"
-    print(f"Portfolio Manager a correr em {url}")
+    print(f"Portfolio Investimentos a correr em {url}")
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print(f"Aberta na rede em {args.host}:{args.port}. Os outros dispositivos só entram depois de definires "
               "uma palavra-passe (Definições → Segurança ou variável PORTFOLIO_PASSWORD).")

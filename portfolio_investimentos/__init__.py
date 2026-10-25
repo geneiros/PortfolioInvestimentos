@@ -1,4 +1,4 @@
-"""Portfolio Manager: gestor de carteira de investimentos que corre localmente."""
+"""Portfolio Investimentos: gestor de carteira de investimentos que corre localmente."""
 import mimetypes
 import os
 import secrets
@@ -32,7 +32,7 @@ def data_dir():
         appdata = Path(os.environ.get("APPDATA", Path.home()))
         path = _adopt_legacy(appdata / "PortfolioManager", appdata / "PortfolioInvestimentos")
     else:
-        path = Path.home() / ".portfolio-manager"
+        path = _adopt_legacy(Path.home() / ".portfolio-manager", Path.home() / ".portfolio-investimentos")
     path.mkdir(parents=True, exist_ok=True)
     return path
 

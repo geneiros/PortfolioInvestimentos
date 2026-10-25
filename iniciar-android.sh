@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Inicia o Portfolio Manager no Android, dentro do Termux (https://f-droid.org/packages/com.termux/).
+# Inicia o Portfolio Investimentos no Android, dentro do Termux (https://f-droid.org/packages/com.termux/).
 # Na primeira vez instala o Python e as dependências; depois abre a aplicação no browser do telemóvel.
 #
 #   bash iniciar-android.sh               arranca e abre o browser
@@ -8,7 +8,7 @@
 #
 # O yfinance (cotações) não é instalado: precisa de pandas/numpy, que no Android raramente compilam.
 # Sem ele a aplicação funciona com as cotações já guardadas; podes atualizá-las no computador e
-# copiar o ficheiro de dados (Definições → Cópia de segurança) para ~/.portfolio-manager/portfolio.db.
+# copiar o ficheiro de dados (Definições → Cópia de segurança) para ~/.portfolio-investimentos/portfolio.db.
 set -e
 cd "$(dirname "$0")"
 
@@ -51,7 +51,7 @@ if command -v termux-wake-lock >/dev/null 2>&1; then
 fi
 
 echo
-echo "Portfolio Manager a correr em $URL"
+echo "Portfolio Investimentos a correr em $URL"
 echo "No Chrome: menu ⋮ → Adicionar ao ecrã principal, para a abrires como uma aplicação."
 echo "Para terminar: Ctrl+C (no teclado do Termux: CTRL e depois C)."
 echo
@@ -67,4 +67,4 @@ echo
   done
 ) &
 
-"$VENV/bin/python" -m portfolio_manager --no-browser --port "$PORT" "$@"
+"$VENV/bin/python" -m portfolio_investimentos --no-browser --port "$PORT" "$@"

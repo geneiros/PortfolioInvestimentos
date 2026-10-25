@@ -5,8 +5,8 @@ from datetime import date
 
 import pytest
 
-from portfolio_manager import create_app
-from portfolio_manager.models import ImportBatch, Transaction, db
+from portfolio_investimentos import create_app
+from portfolio_investimentos.models import ImportBatch, Transaction, db
 
 PAGES = ["/", "/carteira", "/desempenho", "/desempenho?periodo=1A&bench=%5EGSPC", "/dividendos", "/fiscal",
          "/radar", "/noticias", "/importar", "/transacoes", "/transacoes?tipo=BUY", "/definicoes"]
@@ -114,8 +114,8 @@ Interest on cash,2026-01-13 02:00:00+00:00,,,,Interest on cash,I1,,,,,,,0.18,EUR
 
 
 def test_import_trading212_full_export(app, client):
-    from portfolio_manager.models import FxRate, Instrument, Price
-    from portfolio_manager.services import data
+    from portfolio_investimentos.models import FxRate, Instrument, Price
+    from portfolio_investimentos.services import data
 
     token = csrf(client)
     resp = client.post("/api/upload_statement", headers={"X-CSRF-Token": token},
@@ -192,8 +192,8 @@ def _xtb_workbook():
 
 
 def test_import_xtb_xlsx(app, client):
-    from portfolio_manager.models import Instrument, Price
-    from portfolio_manager.services import data
+    from portfolio_investimentos.models import Instrument, Price
+    from portfolio_investimentos.services import data
 
     token = csrf(client)
     resp = client.post("/api/upload_statement", headers={"X-CSRF-Token": token},
@@ -235,8 +235,8 @@ def _upload(client, token, key, name, content):
 
 @pytest.mark.parametrize("trade_republic_first", [True, False])
 def test_trade_republic_and_isin_unification(app, client, trade_republic_first):
-    from portfolio_manager.models import Instrument
-    from portfolio_manager.services import data
+    from portfolio_investimentos.models import Instrument
+    from portfolio_investimentos.services import data
 
     t212 = ("Action,Time (UTC),ISIN,Ticker,Name,ID,No. of shares,Price / share,Currency (Price / share),"
             "Exchange rate,Total,Currency (Total)\n"
@@ -298,8 +298,8 @@ class _FakeYf:
 
 def test_refresh_picks_symbol_in_instrument_currency(app, client, monkeypatch):
     import sys
-    from portfolio_manager.models import Instrument, Price
-    from portfolio_manager.services import market
+    from portfolio_investimentos.models import Instrument, Price
+    from portfolio_investimentos.services import market
     monkeypatch.setitem(sys.modules, "yfinance", _FakeYf)
     with app.app_context():
         db.session.add_all([
@@ -331,8 +331,8 @@ def test_refresh_picks_symbol_in_instrument_currency(app, client, monkeypatch):
 
 def test_refresh_state(app):
     from datetime import datetime, timedelta
-    from portfolio_manager.models import Setting
-    from portfolio_manager.services.market import refresh_state
+    from portfolio_investimentos.models import Setting
+    from portfolio_investimentos.services.market import refresh_state
     with app.app_context():
         Setting.set("refresh_status", "running:" + datetime.now().isoformat())
         assert refresh_state()[0] is True
@@ -389,8 +389,8 @@ def test_password_login_flow(app, client):
 
 
 def test_login_rate_limited(app):
-    from portfolio_manager import auth
-    from portfolio_manager.models import Setting
+    from portfolio_investimentos import auth
+    from portfolio_investimentos.models import Setting
     with app.app_context():
         Setting.set("password_hash", __import__("werkzeug.security").security.generate_password_hash("segredo123"))
     c = app.test_client()
@@ -414,7 +414,7 @@ def test_env_password(app, monkeypatch):
 
 
 def test_closes_undo_split_adjustment():
-    from portfolio_manager.services.market import _closes
+    from portfolio_investimentos.services.market import _closes
     # reagrupamento 1:15 a 07/07/2025: o Yahoo mostra os preços antigos multiplicados por 15
     hist = _Hist([(date(2025, 7, 3), 9.33), (date(2025, 7, 4), float("nan")), (date(2025, 7, 7), 9.40)])
     hist.rows[2][1]["Stock Splits"] = 1 / 15
@@ -436,10 +436,10 @@ def test_pwa_files(app, client):
     for icon in m.get_json()["icons"]:
         assert client.get(icon["src"]).status_code == 200
     # com palavra-passe, o browser continua a conseguir instalar (manifesto e service worker abertos)
-    from portfolio_manager import auth
+    from portfolio_investimentos import auth
     with app.app_context():
         auth.clear_password()
-        from portfolio_manager.models import Setting
+        from portfolio_investimentos.models import Setting
         Setting.set("password_hash", "x")
     other = app.test_client()
     assert other.get("/sw.js", environ_base=REMOTE).status_code == 200
@@ -448,8 +448,8 @@ def test_pwa_files(app, client):
 
 
 def test_portfolio_cache_invalidated_on_changes(app, client):
-    from portfolio_manager.models import Price
-    from portfolio_manager.services import data
+    from portfolio_investimentos.models import Price
+    from portfolio_investimentos.services import data
     token = csrf(client)
     post(client, "add_transaction", token, date="2024-01-02", type="DEPOSIT", amount="1000", currency="EUR")
     post(client, "add_transaction", token, date="2024-01-03", type="BUY", instrument="ACME", quantity="10", price="50",
@@ -471,7 +471,7 @@ def test_portfolio_cache_invalidated_on_changes(app, client):
 
 
 def test_legacy_data_dir_is_renamed(tmp_path):
-    from portfolio_manager import _adopt_legacy
+    from portfolio_investimentos import _adopt_legacy
     old, new = tmp_path / "PortfolioManager", tmp_path / "PortfolioInvestimentos"
     old.mkdir()
     (old / "portfolio.db").write_text("dados")

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Inicia o Portfolio Manager (macOS / Linux). Na primeira vez prepara o ambiente Python.
+# Inicia o Portfolio Investimentos (macOS / Linux). Na primeira vez prepara o ambiente Python.
 set -e
 cd "$(dirname "$0")"
 PY=${PYTHON:-python3}
@@ -13,4 +13,4 @@ if [ ! -d .venv ]; then
   .venv/bin/python -m pip install --upgrade pip >/dev/null
   .venv/bin/python -m pip install -r requirements.txt || .venv/bin/python -m pip install Flask Flask-SQLAlchemy waitress openpyxl
 fi
-exec .venv/bin/python -m portfolio_manager "$@"
+exec .venv/bin/python -m portfolio_investimentos "$@"
