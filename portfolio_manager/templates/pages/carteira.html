@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help, logo, signed, empty %}
+{% if not has_data %}
+  {{ empty("Ainda não tens posições", "Importa o extrato da tua corretora para veres a tua carteira.", "/importar", "Importar extrato") }}
+{% else %}
+{% set dc = day_change %}
+
+<ul class="nav nav-pills gap-2 mb-3" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-open">Abertas <span class="badge text-bg-light ms-1">{{ positions|length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-closed">Fechadas <span class="badge text-bg-secondary ms-1">{{ closed|length }}</span></button></li>
+</ul>
+
+<div class="tab-content">
+<div class="tab-pane fade show active" id="tab-open">
+  <div class="pm-card mb-3">
+    <div class="row align-items-center g-3">
+      <div class="col-lg-3">
+        <div class="pm-label">Carteira vs mercado {{ help("Variação de hoje da carteira comparada com os índices de referência.") }}</div>
+        <div class="small text-secondary">{{ p.as_of|ddmm }}</div>
+      </div>
+      <div class="col-lg-9">
+        {% set rows = [("Carteira", dc[1], "var(--pm-up)" if dc[1] >= 0 else "var(--pm-down)")] + market_bars %}
+        {% set scale = [rows|map(attribute=1)|reject("none")|map("abs")|max, 0.001]|max %}
+        {% for name, v, color in rows %}
+        <div class="d-flex align-items-center gap-3 small {{ 'fw-bold' if loop.first }}">
+          <span style="width: 90px" class="text-end">{{ name }}</span>
+          <div class="flex-grow-1 position-relative" style="height: 6px; background: var(--pm-surface-2); border-radius: 3px">
+            {% if v is not none %}
+            {% set w = (v|abs) / scale * 50 %}
+            <div style="position:absolute; top:0; bottom:0; border-radius:3px; background: {{ color }}; {{ 'left:50%' if v >= 0 else 'right:50%' }}; width: {{ w }}%"></div>
+            {% endif %}
+          </div>
+          <span class="{{ v|tone }}" style="width: 60px">{{ v|pct(2) }}</span>
+          {% if not loop.first and v is not none %}
+            {% set diff = dc[1] - v %}
+            <span class="badge {{ 'text-bg-success' if diff >= 0 else 'text-bg-danger' }}" style="width: 64px">{{ '▲' if diff >= 0 else '▼' }} {{ (diff|abs)|pct(2, sign=False) }}</span>
+          {% else %}<span style="width: 64px"></span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+    <button class="pm-chip filter active" data-sector="">Todos</button>
+    {% for s in sectors %}<button class="pm-chip filter" data-sector="{{ s }}">{{ s }}</button>{% endfor %}
+    <input id="posSearch" class="form-control form-control-sm ms-auto" style="max-width: 200px" placeholder="Pesquisar…">
+  </div>
+
+  <div class="pm-table-wrap mb-4">
+    <table class="table pm-table" id="posTable">
+      <thead><tr>
+        <th data-sort="text">Ticker</th><th>30D</th>
+        <th data-sort="num" class="text-end">Preço</th>
+        <th data-sort="num" class="text-end">1D · {{ p.as_of|ddmm }}</th>
+        <th data-sort="num" class="text-end">P. médio {{ help("Preço médio de compra (FIFO, com comissões) na moeda do ativo.") }}</th>
+        <th data-sort="num" class="text-end">Invest.</th>
+        <th data-sort="num" class="text-end">Valor</th>
+        <th data-sort="num" class="text-end">Não realiz.</th>
+        <th data-sort="num" class="text-end">Div. {{ help("Dividendos líquidos recebidos desta posição.") }}</th>
+        <th data-sort="num" class="text-end">FX {{ help("Parte do resultado devida à variação cambial.") }}</th>
+        <th data-sort="num" class="text-end">Comiss.</th>
+        <th data-sort="num" class="text-end">ROI {{ help("Não realizado + realizado + dividendos, face ao investido.") }}</th>
+        <th data-sort="num" class="text-end">Peso</th>
+      </tr></thead>
+      <tbody>
+      {% for x in positions %}{% set a = x.asset %}
+        <tr data-sector="{{ a.sector or '' }}" data-search="{{ (a.ticker ~ ' ' ~ a.name)|lower }}">
+          <td data-v="{{ a.ticker }}"><div class="d-flex align-items-center gap-2">{{ logo(a) }}
+            <div><b>{{ a.ticker }}</b> {% if a.kind == 'etf' %}<span class="pm-tag">ETF</span>{% endif %}
+            <div class="sub">{{ x.qty|number(3 if x.qty % 1 else 0) }} unidades · {{ a.name|truncate(22, True, '…') }}</div></div></div></td>
+          <td><canvas class="pm-spark" width="100" height="32" data-spark='{{ sparks[a.ticker] }}'></canvas></td>
+          <td class="text-end" data-v="{{ x.price or 0 }}">{{ x.price|money(2, currency=a.currency) }}
+            <div class="sub {{ (x.price - x.prev_close if x.price and x.prev_close else 0)|tone }}">{{ ((x.price - x.prev_close) if x.price and x.prev_close else none)|money(2, currency=a.currency, sign=True) }}</div></td>
+          <td class="text-end" data-v="{{ x.day_change_pct }}"><span class="{{ x.day_change_pct|tone }}">{{ x.day_change_pct|pct(2) }}</span>
+            <div class="sub {{ x.day_change_eur|tone }} money">{{ x.day_change_eur|money(2, sign=True) }}</div></td>
+          <td class="text-end" data-v="{{ x.avg_price }}">{{ x.avg_price|money(2, currency=a.currency) }}</td>
+          <td class="text-end money" data-v="{{ x.invested_eur }}">{{ x.invested_eur|money(2) }}</td>
+          <td class="text-end money" data-v="{{ x.value_eur }}">{{ x.value_eur|money(2) }}</td>
+          <td class="text-end" data-v="{{ x.unrealized_eur }}"><span class="{{ x.unrealized_eur|tone }} money">{{ x.unrealized_eur|money(2, sign=True) }}</span>
+            <div class="sub {{ x.unrealized_pct|tone }}">{{ x.unrealized_pct|pct(2) }}</div></td>
+          <td class="text-end" data-v="{{ x.dividends_eur }}">{% if x.dividends_eur %}<span class="text-up money">{{ x.dividends_eur|money(2, sign=True) }}</span>{% else %}—{% endif %}</td>
+          <td class="text-end" data-v="{{ x.fx_effect_eur }}">{% if a.currency != 'EUR' %}<span class="{{ x.fx_effect_eur|tone }} money">{{ x.fx_effect_eur|money(2, sign=True) }}</span>{% else %}—{% endif %}</td>
+          <td class="text-end" data-v="{{ x.fees_eur }}">{% if x.fees_eur %}<span class="text-down money">{{ (-x.fees_eur)|money(2) }}</span>{% else %}—{% endif %}</td>
+          <td class="text-end" data-v="{{ x.roi_pct }}"><span class="{{ x.roi_pct|tone }}">{{ x.roi_pct|pct(2) }}</span>
+            <div class="sub {{ x.roi_eur|tone }} money">{{ x.roi_eur|money(2, sign=True) }}</div></td>
+          <td class="text-end" data-v="{{ x.value_eur / p.holdings_value if p.holdings_value else 0 }}">{{ (x.value_eur / p.holdings_value if p.holdings_value else 0)|pct(1, sign=False) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr>
+        <td>Total</td><td></td><td></td>
+        <td class="text-end"><span class="{{ dc[1]|tone }}">{{ dc[1]|pct(2) }}</span><div class="sub {{ dc[0]|tone }} money">{{ dc[0]|money(2, sign=True) }}</div></td>
+        <td></td>
+        <td class="text-end money">{{ total.invested|money(2) }}</td>
+        <td class="text-end money">{{ total.value|money(2) }}</td>
+        <td class="text-end"><span class="{{ total.unrealized|tone }} money">{{ total.unrealized|money(2, sign=True) }}</span>
+          <div class="sub {{ total.unrealized|tone }}">{{ (total.unrealized / total.invested if total.invested else 0)|pct(2) }}</div></td>
+        <td class="text-end text-up money">{{ total.dividends|money(2, sign=True) }}</td>
+        <td class="text-end {{ total.fx|tone }} money">{{ total.fx|money(2, sign=True) }}</td>
+        <td class="text-end text-down money">{{ (-total.fees)|money(2) }}</td>
+        <td class="text-end"><span class="{{ total.roi|tone }}">{{ (total.roi / total.invested if total.invested else 0)|pct(2) }}</span>
+          <div class="sub {{ total.roi|tone }} money">{{ total.roi|money(2, sign=True) }}</div></td>
+        <td class="text-end">100%</td>
+      </tr></tfoot>
+    </table>
+  </div>
+
+  <div class="row g-3">
+    {% for key, label in [("asset", "Por ativo"), ("sector", "Por setor"), ("currency", "Por moeda")] %}
+    <div class="col-lg-4"><div class="pm-card">
+      <div class="pm-label mb-3">Alocação · {{ label }}</div>
+      <div style="height: 240px"><canvas id="alloc-{{ key }}"></canvas></div>
+    </div></div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="tab-pane fade" id="tab-closed">
+  {% if closed %}
+  <div class="pm-table-wrap">
+    <table class="table pm-table">
+      <thead><tr>
+        <th data-sort="text">Ticker</th><th data-sort="text">Período</th>
+        <th data-sort="num" class="text-end">Investido</th>
+        <th data-sort="num" class="text-end">Realizado</th>
+        <th data-sort="num" class="text-end">Dividendos</th>
+        <th data-sort="num" class="text-end">Comissões</th>
+        <th data-sort="num" class="text-end">ROI</th>
+      </tr></thead>
+      <tbody>
+      {% for x in closed %}
+        <tr>
+          <td data-v="{{ x.asset.ticker }}"><div class="d-flex align-items-center gap-2">{{ logo(x.asset) }}<div><b>{{ x.asset.ticker }}</b><div class="sub">{{ x.asset.name }}</div></div></div></td>
+          <td data-v="{{ x.last_date }}">{{ x.first_date|ddmmyyyy }} → {{ x.last_date|ddmmyyyy }}</td>
+          <td class="text-end money" data-v="{{ x.bought_eur }}">{{ x.bought_eur|money(2) }}</td>
+          <td class="text-end {{ x.realized_eur|tone }} money" data-v="{{ x.realized_eur }}">{{ x.realized_eur|money(2, sign=True) }}</td>
+          <td class="text-end money" data-v="{{ x.dividends_eur }}">{{ x.dividends_eur|money(2, sign=True) if x.dividends_eur else '—' }}</td>
+          <td class="text-end text-down money" data-v="{{ x.fees_eur }}">{{ (-x.fees_eur)|money(2) }}</td>
+          <td class="text-end {{ x.roi_pct|tone }}" data-v="{{ x.roi_pct }}">{{ x.roi_pct|pct(2) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    {{ empty("Sem posições fechadas", "Quando venderes uma posição na totalidade, ela aparece aqui com o resultado final.") }}
+  {% endif %}
+</div>
+</div>
+{% endif %}
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+{% if has_data %}
+<script>
+(function () {
+  const alloc = {{ alloc|safe }};
+  const palette = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#06b6d4", "#ef4444", "#84cc16", "#ec4899", "#94a3b8", "#14b8a6"];
+  function apply() {
+    const sector = document.querySelector(".pm-chip.filter.active").dataset.sector;
+    const q = document.getElementById("posSearch").value.trim().toLowerCase();
+    document.querySelectorAll("#posTable tbody tr").forEach((tr) => {
+      tr.classList.toggle("d-none", (sector && tr.dataset.sector !== sector) || (q && !tr.dataset.search.includes(q)));
+    });
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".pm-chip.filter").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll(".pm-chip.filter").forEach((x) => x.classList.toggle("active", x === b)); apply();
+    }));
+    document.getElementById("posSearch").addEventListener("input", apply);
+    Object.entries(alloc).forEach(([key, rows]) => {
+      pm.chart("alloc-" + key, {
+        type: "doughnut",
+        data: { labels: rows.map((r) => r[0]), datasets: [{ data: rows.map((r) => r[1]), backgroundColor: palette, borderWidth: 0 }] },
+        options: { maintainAspectRatio: false, cutout: "65%", plugins: { legend: { position: "right" },
+          tooltip: { callbacks: { label: (it) => {
+            const total = it.dataset.data.reduce((a, b) => a + b, 0);
+            return `${it.label}: ${pm.money(it.parsed)} (${pm.pct(it.parsed / total, 1, false)})`;
+          } } } } },
+      });
+    });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

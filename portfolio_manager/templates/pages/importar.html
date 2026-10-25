@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+<div class="mx-auto" style="max-width: 940px">
+  <h4 class="fw-bold">Importar extrato</h4>
+  <p class="text-secondary">Seleciona a tua corretora e carrega o extrato de conta. As transações são extraídas automaticamente e só é importado o que é novo: podes carregar várias vezes sem duplicar.</p>
+
+  {% if summary %}
+  <div class="pm-card pm-card-sm mb-4" style="height:auto">
+    <div class="d-flex align-items-center mb-2"><span class="pm-label">Já importaste</span>
+      <span class="small text-secondary ms-2">{{ batches|length }} extrato{{ 's' if batches|length != 1 }} em {{ summary|length }} corretora{{ 's' if summary|length != 1 }}</span>
+      <a class="ms-auto small fw-bold" href="#gerir" data-bs-toggle="collapse">Gerir extratos →</a></div>
+    <div class="row g-3">
+      {% for s in summary %}
+      <div class="col-md-4"><b>{{ s.first|ddmmyyyy }} → {{ s.last|ddmmyyyy }}</b>
+        <div class="small"><b>{{ s.broker }}</b> · <span class="text-secondary">{{ s.count }} extrato{{ 's' if s.count != 1 }}</span></div></div>
+      {% endfor %}
+    </div>
+    <div class="collapse mt-3" id="gerir">
+      <table class="table pm-table small">
+        <thead><tr><th>Ficheiro</th><th>Corretora</th><th>Período</th><th class="text-end">Novas</th><th class="text-end">Duplicadas</th><th></th></tr></thead>
+        <tbody>{% for b in batches %}
+          <tr><td>{{ b.filename }}</td><td>{{ broker_names.get(b.broker, '') }}</td><td>{{ b.first_date|ddmmyyyy }} → {{ b.last_date|ddmmyyyy }}</td>
+            <td class="text-end">{{ b.imported }}</td><td class="text-end">{{ b.skipped }}</td>
+            <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-pm-action="delete_import" data-args='{"name": "{{ b.name }}"}'
+              data-confirm="Apagar este extrato e as {{ b.imported }} transações que ele importou?"><i class="bi bi-trash"></i></button></td></tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="pm-label mb-2">Corretoras suportadas</div>
+  <div class="row g-2 mb-2" id="brokerTiles">
+    {% for b in supported %}
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="pm-broker-tile {{ 'active' if loop.index == 2 }} {{ 'disabled' if not b.parser }}" data-key="{{ b.key }}" data-name="{{ b.name }}"
+           {% if not b.parser %}title="Em breve"{% endif %}>
+        <span class="pm-badge-broker" style="background: {{ b.color }}; width: 32px; height: 32px; flex-basis: 32px; color: {{ '#0f172a' if b.color in ('#f8fafc', '#e2e8f0') else '#fff' }}">{{ b.name[:1] }}</span>
+        <div><b class="small">{{ b.name }}</b><div class="small text-secondary">{{ b.format if b.parser else 'Em breve' }}</div></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="small">Tens conta noutra corretora? <a href="{{ feedback_url }}" target="_blank" rel="noopener">Envia-nos o extrato dela →</a></p>
+
+  <div class="row g-2 mb-2">
+    <div class="col-md-6"><label class="form-label small text-secondary">Nome da conta/corretora (opcional)</label>
+      <input id="brokerName" class="form-control" placeholder="Ex.: Trading 212 — conta ISA"></div>
+  </div>
+  <label class="pm-drop d-block mb-4" id="drop">
+    <input type="file" id="fileInput" accept=".csv,.xlsx,text/csv" multiple hidden>
+    <i class="bi bi-upload fs-2"></i>
+    <div class="fw-bold mt-2">Arrasta os ficheiros aqui (CSV ou XLSX)</div>
+    <div class="small text-secondary">vários ficheiros de uma vez · até 20 MB cada · o sistema junta e deduplica</div>
+    <div id="uploadResult" class="small mt-3"></div>
+  </label>
+
+  {% for key, steps in instructions.items() %}
+  <div class="pm-card instructions {{ 'd-none' if key != 'trading212' }}" data-key="{{ key }}" style="height:auto">
+    <div class="pm-label mb-3">Como exportar {{ {'trading212': 'da Trading 212', 'xtb': 'da XTB', 'traderepublic': 'da Trade Republic'}.get(key, 'um CSV genérico') }}</div>
+    {% for step in steps %}
+    <div class="d-flex gap-3 align-items-start mb-3"><span class="pm-step">{{ loop.index }}</span><div>{{ step|safe }}</div></div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <p class="small text-secondary mt-3">Preferes registar à mão? <a href="/transacoes">Adiciona transações manualmente</a>.</p>
+</div>
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  let key = "trading212";
+  document.querySelectorAll(".pm-broker-tile:not(.disabled)").forEach((t) => t.addEventListener("click", () => {
+    document.querySelectorAll(".pm-broker-tile").forEach((x) => x.classList.toggle("active", x === t));
+    key = t.dataset.key;
+    document.querySelectorAll(".instructions").forEach((i) => i.classList.toggle("d-none", i.dataset.key !== key));
+  }));
+  const drop = document.getElementById("drop"), input = document.getElementById("fileInput"), out = document.getElementById("uploadResult");
+  async function upload(files) {
+    if (!files.length) return;
+    const fd = new FormData();
+    [...files].forEach((f) => fd.append("file", f, f.name));
+    fd.append("broker_key", key);
+    fd.append("broker_name", document.getElementById("brokerName").value);
+    out.textContent = "A importar…";
+    try {
+      const res = await pm.call("upload_statement", fd);
+      out.innerHTML = "";
+      res.forEach((r) => {
+        const line = document.createElement("div");
+        const ign = Object.entries(r.ignored || {}).map(([k, v]) => `${v}× ${k}`).join(", ");
+        line.textContent = `${r.file}: ${r.imported} novas transações, ${r.skipped} duplicadas ignoradas` +
+          (ign ? ` · linhas sem efeito na carteira: ${ign}` : "");
+        out.appendChild(line);
+      });
+      pm.toast("Extrato importado.");
+      setTimeout(() => location.reload(), 1500);
+    } catch (e) { out.textContent = e.message; }
+  }
+  input.addEventListener("change", () => upload(input.files));
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => upload(e.dataTransfer.files));
+});
+</script>
+{% endblock %}

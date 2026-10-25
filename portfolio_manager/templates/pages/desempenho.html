@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help, empty, heat_color %}
+{% if not perf %}
+  {{ empty("Sem dados de desempenho", "Importa as tuas transações para veres a evolução da carteira.", "/importar", "Importar extrato") }}
+{% else %}
+{% set m = perf.merit %}{% set r = perf.risk %}{% set b = bench %}
+
+<div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+  <div class="pm-section-title m-0">1 · Que retorno tiveste?</div>
+  <div class="pm-card pm-card-sm ms-auto d-flex align-items-center gap-2 flex-wrap" style="height:auto">
+    <span class="small text-secondary">Comparar com:</span>
+    {% for x in p.benchmarks %}
+      <a class="pm-chip {{ 'active' if x.ticker == bench_ticker }}" style="--chip: {{ x.color }}" href="?periodo={{ period }}&bench={{ x.ticker|urlencode }}"><span class="sw" style="background: {{ x.color }}"></span>{{ x.name }}</a>
+    {% endfor %}
+    <div class="text-end ms-2"><div class="pm-label">Período</div><b class="small">{{ perf.start|month_label }} – hoje</b></div>
+    <div class="dropdown">
+      <button class="btn btn-pm dropdown-toggle fw-bold" data-bs-toggle="dropdown">{{ period_label }}</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        {% for k, label in periods %}<li><a class="dropdown-item {{ 'active' if k == period }}" href="?periodo={{ k }}&bench={{ bench_ticker|urlencode }}">{{ label }}</a></li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-5"><div class="pm-card accent-top">
+    <div class="pm-label mb-3" style="color:var(--pm-text)">O teu dinheiro</div>
+    <div class="row">
+      <div class="col-sm-6">
+        <div class="pm-label">No total <span class="badge text-bg-secondary">Retorno</span> {{ help("Ganho em euros face ao máximo de capital líquido (depósitos menos levantamentos) que esteve investido no período.") }}</div>
+        <div class="pm-hero-value {{ perf.return_pct|tone }}" style="font-size: 3.2rem">{{ perf.return_pct|pct(2) }}</div>
+        <div class="text-secondary money">{{ perf.return_eur|money(sign=True) }}</div>
+      </div>
+      <div class="col-sm-6 border-start" style="border-color: var(--pm-border)!important">
+        <div class="pm-label">Por ano <span class="badge text-bg-secondary">IRR</span> {{ help("Taxa interna de rentabilidade anual (XIRR): a tua rentabilidade pessoal, ponderada pelo dinheiro.") }}</div>
+        <div class="pm-big {{ perf.irr|tone }} mt-2">{{ perf.irr|pct(2) }}</div>
+        <div class="text-secondary">retorno pessoal</div>
+      </div>
+    </div>
+  </div></div>
+  <div class="col-xl-7"><div class="pm-card accent-top">
+    <div class="pm-label mb-3" style="color:var(--pm-text)">O desempenho</div>
+    <div class="row">
+      <div class="col-sm-6">
+        <div class="pm-label">No total <span class="badge text-bg-secondary">TWR</span> {{ help("Retorno ponderado no tempo: mede as tuas escolhas de investimento, ignorando quando depositaste.") }}</div>
+        <div class="d-flex align-items-baseline gap-2 flex-wrap mt-2"><span class="pm-big {{ perf.twr_total|tone }}">{{ perf.twr_total|pct(2) }}</span>
+          {% if b %}<small><span class="pm-chip active py-0" style="--chip: {{ b.color }}">{{ b.name }} <b class="{{ b.total|tone }}">{{ b.total|pct(2) }}</b></span></small>{% endif %}</div>
+        <div class="text-secondary">tempo-ponderado</div>
+      </div>
+      <div class="col-sm-6 border-start" style="border-color: var(--pm-border)!important">
+        <div class="pm-label">Por ano <span class="badge text-bg-secondary">CAGR</span> {{ help("Taxa de crescimento anual composta do TWR.") }}</div>
+        <div class="d-flex align-items-baseline gap-2 flex-wrap mt-2"><span class="pm-big {{ perf.cagr|tone }}">{{ perf.cagr|pct(2) }}</span>
+          {% if b %}<small><span class="pm-chip active py-0" style="--chip: {{ b.color }}">{{ b.name }} <b class="{{ b.cagr|tone }}">{{ b.cagr|pct(2) }}</b></span></small>{% endif %}</div>
+        <div class="text-secondary">composto anual</div>
+      </div>
+    </div>
+  </div></div>
+
+  {% set cards = [
+    ("Melhor ano", perf.best_year[1] if perf.best_year else none, perf.best_year[0] if perf.best_year else ""),
+    ("Pior ano", perf.worst_year[1] if perf.worst_year else none, perf.worst_year[0] if perf.worst_year else ""),
+    ("Melhor mês", perf.best_month[1] if perf.best_month else none, perf.best_month[0] if perf.best_month else ""),
+    ("Pior mês", perf.worst_month[1] if perf.worst_month else none, perf.worst_month[0] if perf.worst_month else ""),
+  ] %}
+  {% for label, v, when in cards %}
+  <div class="col-6 col-xl"><div class="pm-card pm-card-sm">
+    <div class="pm-label">{{ label }}</div><div class="pm-mid {{ v|tone }}">{{ v|pct(2) }}</div>
+    <div class="small text-secondary">{% if '-' in when %}{{ MONTHS[when[5:]|int - 1] }} {{ when[:4] }}{% else %}{{ when }}{% endif %}</div>
+  </div></div>
+  {% endfor %}
+  <div class="col-6 col-xl"><div class="pm-card pm-card-sm">
+    <div class="pm-label">Sequência atual {{ help("Meses consecutivos a subir ou a descer.") }}</div>
+    <div class="pm-mid {{ 'text-up' if perf.streak[1] == 'up' else 'text-down' }}">{{ perf.streak[0] }} {{ 'mês' if perf.streak[0] == 1 else 'meses' }}</div>
+    <div class="small text-secondary">{{ 'a subir ↑' if perf.streak[1] == 'up' else 'a descer ↓' }}</div>
+  </div></div>
+</div>
+
+<div class="pm-section-title">2 · Como foi a jornada?</div>
+<div class="row g-3">
+  <div class="col-xl-6"><div class="pm-card"><div class="pm-label mb-3">TWR anual</div><div style="height: 280px"><canvas id="yearChart"></canvas></div></div></div>
+  <div class="col-xl-6"><div class="pm-card"><div class="pm-label mb-3">TWR acumulado</div><div style="height: 280px"><canvas id="cumChart"></canvas></div></div></div>
+  <div class="col-12"><div class="pm-card"><div class="pm-label mb-3">Drawdown histórico {{ help("Distância ao máximo anterior, em cada dia.") }}</div><div style="height: 260px"><canvas id="ddChart"></canvas></div></div></div>
+</div>
+
+<div class="pm-section-title">3 · Quando ganhaste e perdeste?</div>
+<div class="pm-card">
+  <div class="pm-label mb-2">Retornos mensais</div>
+  <p class="small">Cada célula é um mês. <b class="text-up">Verde</b> = mês positivo · <b class="text-down">Vermelho</b> = mês negativo.</p>
+  <div class="overflow-auto"><div class="pm-heat" style="grid-template-columns: 48px repeat(12, minmax(48px, 1fr)); min-width: 680px">
+    <div></div>{% for mo in MONTHS %}<div class="head">{{ mo }}</div>{% endfor %}
+    {% for year, months in heat.items() %}
+      <div class="year">{{ year }}</div>
+      {% for i in range(1, 13) %}{% set v = months.get(i) %}
+        <div class="cell" style="background: {{ heat_color(v) }}" title="{{ MONTHS[i-1] }} {{ year }}: {{ v|pct(2) }}">{% if v is not none %}{{ '0' if (v * 100)|round|int == 0 else '%+d'|format((v * 100)|round|int) }}{% endif %}</div>
+      {% endfor %}
+    {% endfor %}
+  </div></div>
+</div>
+
+{% if m %}
+<div class="pm-section-title">4 · É sorte ou mérito?</div>
+<div class="pm-card">
+  <div class="pm-label mb-3">Mérito vs mercado <span class="text-secondary">· referência {{ merit_name }}</span></div>
+  <div class="row g-3">
+    {% for label, v, hint, good in [
+      ("Captura em alta", m.up_capture, "Quanto da subida do mercado capturaste nos meses em que ele subiu.", (m.up_capture or 0) >= 1),
+      ("Captura em baixa", m.down_capture, "Quanto da descida do mercado sofreste nos meses em que ele caiu (menos é melhor).", (m.down_capture or 0) <= 1)] %}
+    <div class="col-lg-4"><div class="pm-card pm-card-sm" style="background: var(--pm-surface-2)">
+      <div class="pm-label">{{ label }} {{ help(hint) }}</div>
+      <div class="pm-mid {{ 'text-up' if good else 'text-down' }}">{{ v|pct(0, sign=False) }}</div>
+      <div class="pm-progress mt-2"><div style="width: {{ [[(v or 0) * 50, 0]|max, 100]|min }}%; background: {{ 'var(--pm-up)' if good else 'var(--pm-down)' }}"></div></div>
+      <div class="d-flex justify-content-between small text-secondary mt-1"><span>0%</span><span>100% · mercado</span><span>200%</span></div>
+    </div></div>
+    {% endfor %}
+    <div class="col-lg-4"><div class="pm-card pm-card-sm" style="background: var(--pm-surface-2)">
+      <div class="pm-label">Beta vs {{ merit_name }} {{ help("Sensibilidade aos movimentos do mercado. 1 = acompanha o mercado.") }}</div>
+      <div class="pm-mid text-up">{{ m.beta|number(2) }}×</div>
+      <div class="small">{% if m.beta is none %}—{% elif m.beta < 0.8 %}menos volátil que o mercado{% elif m.beta <= 1.2 %}volatilidade parecida com a do mercado{% else %}mais volátil que o mercado{% endif %}</div>
+    </div></div>
+  </div>
+  <div class="pm-card pm-card-sm mt-3 {{ 'accent-top' if m.beat_months * 2 >= m.months else 'accent-red' }}" style="height:auto">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <span class="pm-big {{ 'text-up' if m.beat_months * 2 >= m.months else 'text-down' }}" id="beatPct">{{ (m.beat_months / m.months if m.months else 0)|pct(0, sign=False) }}</span>
+      <span id="beatText">dos meses superaste o mercado ({{ m.beat_months }} de {{ m.months }} meses)</span>
+      <div class="pm-seg ms-auto" id="beatSeg"><button class="active" data-g="m">Mensal</button><button data-g="y">Anual</button></div>
+    </div>
+  </div>
+  <p class="small mt-3 mb-1">Cada barra = retorno da carteira − retorno do {{ merit_name }} nesse período. <span class="text-up">■</span> acima de 0 = bateste o mercado · <span class="text-down">■</span> abaixo = ficaste abaixo.</p>
+  <div style="height: 240px"><canvas id="excessChart"></canvas></div>
+</div>
+{% endif %}
+
+<div class="pm-section-title">5 · Qual é o risco real?</div>
+<div class="pm-card">
+  <div class="pm-label mb-3">Risco & detalhe</div>
+  <div class="row g-3">
+    {% for label, v, fmt, rate, hint in [
+      ("Sharpe", r.sharpe, "n", ratings.sharpe, "Retorno anual por unidade de volatilidade."),
+      ("Sortino", r.sortino, "n", ratings.sortino, "Como o Sharpe, mas só penaliza a volatilidade negativa."),
+      ("Calmar", r.calmar, "n", ratings.calmar, "CAGR dividido pela maior queda."),
+      ("Volatilidade", r.volatility, "p", ratings.volatility ~ (" · ~" ~ ((r.volatility / m.volatility)|number(1)) ~ "× a do " ~ merit_name ~ " (" ~ (m.volatility|pct(2, sign=False)) ~ ")" if m and m.volatility else ""), "Desvio-padrão anualizado dos retornos diários."),
+      ("Max drawdown", r.max_drawdown, "p", ratings.max_drawdown, "Maior queda desde um máximo."),
+      ("Retorno médio/ano", r.avg_year, "p", r.years ~ " períodos anuais", "Média simples dos retornos anuais."),
+    ] %}
+    <div class="col-md-6 col-xl-4"><div class="pm-card pm-card-sm" style="background: var(--pm-surface-2)">
+      <div class="pm-label">{{ label }} {{ help(hint) }}</div>
+      <div class="pm-mid {{ 'text-warning' if label not in ('Retorno médio/ano', 'Max drawdown') else (v|tone) }}">{{ (v|number(2)) if fmt == 'n' else (v|pct(2, sign=(label == 'Retorno médio/ano'))) }}</div>
+      <div class="small">{{ rate }}</div>
+    </div></div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if m %}
+<div class="pm-section-title">6 · Análise avançada</div>
+<div class="pm-card">
+  <div class="pm-label mb-3">Mérito real face ao mercado {{ help("Alfa de Jensen: retorno acima do esperado para o risco de mercado (beta) assumido.") }}</div>
+  <div class="pm-card pm-card-sm {{ 'accent-top' if (m.alpha or 0) >= 0 else 'accent-red' }}" style="height:auto">
+    <div class="row g-3 align-items-center">
+      <div class="col-lg-5"><div class="pm-hero-value {{ m.alpha|tone }}" style="font-size: 3rem">{{ m.alpha|pct(2) }}</div>
+        <div class="small">diferença face ao mercado depois de descontar o risco</div></div>
+      <div class="col-6 col-lg-3"><div class="pm-label">Superação do mercado</div><div class="pm-mid {{ m.excess_cagr|tone }}">{{ m.excess_cagr|pct(2) }}</div><div class="small text-secondary">sem ajustar ao risco</div></div>
+      <div class="col-6 col-lg-3"><div class="pm-label">Média anual</div><div class="pm-mid {{ m.avg_yearly_excess|tone }}">{{ m.avg_yearly_excess|pct(2) }}</div><div class="small text-secondary">{{ m.years }} anos · média anual</div></div>
+    </div>
+  </div>
+  {% set pos = m.sorted|selectattr(0, "ge", 0)|list|length %}
+  <div class="fw-bold mt-4">Distribuição mensal ordenada · Carteira vs {{ merit_name }}</div>
+  <p class="small text-secondary">Os teus {{ m.sorted|length }} meses ordenados do pior ao melhor. <span class="text-up">■</span> {{ pos }} positivos · <span class="text-down">■</span> {{ m.sorted|length - pos }} negativos. Pontos <span style="color:#f97316">●</span> = retorno do {{ merit_name }} no mesmo mês.</p>
+  <div style="height: 280px"><canvas id="sortedChart"></canvas></div>
+</div>
+{% endif %}
+{% endif %}
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+{% if perf %}
+<script>
+(function () {
+  const d = {{ chart|safe }};
+  const merit = d.merit;
+  const pctAxis = { ticks: { callback: (v) => pm.pct(v, 0) } };
+  const MONTHS = {{ MONTHS|tojson }};
+  const monthLabel = (k) => (k.length > 4 ? `${MONTHS[+k.slice(5) - 1]} '${k.slice(2, 4)}` : k);
+  function draw() {
+    const up = pm.css("--pm-up"), down = pm.css("--pm-down"), accent = pm.css("--pm-accent");
+    const bench = d.bench;
+    const yearDs = [{ label: "Carteira", data: d.yearly.map((y) => y[1]), backgroundColor: accent, borderRadius: 3 }];
+    if (bench) yearDs.push({ label: bench.name, data: bench.yearly, backgroundColor: bench.color, borderRadius: 3 });
+    pm.chart("yearChart", { type: "bar", data: { labels: d.yearly.map((y) => y[0]), datasets: yearDs },
+      options: { maintainAspectRatio: false, plugins: { legend: { position: "bottom", align: "end" }, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.pct(it.parsed.y, 2)}` } } }, scales: { y: pctAxis, x: { grid: { display: false } } } } });
+
+    const lineDs = (key, fill) => {
+      const ctx = document.getElementById(key === "twr" ? "cumChart" : "ddChart").getContext("2d");
+      const ds = [{ label: "Carteira", data: d[key], borderColor: accent, backgroundColor: pm.gradient(ctx, accent), fill, borderWidth: 2, pointRadius: 0, tension: .15 }];
+      if (bench) ds.push({ label: bench.name, data: bench[key], borderColor: bench.color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .15 });
+      return ds;
+    };
+    const lineOpts = { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { position: "bottom", align: "end" }, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.pct(it.parsed.y, 2)}` } } },
+      scales: { y: pctAxis, x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 0, callback: pm.yearTicks(d.dates) } } } };
+    pm.chart("cumChart", { type: "line", data: { labels: d.dates, datasets: lineDs("twr", true) }, options: lineOpts });
+    pm.chart("ddChart", { type: "line", data: { labels: d.dates, datasets: lineDs("drawdown", "origin") }, options: lineOpts });
+
+    if (merit) {
+      drawExcess(document.querySelector("#beatSeg .active").dataset.g);
+      const s = merit.sorted;
+      pm.chart("sortedChart", { data: { labels: s.map((_, i) => i + 1), datasets: [
+        { type: "scatter", label: "{{ merit_name }}", data: s.map((x, i) => ({ x: i + 1, y: x[1] })), backgroundColor: "#f97316", pointRadius: 3.5 },
+        { type: "bar", label: "Carteira", data: s.map((x) => x[0]), backgroundColor: s.map((x) => (x[0] >= 0 ? up : down)), borderRadius: 2 },
+      ] }, options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.pct(it.parsed.y, 2)}` } } },
+        scales: { y: pctAxis, x: { type: "category", grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, title: { display: true, text: `mês (1 = pior · ${s.length} = melhor)` } } } } });
+    }
+  }
+  function drawExcess(g) {
+    const up = pm.css("--pm-up"), down = pm.css("--pm-down");
+    const rows = g === "y" ? merit.yearly_excess : merit.monthly_excess;
+    pm.chart("excessChart", { type: "bar", data: { labels: rows.map((r) => r[0]), datasets: [{ data: rows.map((r) => r[1]), backgroundColor: rows.map((r) => (r[1] >= 0 ? up : down)), borderRadius: 2 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (it) => pm.pct(it.parsed.y, 2) } } },
+        scales: { y: pctAxis, x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14, callback: (v, i) => monthLabel(rows[i][0]) } } } } });
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    draw();
+    document.addEventListener("pm:theme", draw);
+    document.querySelectorAll("#beatSeg button").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll("#beatSeg button").forEach((x) => x.classList.toggle("active", x === b));
+      const g = b.dataset.g;
+      const rows = g === "y" ? merit.yearly_excess : merit.monthly_excess;
+      const beat = rows.filter((r) => r[1] > 0).length;
+      document.getElementById("beatPct").textContent = pm.pct(rows.length ? beat / rows.length : 0, 0, false);
+      document.getElementById("beatText").textContent = `dos ${g === "y" ? "anos" : "meses"} superaste o mercado (${beat} de ${rows.length} ${g === "y" ? "anos" : "meses"})`;
+      drawExcess(g);
+    }));
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

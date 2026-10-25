@@ -1,0 +1,29 @@
+[project]
+name = "portfolio-manager"
+authors = [{ name = "Helder Meneses", email = "helder.meneses@gmail.com" }]
+description = "Gestor de carteira de investimentos que corre localmente: desempenho, dividendos, fiscalidade e alertas"
+requires-python = ">=3.10"
+readme = "README.md"
+license = { file = "LICENSE" }
+classifiers = ["License :: OSI Approved :: Apache Software License"]
+dynamic = ["version"]
+dependencies = [
+    "Flask>=3.0",
+    "Flask-SQLAlchemy>=3.1",
+    "waitress>=3.0",
+    "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+market = ["yfinance>=0.2"]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+portfolio-manager = "portfolio_manager.__main__:main"
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.module]
+name = "portfolio_manager"

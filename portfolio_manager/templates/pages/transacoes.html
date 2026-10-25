@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+  <h5 class="fw-bold m-0">Transações <span class="text-secondary fw-normal fs-6">{{ total }}</span></h5>
+  <div class="ms-auto d-flex gap-2">
+    <a class="btn btn-pm btn-sm" href="/api/export_transactions"><i class="bi bi-download"></i> Exportar CSV</a>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#newTx"><i class="bi bi-plus"></i> Nova transação</button>
+  </div>
+</div>
+
+<div class="collapse mb-3" id="newTx"><div class="pm-card" style="height:auto">
+  <form class="row g-2" data-pm-method="add_transaction" data-pm-success="Transação adicionada.">
+    <div class="col-md-2"><label class="form-label small">Data</label><input type="date" name="date" class="form-control form-control-sm" value="{{ today }}" required></div>
+    <div class="col-md-2"><label class="form-label small">Tipo</label><select name="type" id="txType" class="form-select form-select-sm">{% for k, l in labels.items() %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label small">Corretora</label><select name="broker" class="form-select form-select-sm"><option value="">—</option>{% for b in brokers %}<option value="{{ b.name }}" {{ 'selected' if b.name == broker }}>{{ b.broker_name }}</option>{% endfor %}</select></div>
+    <div class="col-md-2 f-asset"><label class="form-label small">Ticker</label><input name="instrument" class="form-control form-control-sm" placeholder="Ex.: VWCE.DE"></div>
+    <div class="col-md-1"><label class="form-label small">Moeda</label><input name="currency" class="form-control form-control-sm" value="EUR" maxlength="3"></div>
+    <div class="col-md-1 f-trade"><label class="form-label small">Quantidade</label><input name="quantity" type="number" step="any" class="form-control form-control-sm"></div>
+    <div class="col-md-1 f-trade"><label class="form-label small">Preço</label><input name="price" type="number" step="any" class="form-control form-control-sm"></div>
+    <div class="col-md-1 f-cash d-none"><label class="form-label small">Montante</label><input name="amount" type="number" step="any" class="form-control form-control-sm"></div>
+    <div class="col-md-1"><label class="form-label small">Comissões</label><input name="fees" type="number" step="any" class="form-control form-control-sm"></div>
+    <div class="col-md-1 f-tax d-none"><label class="form-label small">Retenção</label><input name="tax" type="number" step="any" class="form-control form-control-sm"></div>
+    <div class="col-12"><button class="btn btn-primary btn-sm" type="submit">Guardar</button></div>
+  </form>
+</div></div>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a class="pm-chip filter {{ 'active' if not tipo }}" href="?">Todas</a>
+  {% for k, l in labels.items() %}<a class="pm-chip filter {{ 'active' if tipo == k }}" href="?tipo={{ k }}">{{ l }}</a>{% endfor %}
+</div>
+<div class="pm-table-wrap"><table class="table pm-table">
+  <thead><tr><th>Data</th><th>Tipo</th><th>Ativo</th><th class="text-end">Quantidade</th><th class="text-end">Preço</th><th class="text-end">Montante</th><th class="text-end">Comissões</th><th class="text-end">Retenção</th><th>Corretora</th><th></th></tr></thead>
+  <tbody>{% for t in rows %}
+    <tr><td>{{ t.date|ddmmyyyy }}</td>
+      <td><span class="badge {{ {'BUY': 'text-bg-primary', 'SELL': 'text-bg-warning', 'DIVIDEND': 'text-bg-success', 'DEPOSIT': 'text-bg-info', 'INTEREST': 'text-bg-success'}.get(t.type, 'text-bg-secondary') }}">{{ labels[t.type] }}</span></td>
+      <td><b>{{ t.instrument or '' }}</b></td>
+      <td class="text-end">{{ t.quantity|number(4) if t.quantity else '' }}</td>
+      <td class="text-end">{{ t.price|money(4, currency=t.currency) if t.price else '' }}</td>
+      <td class="text-end money">{{ t.amount|money(2, currency=t.currency) if t.amount else ((t.quantity * t.price)|money(2, currency=t.currency) if t.quantity and t.price else '') }}</td>
+      <td class="text-end">{{ t.fees|money(2, currency=t.currency) if t.fees else '' }}</td>
+      <td class="text-end">{{ t.tax|money(2, currency=t.currency) if t.tax else '' }}</td>
+      <td class="small text-secondary">{{ broker_names.get(t.broker, '') }}</td>
+      <td class="text-end">{% if not t.import_batch %}<button class="btn btn-sm btn-outline-danger" data-pm-action="delete_transaction" data-args='{"name": "{{ t.name }}"}' data-confirm="Apagar transação?"><i class="bi bi-trash"></i></button>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="10" class="text-secondary">Sem transações.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% if pages > 1 %}
+<nav class="mt-3"><ul class="pagination pagination-sm">
+  {% for i in range(1, pages + 1) %}<li class="page-item {{ 'active' if i == page }}"><a class="page-link" href="?pagina={{ i }}{{ '&tipo=' ~ tipo if tipo }}">{{ i }}</a></li>{% endfor %}
+</ul></nav>
+{% endif %}
+{% endautoescape %}{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const sel = document.getElementById("txType");
+  const sync = () => {
+    const t = sel.value, trade = t === "BUY" || t === "SELL";
+    document.querySelectorAll(".f-trade").forEach((e) => e.classList.toggle("d-none", !(trade || t === "DIVIDEND")));
+    document.querySelectorAll(".f-asset").forEach((e) => e.classList.toggle("d-none", !(trade || t === "DIVIDEND")));
+    document.querySelectorAll(".f-cash").forEach((e) => e.classList.toggle("d-none", trade));
+    document.querySelectorAll(".f-tax").forEach((e) => e.classList.toggle("d-none", !(t === "DIVIDEND" || t === "INTEREST")));
+  };
+  sel.addEventListener("change", sync); sync();
+});
+</script>
+{% endblock %}

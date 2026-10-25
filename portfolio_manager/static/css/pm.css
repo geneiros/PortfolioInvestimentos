@@ -1,0 +1,120 @@
+/* Portfolio Manager — complementos mínimos ao Bootstrap 5.3.
+   Todas as cores vêm das variáveis nativas (--bs-*), por isso os modos claro e escuro
+   são os do próprio Bootstrap (data-bs-theme="light" | "dark"). */
+:root {
+  --pm-up: var(--bs-success);
+  --pm-down: var(--bs-danger);
+  --pm-accent: var(--bs-primary);
+  --pm-muted: var(--bs-secondary-color);
+  --pm-text: var(--bs-body-color);
+  --pm-grid: var(--bs-border-color-translucent);
+  --pm-surface: var(--bs-body-bg);
+  --pm-surface-2: var(--bs-tertiary-bg);
+  --pm-border: var(--bs-border-color);
+  --pm-sidebar-width: 240px;
+}
+
+[data-bs-theme="dark"] {
+  --pm-up: var(--bs-success-text-emphasis);
+  --pm-down: var(--bs-danger-text-emphasis);
+}
+
+.text-up { color: var(--pm-up) !important; }
+.text-down { color: var(--pm-down) !important; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ layout */
+.pm-shell { display: flex; min-height: 100vh; }
+.pm-sidebar { width: var(--pm-sidebar-width); flex: 0 0 var(--pm-sidebar-width); position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.pm-sidebar .nav-link { display: flex; align-items: center; gap: .6rem; }
+.pm-logo { flex: 0 0 auto; }
+.pm-main { flex: 1; min-width: 0; }
+.pm-content { padding: 1.5rem; }
+body.pm-collapsed .pm-sidebar { --pm-sidebar-width: 76px; }
+body.pm-collapsed .pm-sidebar .label, body.pm-collapsed .pm-sidebar .badge { display: none; }
+
+/* ------------------------------------------------------------------ cartões (equivalentes a .card) */
+.pm-card {
+  background: var(--bs-body-bg); border: var(--bs-border-width) solid var(--bs-border-color-translucent);
+  border-radius: var(--bs-border-radius-lg); box-shadow: var(--bs-box-shadow-sm);
+  padding: 1.25rem; position: relative; overflow: hidden;
+}
+.row > [class*="col"] > .pm-card:only-child { height: 100%; }
+.pm-card-sm { padding: 1rem; }
+.pm-card.accent-red { border-color: var(--bs-danger-border-subtle); background: var(--bs-danger-bg-subtle); }
+.pm-card.accent-top.inner, .pm-card .pm-card { box-shadow: none; }
+.pm-label { text-transform: uppercase; letter-spacing: .05em; font-size: .75rem; font-weight: 600; color: var(--bs-secondary-color); }
+.pm-label .help { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%;
+  border: 1px solid var(--bs-secondary-color); font-size: .6rem; margin-left: .2rem; cursor: help; letter-spacing: 0; }
+.pm-hero-value { font-size: calc(1.6rem + 2.4vw); font-weight: 600; line-height: 1.1; color: var(--bs-emphasis-color); }
+.pm-big { font-size: 1.75rem; font-weight: 600; }
+.pm-mid { font-size: 1.3rem; font-weight: 600; }
+.pm-section-title { text-transform: uppercase; letter-spacing: .06em; font-size: .85rem; font-weight: 600; color: var(--bs-secondary-color); margin: 2rem 0 1rem; }
+.pm-hero-chart { position: absolute; inset: auto 0 0 0; height: 55%; opacity: .35; pointer-events: none; }
+.pm-hero-chart canvas { width: 100% !important; height: 100% !important; }
+.pm-progress { height: 6px; background: var(--bs-secondary-bg); border-radius: var(--bs-border-radius-pill); overflow: hidden; }
+.pm-progress > div { height: 100%; background: var(--bs-success); }
+
+/* ------------------------------------------------------------------ botões e seletores (aspeto de .btn-outline-secondary / .btn-group) */
+.btn-pm { --bs-btn-color: var(--bs-body-color); --bs-btn-border-color: var(--bs-border-color); --bs-btn-hover-bg: var(--bs-tertiary-bg);
+  --bs-btn-hover-border-color: var(--bs-border-color); --bs-btn-hover-color: var(--bs-body-color); }
+.btn-icon { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.pm-seg, .pm-periods { display: inline-flex; border: var(--bs-border-width) solid var(--bs-border-color); border-radius: var(--bs-border-radius); overflow: hidden; }
+.pm-periods { display: flex; }
+.pm-seg button, .pm-periods button { border: 0; background: transparent; color: var(--bs-body-color); padding: .3rem .8rem; white-space: nowrap; }
+.pm-periods button { flex: 1; }
+.pm-seg button + button, .pm-periods button + button { border-left: var(--bs-border-width) solid var(--bs-border-color); }
+.pm-seg button:hover, .pm-periods button:hover { background: var(--bs-tertiary-bg); }
+.pm-seg button.active, .pm-periods button.active { background: var(--bs-primary); color: #fff; }
+.pm-chip { display: inline-flex; align-items: center; gap: .35rem; border: var(--bs-border-width) solid var(--bs-border-color); border-radius: var(--bs-border-radius-pill);
+  background: transparent; color: var(--bs-body-color); padding: .15rem .65rem; font-size: .85rem; text-decoration: none; }
+.pm-chip .sw { width: 8px; height: 8px; border-radius: 2px; }
+.pm-chip.active { border-color: var(--bs-primary); background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); }
+.pm-chip.filter.active { background: var(--bs-primary); border-color: var(--bs-primary); color: #fff; }
+
+/* ------------------------------------------------------------------ listas, tabelas, logos */
+.pm-row { display: flex; align-items: center; gap: .75rem; padding: .45rem 0; }
+.pm-logo, .pm-badge-broker { border-radius: var(--bs-border-radius-sm); display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; color: #fff; }
+.pm-logo { width: 28px; height: 28px; flex: 0 0 28px; font-size: .62rem; }
+.pm-badge-broker { width: 22px; height: 22px; flex: 0 0 22px; font-size: .65rem; }
+.pm-table { --bs-table-bg: transparent; margin: 0; }
+.pm-table thead th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--bs-secondary-color); white-space: nowrap;
+  background: var(--bs-body-bg); cursor: pointer; user-select: none; }
+.pm-table td { white-space: nowrap; vertical-align: middle; }
+.pm-table tfoot td { font-weight: 600; background: var(--bs-tertiary-bg); position: sticky; bottom: 0; }
+.pm-table .sub { font-size: .75rem; color: var(--bs-secondary-color); }
+.pm-table-wrap { border: var(--bs-border-width) solid var(--bs-border-color-translucent); border-radius: var(--bs-border-radius-lg);
+  overflow: auto; background: var(--bs-body-bg); max-height: 70vh; }
+.pm-table-wrap thead th { position: sticky; top: 0; z-index: 1; }
+.pm-tag { font-size: .65rem; padding: .05rem .35rem; border-radius: var(--bs-border-radius-sm); background: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary-text-emphasis); font-weight: 600; }
+.pm-spark { width: 100px; height: 32px; }
+
+/* ------------------------------------------------------------------ mapas de calor */
+.pm-heat { display: grid; gap: 3px; font-size: .8rem; }
+.pm-heat .cell { border-radius: var(--bs-border-radius-sm); padding: .3rem 0; text-align: center; font-weight: 600; background: var(--bs-tertiary-bg); min-height: 1.6rem; }
+.pm-heat .head { text-align: center; color: var(--bs-secondary-color); font-size: .75rem; }
+.pm-heat .year { color: var(--bs-secondary-color); display: flex; align-items: center; }
+
+/* ------------------------------------------------------------------ eventos, importação */
+.pm-event { display: flex; gap: 1rem; padding: .7rem 0; border-bottom: var(--bs-border-width) solid var(--bs-border-color-translucent); }
+.pm-event .day { text-align: center; min-width: 42px; font-weight: 600; font-size: 1.2rem; line-height: 1; }
+.pm-event .day small { display: block; font-size: .65rem; letter-spacing: .08em; color: var(--bs-secondary-color); margin-top: .2rem; }
+.pm-broker-tile { border: var(--bs-border-width) solid var(--bs-border-color); border-radius: var(--bs-border-radius-lg); padding: .75rem;
+  display: flex; gap: .7rem; align-items: center; cursor: pointer; background: var(--bs-body-bg); height: 100%; }
+.pm-broker-tile.active { border-color: var(--bs-primary); box-shadow: 0 0 0 .2rem var(--bs-primary-bg-subtle); }
+.pm-broker-tile.disabled { opacity: .5; cursor: not-allowed; }
+.pm-drop { border: 2px dashed var(--bs-border-color); border-radius: var(--bs-border-radius-lg); padding: 2.5rem; text-align: center; cursor: pointer; }
+.pm-drop.over { border-color: var(--bs-primary); background: var(--bs-primary-bg-subtle); }
+.pm-step { width: 26px; height: 26px; border-radius: 50%; background: var(--bs-primary); color: #fff; display: inline-flex; align-items: center;
+  justify-content: center; font-weight: 600; font-size: .8rem; flex: 0 0 26px; }
+
+/* privacidade */
+body.pm-private .money { filter: blur(7px); }
+
+@media (max-width: 991.98px) {
+  .pm-sidebar { position: fixed; left: calc(-1 * var(--pm-sidebar-width) - 20px); z-index: 1040; transition: left .2s; }
+  body.pm-menu-open .pm-sidebar { left: 0; }
+  .pm-content { padding: 1rem; }
+}

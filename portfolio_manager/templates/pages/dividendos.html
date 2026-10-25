@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help, logo, empty, heat_color %}
+{% if not s or not s.records %}
+  {{ empty("Ainda não recebeste dividendos", "Quando as tuas posições pagarem dividendos, vais ver aqui o rendimento, a projeção e o calendário.", "/importar", "Importar extrato") }}
+{% else %}
+
+<div class="pm-card accent-top mb-3">
+  <div class="row align-items-end g-3">
+    <div class="col-lg-6">
+      <div class="pm-label">Dividendos recebidos</div>
+      <div class="pm-hero-value text-up money my-2">{{ s.net|money(2, sign=True) }}</div>
+      <div class="small text-secondary">líquido após retenção · <span class="money">{{ s.avg_month|money(2) }}</span>/mês médio · {{ s.payers }} posições</div>
+    </div>
+    <div class="col-6 col-lg-3 text-lg-end">
+      <div class="pm-label">Bruto recebido {{ help("Antes da retenção na fonte.") }}</div>
+      <div class="pm-mid text-up money">{{ s.gross|money(2, sign=True) }}</div>
+      <div class="small text-secondary">antes de retenção</div>
+    </div>
+    <div class="col-6 col-lg-3 text-lg-end">
+      <div class="pm-label">Retenção na fonte {{ help("Imposto retido pelos países de origem e/ou pela corretora.") }}</div>
+      <div class="pm-mid text-down money">{{ (-s.tax)|money(2) }}</div>
+      <div class="small text-secondary">retido na fonte</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-xl"><div class="pm-card pm-card-sm">
+    <div class="pm-label">Maior pagador</div>
+    <div class="pm-mid">{{ s.top[0] if s.top else '—' }}</div>
+    <div class="small"><span class="text-up money">{{ s.top[1]|money(2) if s.top else '' }}</span> · {{ s.top_share|pct(0, sign=False) }} dos dividendos</div>
+  </div></div>
+  <div class="col-6 col-xl"><div class="pm-card pm-card-sm">
+    <div class="pm-label">Meses com dividendos</div>
+    <div class="pm-mid">{{ s.months_with }} <small class="fs-6 text-secondary">/ {{ s.months_total }}</small></div>
+    <div class="small text-secondary">{{ (s.months_with / s.months_total if s.months_total else 0)|pct(0, sign=False) }} dos meses</div>
+  </div></div>
+  <div class="col-6 col-xl"><div class="pm-card pm-card-sm">
+    <div class="pm-label">Rendimento anualizado {{ help("Total líquido recebido a dividir pelos anos desde a primeira transação.") }}</div>
+    <div class="pm-mid text-up money">{{ s.annualized|money(2) }}</div>
+    <div class="small text-secondary">média anual</div>
+  </div></div>
+  <div class="col-6 col-xl"><div class="pm-card pm-card-sm">
+    <div class="pm-label">Projeção de {{ p.as_of.year }} {{ help("Recebido este ano + estimativa para os meses que faltam, com base nos últimos 12 meses e nas quantidades atuais.") }}</div>
+    <div class="pm-mid text-up money">{{ s.projection_year|money(2) }}</div>
+    <div class="small text-secondary">próximos 12 meses: <span class="money">{{ s.forward_net|money(2) }}</span> (bruto <span class="money">{{ s.forward_gross|money(2) }}</span>)</div>
+  </div></div>
+  <div class="col-6 col-xl"><div class="pm-card pm-card-sm">
+    <div class="pm-label">Crescimento anual {{ help("Crescimento anual composto dos dividendos entre anos completos.") }}</div>
+    {% if s.growth %}
+      <div class="pm-mid {{ s.growth[0]|tone }}">{{ s.growth[0]|pct(2) }}<small class="fs-6">/ano</small></div>
+      <div class="small text-secondary">rendimento · {{ s.growth[1] }}–{{ s.growth[2] }}</div>
+    {% else %}<div class="pm-mid">—</div><div class="small text-secondary">precisa de 2 anos completos</div>{% endif %}
+  </div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-xl-7"><div class="pm-card">
+    <div class="pm-label mb-3">Dividendos por ano <span class="ms-2 text-primary text-capitalize">■ projeção</span></div>
+    <div style="height: 260px"><canvas id="divYear"></canvas></div>
+  </div></div>
+  <div class="col-xl-5"><div class="pm-card">
+    <div class="pm-label mb-3">Decomposição do crescimento {{ help("Compara o que recebeste este ano até ao mês atual com o mesmo período do ano anterior.") }}</div>
+    {% set g = growth %}
+    {% if (p.as_of.year - 1) not in s.years %}
+    <p class="small">Recebeste <b class="text-up money">{{ g.cur|money(2) }}</b> entre janeiro e {{ MONTHS[g.month - 1]|lower }} de {{ p.as_of.year }}.
+      Não há dados de {{ p.as_of.year - 1 }} para comparar: importa os extratos desse ano.</p>
+    {% else %}
+    <p class="small">Os teus dividendos {{ 'subiram' if g.diff >= 0 else 'caíram' }} <b class="{{ g.diff|tone }} money">{{ (g.diff|abs)|money(2) }}</b>
+      {% if g.pct is not none %}({{ g.pct|pct(2) }}){% endif %} entre janeiro e {{ MONTHS[g.month - 1]|lower }} de {{ p.as_of.year }} vs o mesmo período de {{ p.as_of.year - 1 }}.</p>
+    {% endif %}
+    <div class="pm-label mt-3 mb-2">Detalhe por empresa</div>
+    <div class="small" style="max-height: 170px; overflow: auto">
+    {% for ticker, (cur, prev) in g.assets %}
+      <div class="d-flex justify-content-between border-bottom py-1" style="border-color: var(--pm-border)!important">
+        <b>{{ ticker }}</b><span class="text-secondary money">{{ prev|money(2) }} → {{ cur|money(2) }}</span>
+        <span class="{{ (cur - prev)|tone }} money">{{ (cur - prev)|money(2, sign=True) }}</span></div>
+    {% else %}<span class="text-secondary">Sem dividendos neste período.</span>{% endfor %}
+    </div>
+  </div></div>
+</div>
+
+<div class="pm-card mb-3">
+  <div class="d-flex align-items-center mb-3 flex-wrap gap-2">
+    <div class="pm-label">Mapa de rendimento: dividendos por mês</div>
+    <div class="ms-auto d-flex align-items-center gap-2"><span class="pm-label">Ver a partir de</span>
+      <div class="dropdown"><button class="btn btn-pm btn-sm dropdown-toggle fw-bold" data-bs-toggle="dropdown">{{ start_year }}</button>
+        <ul class="dropdown-menu dropdown-menu-end">{% for y in s.years %}<li><a class="dropdown-item" href="?desde={{ y }}">{{ y }}</a></li>{% endfor %}</ul></div>
+    </div>
+  </div>
+  <div class="overflow-auto"><div class="pm-heat" style="grid-template-columns: 48px repeat(12, minmax(48px, 1fr)) 80px; min-width: 760px">
+    <div></div>{% for mo in MONTHS %}<div class="head">{{ mo }}</div>{% endfor %}<div class="head">Total</div>
+    {% for y in heat_years %}
+      <div class="year">{{ y }}</div>
+      {% for mth in range(1, 13) %}{% set v = s.by_month.get((y, mth)) %}
+        <div class="cell money" style="background: {{ heat_color(v, max_month) if v else 'var(--pm-surface-2)' }}">{% if v %}{{ '<€1' if v < 1 else v|money }}{% endif %}</div>
+      {% endfor %}
+      <div class="cell text-up money" style="background: transparent">{{ s.by_year.get(y, 0)|money(2, sign=True) }}</div>
+    {% endfor %}
+  </div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-6"><div class="pm-card">
+    <div class="pm-label mb-3">Yield por posição {{ help("Dividendos dos últimos 12 meses por ação × quantidade atual, face ao custo (yield on cost) e ao valor atual.") }}</div>
+    <div class="table-responsive"><table class="table pm-table">
+      <thead><tr><th>Ativo</th><th class="text-end">Anual estimado</th><th class="text-end">Yield s/ custo</th><th class="text-end">Yield atual</th></tr></thead>
+      <tbody>{% for pos, annual, yoc, yld in s.yield_on_cost %}
+        <tr><td><div class="d-flex gap-2 align-items-center">{{ logo(pos.asset) }}<b>{{ pos.asset.ticker }}</b></div></td>
+          <td class="text-end text-up money">{{ annual|money(2) }}</td><td class="text-end">{{ yoc|pct(2, sign=False) }}</td><td class="text-end">{{ yld|pct(2, sign=False) }}</td></tr>
+      {% else %}<tr><td colspan="4" class="text-secondary">Sem dividendos nos últimos 12 meses.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div></div>
+  <div class="col-xl-6"><div class="pm-card">
+    <div class="pm-label mb-3">Histórico de pagamentos</div>
+    <div class="table-responsive" style="max-height: 360px"><table class="table pm-table">
+      <thead><tr><th>Data</th><th>Ativo</th><th class="text-end">Bruto</th><th class="text-end">Retenção</th><th class="text-end">Líquido</th></tr></thead>
+      <tbody>{% for d in s.records[:200] %}
+        <tr><td>{{ d.date|ddmmyyyy }}</td><td><b>{{ d.asset.ticker }}</b></td><td class="text-end money">{{ d.gross_eur|money(2) }}</td>
+          <td class="text-end text-down money">{{ (-d.tax_eur)|money(2) }}</td><td class="text-end text-up money">{{ d.net_eur|money(2) }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div></div>
+</div>
+{% endif %}
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+{% if s and s.records %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const d = {{ chart|safe }};
+  const draw = () => pm.chart("divYear", { type: "bar", data: { labels: d.labels, datasets: [
+      { label: "Recebido", data: d.received, backgroundColor: pm.css("--pm-up"), borderRadius: 3, stack: "s" },
+      { label: "Projeção", data: d.projection, backgroundColor: "#60a5fa", borderRadius: 3, stack: "s" }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 2)}` } } },
+      scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, ticks: { callback: (v) => pm.money(v) } } } } });
+  draw(); document.addEventListener("pm:theme", draw);
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help %}
+{% for a in fired_now %}<div class="alert alert-warning"><i class="bi bi-bell-fill"></i> Alerta disparado agora: <b>{{ a.instrument }}</b> — {{ kinds[a.kind]|lower }} {{ a.threshold|number(2) }}.</div>{% endfor %}
+<div class="row g-3">
+  <div class="col-xl-6"><div class="pm-card">
+    <div class="pm-label mb-3">Alertas de preço {{ help("Verificados sempre que abres a aplicação e após cada atualização de cotações.") }}</div>
+    <form class="row g-2 mb-3" data-pm-method="add_alert" data-pm-success="Alerta criado.">
+      <div class="col-md-4"><select name="instrument" class="form-select form-select-sm" required>
+        {% for i in instruments %}<option value="{{ i.name }}">{{ i.name }} · {{ i.instrument_name }}</option>{% endfor %}</select></div>
+      <div class="col-md-4"><select name="kind" class="form-select form-select-sm">{% for k, l in kinds.items() %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><input name="threshold" type="number" step="any" class="form-control form-control-sm" placeholder="Valor" required></div>
+      <div class="col-md-2"><button class="btn btn-primary btn-sm w-100" type="submit">Criar</button></div>
+    </form>
+    <table class="table pm-table">
+      <thead><tr><th>Ativo</th><th>Condição</th><th>Estado</th><th></th></tr></thead>
+      <tbody>{% for a in alerts %}
+        <tr class="{{ 'opacity-50' if not a.active and not a.triggered_on }}">
+          <td><b>{{ a.instrument }}</b></td><td>{{ kinds[a.kind] }} <b>{{ a.threshold|number(2) }}{{ '%' if a.kind == 'change_pct' }}</b></td>
+          <td>{% if a.triggered_on %}<span class="badge text-bg-warning">Disparado {{ a.triggered_on.strftime('%d/%m %H:%M') }}</span>
+              {% elif a.active %}<span class="badge text-bg-success">Ativo</span>{% else %}<span class="badge text-bg-secondary">Pausado</span>{% endif %}</td>
+          <td class="text-end text-nowrap">
+            <button class="btn btn-sm btn-pm" data-pm-action="toggle_alert" data-args='{"name": "{{ a.name }}", "active": {{ 0 if a.active else 1 }}}' title="{{ 'Pausar' if a.active else 'Reativar' }}"><i class="bi {{ 'bi-pause' if a.active else 'bi-play' }}"></i></button>
+            <button class="btn btn-sm btn-outline-danger" data-pm-action="delete_alert" data-args='{"name": "{{ a.name }}"}' data-confirm="Apagar alerta?"><i class="bi bi-trash"></i></button></td></tr>
+      {% else %}<tr><td colspan="4" class="text-secondary">Ainda não tens alertas.</td></tr>{% endfor %}</tbody>
+    </table>
+  </div></div>
+  <div class="col-xl-6"><div class="pm-card">
+    <div class="pm-label mb-3">Radar (lista de observação) {{ help("Ativos que estás a acompanhar, com preço-alvo de entrada.") }}</div>
+    <form class="row g-2 mb-3" data-pm-method="add_watch" data-pm-success="Adicionado ao radar.">
+      <div class="col-md-3"><input name="instrument" class="form-control form-control-sm" placeholder="Ticker" list="instList" required></div>
+      <div class="col-md-2"><input name="currency" class="form-control form-control-sm" placeholder="Moeda" value="EUR" maxlength="3"></div>
+      <div class="col-md-2"><input name="target_price" type="number" step="any" class="form-control form-control-sm" placeholder="Alvo"></div>
+      <div class="col-md-3"><input name="note" class="form-control form-control-sm" placeholder="Nota"></div>
+      <div class="col-md-2"><button class="btn btn-primary btn-sm w-100" type="submit">Adicionar</button></div>
+      <datalist id="instList">{% for i in instruments %}<option value="{{ i.name }}">{{ i.instrument_name }}</option>{% endfor %}</datalist>
+    </form>
+    <table class="table pm-table">
+      <thead><tr><th>Ativo</th><th class="text-end">Preço</th><th class="text-end">1D</th><th class="text-end">Alvo</th><th class="text-end">Distância</th><th></th></tr></thead>
+      <tbody>{% for w in watch %}
+        <tr><td><b>{{ w.instrument }}</b><div class="sub">{{ w.note or '' }}</div></td>
+          <td class="text-end">{{ w.price|money(2, currency=w.currency) }}</td>
+          <td class="text-end {{ w.change|tone }}">{{ w.change|pct(2) }}</td>
+          <td class="text-end">{{ w.target_price|money(2, currency=w.currency) if w.target_price else '—' }}</td>
+          <td class="text-end">{% if w.distance is not none %}<span class="badge {{ 'text-bg-success' if w.distance <= 0 else 'text-bg-secondary' }}">{{ w.distance|pct(1) }}</span>{% else %}—{% endif %}</td>
+          <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-pm-action="delete_watch" data-args='{"name": "{{ w.name }}"}'><i class="bi bi-x"></i></button></td></tr>
+      {% else %}<tr><td colspan="6" class="text-secondary">O teu radar está vazio.</td></tr>{% endfor %}</tbody>
+    </table>
+    <p class="small text-secondary mb-0">As cotações de ativos novos ficam disponíveis após a próxima atualização de mercado.</p>
+  </div></div>
+</div>
+{% endautoescape %}{% endblock %}

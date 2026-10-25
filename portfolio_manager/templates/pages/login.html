@@ -1,0 +1,12 @@
+{% extends "_standalone.html" %}
+{% block title %}Entrar{% endblock %}
+{% block body %}
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label for="password" class="form-label">Palavra-passe</label>
+  <input type="password" class="form-control {{ 'is-invalid' if error }}" id="password" name="password"
+         autocomplete="current-password" required autofocus>
+  {% if error %}<div class="invalid-feedback">{{ error }}</div>{% endif %}
+  <button class="btn btn-primary w-100 mt-3" type="submit"><i class="bi bi-box-arrow-in-right"></i> Entrar</button>
+</form>
+{% endblock %}

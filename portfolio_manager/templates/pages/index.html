@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help, logo, signed, empty %}
+
+{% if not has_data %}
+  {{ empty("Ainda não tens transações", "Importa o extrato da tua corretora ou adiciona transações manualmente.", "/importar", "Importar extrato") }}
+{% else %}
+
+{% for a in fired %}
+<div class="alert alert-warning d-flex align-items-center gap-2"><i class="bi bi-bell-fill"></i>
+  Alerta disparado: <b>{{ a.instrument }}</b> — {{ {'price_above': 'preço acima de', 'price_below': 'preço abaixo de', 'change_pct': 'variação diária superior a'}[a.kind] }} {{ a.threshold|number(2) }}{{ '%' if a.kind == 'change_pct' }}.
+  <a href="/radar" class="ms-auto">Ver alertas</a></div>
+{% endfor %}
+
+<div class="row g-3">
+  <!-- Carteira -->
+  <div class="col-xl-8">
+    <div class="pm-card accent-top">
+      <div class="pm-hero-chart"><canvas id="heroSpark"></canvas></div>
+      <div class="row position-relative">
+        <div class="col-md-7">
+          <div class="pm-label">Carteira {{ help("Valor de mercado das posições abertas, em euros.") }}</div>
+          <div class="pm-hero-value money my-3">{{ p.holdings_value|money }}</div>
+          <div class="pm-label mt-4">Variação diária · {{ p.as_of|ddmm }} {{ help("Variação do valor desde o fecho anterior, sem contar depósitos.") }}</div>
+          <div class="pm-big {{ day_change[0]|tone }}">{{ day_change[1]|pct(1) }} <small class="fs-5 money">· {{ day_change[0]|money(sign=True) }}</small></div>
+        </div>
+        <div class="col-md-5 mt-4 mt-md-0">
+          <div class="pm-label mt-md-4">Retorno total {{ help("Em euros: valor total (posições + caixa) menos o dinheiro líquido depositado (depósitos − levantamentos). Em %: esse ganho dividido pelo máximo de dinheiro líquido que chegaste a ter investido. O retorno ponderado no tempo (TWR) está em Desempenho.") }}</div>
+          <div class="pm-big {{ p.total_return|tone }}">{{ p.total_return_pct|pct(1) }} <small class="fs-5 money">· {{ p.total_return|money(sign=True) }}</small></div>
+          <div class="pm-label mt-4">Ano corrente {{ help("Em euros: variação do valor desde 31 de dezembro, sem contar depósitos e levantamentos. Em %: esse ganho dividido pelo capital investido no ano (valor a 31 de dezembro mais as entradas do ano).") }}</div>
+          <div class="pm-big {{ ytd[1]|tone }}">{{ ytd[1]|pct(1) }} <small class="fs-5 money">· {{ ytd[0]|money(sign=True) }}</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Máximo histórico -->
+  <div class="col-xl-4">
+    <div class="pm-card accent-top">
+      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+        <div class="pm-label mt-2">Máximo histórico {{ help("Valor mais alto alguma vez atingido.") }}</div>
+        <div class="pm-seg small" id="athSeg"><button class="active" data-mode="value">Carteira</button><button data-mode="return">Retorno total</button></div>
+      </div>
+      {% for mode, a in ath.items() %}
+      <div class="ath-panel {{ 'd-none' if mode != 'value' }}" data-mode="{{ mode }}">
+        {% if a %}
+        <div class="row mt-4">
+          <div class="col-7">
+            <div class="pm-big money">{{ a.value|money }} <small class="fs-6 text-secondary fw-normal">· {{ a.date|ddmmyyyy }}</small></div>
+            {% if a.previous %}<div class="small text-secondary mt-1">anterior <span class="money">{{ a.previous[0]|money }}</span> · {{ a.previous[1]|ddmmyyyy }}</div>{% endif %}
+          </div>
+          <div class="col-5 border-start" style="border-color:var(--pm-border)!important">
+            <div class="pm-label">Face ao máximo</div>
+            <div class="pm-mid {{ a.vs_ath_pct|tone }}">{{ a.vs_ath_pct|pct(2) }}</div>
+            <div class="pm-label mt-2">Falta recuperar</div>
+            <div class="pm-mid money">{{ a.to_recover|money }}</div>
+          </div>
+        </div>
+        <div class="d-flex justify-content-between small mt-4"><span>Posição vs máximo</span><span>{{ a.position_pct|pct(2, sign=False) }}</span></div>
+        <div class="pm-progress mt-1"><div style="width: {{ [[a.position_pct * 100, 0]|max, 100]|min }}%"></div></div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Movers + notícias -->
+  <div class="col-xl-8">
+    <div class="pm-card">
+      <div class="row">
+        <div class="col-lg-5">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="pm-label">Principais movers · {{ p.as_of|ddmm }}</span>
+            <a class="btn btn-pm btn-icon btn-sm ms-auto" href="/radar" title="Alertas"><i class="bi bi-bell"></i></a>
+            <a class="btn btn-pm btn-icon btn-sm" href="/carteira" title="Carteira"><i class="bi bi-list"></i></a>
+          </div>
+          {% for m in movers %}
+          <div class="pm-row">
+            {{ logo(m.asset) }}<b class="flex-grow-1">{{ m.asset.ticker }}</b>
+            <span class="{{ m.day_change_pct|tone }} fw-bold">{{ m.day_change_pct|pct(2) }}</span>
+            <small class="{{ m.day_change_eur|tone }} money" style="min-width:4.5rem;text-align:right">· {{ m.day_change_eur|money(sign=True) }}</small>
+          </div>
+          {% else %}<p class="text-secondary small">Sem cotações recentes.</p>{% endfor %}
+        </div>
+        <div class="col-lg-7 mt-3 mt-lg-0">
+          <div class="pm-label mb-2">Notícias em destaque</div>
+          {% for m in movers %}
+            {% set n = mover_news[m.asset.ticker] %}
+            <div class="pm-row small">
+              {% if n %}
+                <a class="fst-italic text-truncate flex-grow-1" style="color:var(--pm-text)" href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
+                <span class="text-secondary text-nowrap">{{ n.source }} · {{ n.published_on|ago }}</span>
+              {% else %}
+                <span class="text-secondary flex-grow-1">{{ m.asset.ticker }} — sem notícias recentes</span>
+              {% endif %}
+              <a class="btn btn-pm btn-icon btn-sm" href="/noticias?ticker={{ m.asset.ticker|urlencode }}"><i class="bi bi-list"></i></a>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resultados / conta -->
+  <div class="col-xl-4">
+    <div class="pm-card">
+      <div class="pm-label mb-2" style="color:var(--pm-text)">Resultados</div>
+      <div class="row g-2">
+        <div class="col-6"><div class="pm-label">Não realizado {{ help("Ganho/perda das posições abertas face ao custo.") }}</div>
+          <div class="pm-mid">{{ signed(p.unrealized, 0, p.unrealized / p.cost_basis if p.cost_basis else 0) }}</div></div>
+        <div class="col-6"><div class="pm-label">Dividendos {{ help("Dividendos líquidos de retenção.") }}</div>
+          <div class="pm-mid">{{ signed(p.dividends_total) }}</div></div>
+        <div class="col-6"><div class="pm-label">Realizado {{ help("Mais/menos-valias de vendas (FIFO).") }}</div>
+          <div class="pm-mid">{{ signed(p.realized) }}</div></div>
+        <div class="col-6"><div class="pm-label">Comissões</div>
+          <div class="pm-mid">{{ signed(-p.fees_eur) }}</div></div>
+      </div>
+      <hr style="border-color:var(--pm-border)">
+      <div class="pm-label mb-2" style="color:var(--pm-text)">Conta</div>
+      <div class="row g-2">
+        <div class="col-6"><div class="pm-label">Custo base</div><div class="pm-mid money">{{ p.cost_basis|money }} <small class="fs-6 text-secondary fw-normal">{{ p.open_positions|length }} posições</small></div></div>
+        <div class="col-6"><div class="pm-label">Depositado {{ help("Depósitos menos levantamentos (inclui compras sem depósito registado).") }}</div><div class="pm-mid money">{{ p.net_deposits|money }}</div></div>
+        <div class="col-6"><div class="pm-label">Caixa</div><div class="pm-mid money">{{ p.cash|money }} <small class="fs-6 text-secondary fw-normal">{{ (p.cash / p.total_value if p.total_value else 0)|pct(1, sign=False) }}</small></div></div>
+        <div class="col-6"><div class="pm-label">Valor total</div><div class="pm-mid money">{{ p.total_value|money }}</div></div>
+        <div class="col-6"><div class="pm-label">Juros da conta</div><div class="pm-mid">{{ signed(p.interest_eur) }}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráfico de desempenho -->
+  <div class="col-xl-8">
+    <div class="pm-card">
+      <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+        <div class="pm-seg" id="modeSeg"><button class="active" data-mode="gain">Retorno total</button><button data-mode="value">Valor total</button></div>
+        <div class="ms-auto text-end"><div class="pm-label">Período</div><b id="periodLabel" class="small"></b></div>
+      </div>
+      <div class="pm-periods mb-3" id="periods">
+        {% for k in ["1M", "3M", "6M", "YTD", "1A", "3A", "5A", "MAX"] %}<button data-p="{{ k }}" class="{{ 'active' if k == 'MAX' }}">{{ 'Max' if k == 'MAX' else k }}</button>{% endfor %}
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap small mb-2">
+        <span class="text-secondary">Comparar com:</span>
+        {% for b in benchmarks %}<button class="pm-chip bench" data-t="{{ b.ticker }}" style="--chip: {{ b.color }}"><span class="sw" style="background: {{ b.color }}"></span>{{ b.name }}</button>{% endfor %}
+      </div>
+      <div style="height: 320px"><canvas id="perfChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Eventos -->
+  <div class="col-xl-4">
+    <div class="pm-card">
+      <div class="d-flex align-items-center mb-2">
+        <span class="pm-label">Próximos eventos {{ help("Resultados e dividendos das tuas posições. Os marcados com ~ são estimados pelo histórico.") }}</span>
+        <span class="ms-auto badge text-bg-secondary">{{ events_total }}</span>
+      </div>
+      {% for label, evs in event_groups if evs %}
+        <div class="pm-label mt-3">{{ label }}</div>
+        {% for e in evs %}
+          {% set inst = instruments.get(e.instrument) or {} %}
+          <div class="pm-event">
+            <div class="day">{{ '~' if e.estimated }}{{ e.date.day }}<small>{{ MONTHS[e.date.month - 1]|upper }}</small></div>
+            <div class="flex-grow-1 small">
+              <b>{{ e.instrument }}</b>
+              {% if e.kind == 'earnings' %}<span class="text-primary">● Resultados</span> {{ e.title or '' }}
+                {% if e.eps_estimate is not none %}<div>EPS est. <b class="{{ e.eps_estimate|tone }}">{{ e.eps_estimate|number(2) }}</b></div>{% endif %}
+                {% if e.revenue_estimate %}<div>Receita est. <b>{{ (e.revenue_estimate / 1e9)|number(2) }} mil M</b></div>{% endif %}
+              {% elif e.kind == 'ex_dividend' %}<span class="text-up">○ Ex-dividendo</span>
+              {% else %}<span class="text-up">● Pagamento de dividendo</span>{% if e.estimated %} <span class="text-secondary">(estimado)</span>{% endif %}{% endif %}
+              <div class="text-secondary">{{ inst.instrument_name or '' }}</div>
+            </div>
+            <div class="small text-secondary text-end">{{ e.timing or '' }}</div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-secondary small mt-3">Sem eventos nas próximas semanas.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+{% if has_data %}
+<script>
+(function () {
+  const spark = {{ hero_spark|safe }};
+  let perf = {{ perf|safe }};
+  let mode = "gain";
+  const active = new Set();
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const c = document.getElementById("heroSpark");
+    const accent = pm.css("--pm-up");
+    pm.chart("heroSpark", {
+      type: "line",
+      data: { labels: spark.map((_, i) => i), datasets: [{ data: spark, borderColor: accent, borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: pm.gradient(c.getContext("2d"), accent), tension: .3 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } } },
+    });
+
+    document.querySelectorAll("#athSeg button").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll("#athSeg button").forEach((x) => x.classList.toggle("active", x === b));
+      document.querySelectorAll(".ath-panel").forEach((p) => p.classList.toggle("d-none", p.dataset.mode !== b.dataset.mode));
+    }));
+    document.querySelectorAll("#modeSeg button").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll("#modeSeg button").forEach((x) => x.classList.toggle("active", x === b));
+      mode = b.dataset.mode; draw();
+    }));
+    document.querySelectorAll("#periods button").forEach((b) => b.addEventListener("click", async () => {
+      document.querySelectorAll("#periods button").forEach((x) => x.classList.toggle("active", x === b));
+      perf = await pm.call("performance", { period: b.dataset.p }); draw();
+    }));
+    document.querySelectorAll(".pm-chip.bench").forEach((b) => b.addEventListener("click", () => {
+      b.classList.toggle("active");
+      active.has(b.dataset.t) ? active.delete(b.dataset.t) : active.add(b.dataset.t);
+      draw();
+    }));
+    document.addEventListener("pm:theme", draw);
+    draw();
+  });
+
+  function draw() {
+    if (!perf) return;
+    const fmt = (d) => new Date(d).toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" });
+    document.getElementById("periodLabel").textContent = fmt(perf.start) + " – hoje";
+    const accent = pm.css("--pm-accent");
+    const ctx = document.getElementById("perfChart").getContext("2d");
+    const series = mode === "gain" ? perf.gain : perf.value;
+    const datasets = [{ label: mode === "gain" ? "Retorno" : "Valor", data: series, borderColor: accent, backgroundColor: pm.gradient(ctx, accent), fill: true, borderWidth: 2, pointRadius: 0, tension: .2, yAxisID: "y" }];
+    // índices de referência: mesma variação % aplicada ao valor inicial do período
+    perf.benchmarks.filter((b) => active.has(b.ticker)).forEach((b) => {
+      const base = mode === "gain" ? perf.value[0] : perf.value[0];
+      const data = b.twr.map((x, i) => mode === "gain" ? x * (perf.value[0] || 1) : base * (1 + x));
+      datasets.push({ label: b.name, data, borderColor: b.color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .2 });
+    });
+    pm.chart("perfChart", {
+      type: "line",
+      data: { labels: perf.dates, datasets },
+      options: {
+        maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: datasets.length > 1, position: "bottom" },
+          tooltip: { callbacks: { title: (it) => fmt(it[0].label), label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0, mode === "gain")}` } } },
+        scales: { x: { ticks: { maxTicksLimit: 8, callback: (v, i) => perf.dates[i].slice(0, 7) }, grid: { display: false } },
+                  y: { position: "right", ticks: { callback: (v) => pm.money(v, 0, mode === "gain") } } },
+      },
+    });
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

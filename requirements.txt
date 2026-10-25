@@ -1,0 +1,6 @@
+Flask>=3.0
+Flask-SQLAlchemy>=3.1
+waitress>=3.0
+openpyxl>=3.1
+# cotações, câmbios, notícias e eventos (opcional, precisa de internet)
+yfinance>=0.2

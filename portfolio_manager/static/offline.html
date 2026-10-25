@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aplicação parada · Portfolio Manager</title>
+  <script>
+    (function () {
+      let pref = "auto";
+      try { pref = localStorage.getItem("pm-theme") || "auto"; } catch (e) {}
+      const dark = pref === "dark" || (pref === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+    })();
+  </script>
+  <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css" rel="stylesheet">
+</head>
+<body class="bg-body-tertiary">
+<main class="container d-flex align-items-center justify-content-center min-vh-100 py-4">
+  <div class="card shadow-sm w-100" style="max-width: 460px">
+    <div class="card-body p-4">
+      <div class="d-flex align-items-center gap-2 mb-4">
+        <img src="/static/icons/favicon.svg" width="32" height="32" alt=""><span class="fs-4 fw-semibold">Portfolio Manager</span>
+      </div>
+      <h1 class="h5"><i class="bi bi-plug text-warning"></i> A aplicação não está a correr</h1>
+      <p class="text-body-secondary">Os teus dados ficam no computador, por isso a aplicação precisa de estar ligada. Inicia-a e tenta de novo:</p>
+      <ul class="text-body-secondary small">
+        <li><b>Windows:</b> duplo clique em <code>iniciar.bat</code></li>
+        <li><b>macOS:</b> duplo clique em <code>iniciar.command</code></li>
+        <li><b>Linux:</b> <code>./iniciar.sh</code></li>
+      </ul>
+      <button class="btn btn-primary w-100" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i> Tentar de novo</button>
+    </div>
+  </div>
+</main>
+<script>
+  // volta sozinha quando a aplicação arrancar
+  setInterval(() => fetch("/", { method: "HEAD", cache: "no-store" }).then((r) => { if (r.ok || r.status === 302) location.reload(); }).catch(() => {}), 3000);
+</script>
+</body>
+</html>

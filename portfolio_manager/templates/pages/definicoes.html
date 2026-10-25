@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-xl-5">
+    <div class="pm-card mb-3">
+      <div class="pm-label mb-3">Corretoras</div>
+      {% for b in brokers %}
+      <form class="d-flex gap-2 mb-2" data-pm-method="save_broker" data-pm-success="Guardado.">
+        <input type="hidden" name="name" value="{{ b.name }}">
+        <input type="color" name="color" value="{{ b.color or '#3b82f6' }}" class="form-control form-control-color form-control-sm">
+        <input name="broker_name" value="{{ b.broker_name }}" class="form-control form-control-sm">
+        <span class="small text-body-secondary text-nowrap align-self-center">{{ b.positions }} pos.</span>
+        <button class="btn btn-sm btn-outline-secondary" type="submit" title="Guardar"><i class="bi bi-check"></i></button>
+        <button class="btn btn-sm btn-outline-danger" type="button" data-pm-action="delete_broker" data-args='{"name": "{{ b.name }}"}' data-confirm="Apagar corretora?"><i class="bi bi-trash"></i></button>
+      </form>
+      {% else %}<p class="text-body-secondary small">Ainda não tens corretoras. São criadas automaticamente ao importar um extrato.</p>{% endfor %}
+      <form class="d-flex gap-2 mt-3" data-pm-method="save_broker" data-pm-success="Corretora criada.">
+        <input type="color" name="color" value="#3b82f6" class="form-control form-control-color form-control-sm">
+        <input name="broker_name" class="form-control form-control-sm" placeholder="Nova corretora" required>
+        <button class="btn btn-sm btn-primary" type="submit">Adicionar</button>
+      </form>
+    </div>
+
+    <div class="pm-card mb-3">
+      <div class="pm-label mb-2">Dados de mercado</div>
+      <p class="small text-body-secondary">Última cotação guardada: <b>{{ last_price|ddmmyyyy }}</b>.
+        As cotações, câmbios, notícias e eventos vêm do Yahoo Finance através do pacote <code>yfinance</code>.</p>
+      {% if last_refresh %}
+        <p class="small text-body-secondary">Última atualização: <b>{{ last_refresh|replace("T", " ") }}</b>.</p>
+        {% if refresh_report %}
+          <details class="small mb-2"><summary>Resultado por ativo</summary>
+            <pre class="small mb-0 mt-2">{{ refresh_report }}</pre></details>
+        {% endif %}
+      {% endif %}
+      {% if yfinance %}
+        <button class="btn btn-sm btn-primary" data-pm-refresh><i class="bi bi-arrow-repeat"></i> Atualizar cotações agora</button>
+      {% else %}
+        <div class="alert alert-secondary small mb-0">Para atualizar cotações, instala o pacote opcional: <code>pip install yfinance</code> (os scripts de arranque já o fazem).</div>
+      {% endif %}
+    </div>
+
+    <div class="pm-card mb-3">
+      <div class="pm-label mb-2">Segurança</div>
+      {% if password_env %}
+        <p class="small text-body-secondary mb-0"><i class="bi bi-shield-check text-success"></i> A palavra-passe está definida na variável de ambiente <code>PORTFOLIO_PASSWORD</code>. Para a mudares, altera essa variável no servidor.</p>
+      {% else %}
+        <p class="small text-body-secondary">
+          {% if auth_enabled %}<i class="bi bi-shield-check text-success"></i> A aplicação pede palavra-passe para entrar.
+          {% else %}<i class="bi bi-shield"></i> Sem palavra-passe: a aplicação só abre neste computador. Define uma para a abrires noutros dispositivos (rede local ou cloud).{% endif %}
+        </p>
+        <form class="row g-2" data-pm-method="set_password" data-pm-success="Palavra-passe guardada.">
+          {% if auth_enabled %}<div class="col-12"><input type="password" name="current_password" class="form-control form-control-sm" placeholder="Palavra-passe atual" autocomplete="current-password" required></div>{% endif %}
+          <div class="col-sm-6"><input type="password" name="new_password" class="form-control form-control-sm" placeholder="Nova palavra-passe (mín. 8)" minlength="8" autocomplete="new-password" required></div>
+          <div class="col-sm-6"><input type="password" name="confirm" class="form-control form-control-sm" placeholder="Repete a nova" minlength="8" autocomplete="new-password" required></div>
+          <div class="col-12"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-key"></i> {{ 'Mudar palavra-passe' if auth_enabled else 'Definir palavra-passe' }}</button></div>
+        </form>
+        {% if auth_enabled %}
+        <hr>
+        <form class="d-flex gap-2" data-pm-method="remove_password" data-pm-success="Palavra-passe removida.">
+          <input type="password" name="current_password" class="form-control form-control-sm" placeholder="Palavra-passe atual" autocomplete="current-password" required>
+          <button class="btn btn-sm btn-outline-danger text-nowrap" type="submit"><i class="bi bi-unlock"></i> Remover</button>
+        </form>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <div class="pm-card">
+      <div class="pm-label mb-2">Os teus dados</div>
+      <p class="small text-body-secondary mb-2">Tudo é guardado localmente, num único ficheiro SQLite:</p>
+      <p class="small"><code class="user-select-all">{{ db_path }}</code></p>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm btn-outline-secondary" href="/api/backup"><i class="bi bi-download"></i> Cópia de segurança (.db)</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/api/export_transactions"><i class="bi bi-filetype-csv"></i> Exportar transações (CSV)</a>
+        <button class="btn btn-sm btn-outline-secondary" data-pm-action="load_demo" data-confirm="Isto substitui as transações atuais por dados de demonstração. Continuar?"><i class="bi bi-magic"></i> Carregar demonstração</button>
+      </div>
+      <hr>
+      <form class="d-flex gap-2" data-pm-method="reset_data" data-pm-success="Dados apagados.">
+        <input name="confirm" class="form-control form-control-sm" placeholder='Escreve APAGAR para confirmar'>
+        <button class="btn btn-sm btn-danger text-nowrap" type="submit"><i class="bi bi-trash"></i> Apagar tudo</button>
+      </form>
+      <p class="small text-body-secondary mt-2 mb-0">Para restaurar uma cópia, fecha a aplicação e substitui o ficheiro acima pelo ficheiro da cópia.</p>
+    </div>
+  </div>
+
+  <div class="col-xl-7"><div class="pm-card">
+    <div class="pm-label mb-1">Ativos</div>
+    <p class="small text-body-secondary">O <b>símbolo de dados</b> é o código no Yahoo Finance (ex.: <code>VWCE.DE</code>, <code>IWDA.AS</code>, <code>AAPL</code>). O setor define os filtros da página Carteira.</p>
+    {% for i in instruments %}
+      <form class="d-flex gap-2 align-items-center py-2 border-bottom" data-pm-method="update_instrument" data-pm-success="Ativo atualizado." data-pm-reload="false">
+        <input type="hidden" name="ticker" value="{{ i.ticker }}"><b style="min-width: 110px" class="small">{{ i.ticker }}</b>
+        <input name="instrument_name" value="{{ i.instrument_name or '' }}" class="form-control form-control-sm" placeholder="Nome">
+        <select name="kind" class="form-select form-select-sm" style="width: 90px"><option value="stock" {{ 'selected' if i.kind == 'stock' }}>Ação</option><option value="etf" {{ 'selected' if i.kind == 'etf' }}>ETF</option></select>
+        <input name="sector" value="{{ i.sector or '' }}" class="form-control form-control-sm" placeholder="Setor">
+        <input name="data_symbol" value="{{ i.data_symbol or '' }}" class="form-control form-control-sm" placeholder="Símbolo">
+        <input type="color" name="color" value="{{ i.color or '#64748b' }}" class="form-control form-control-color form-control-sm">
+        <button class="btn btn-sm btn-outline-secondary" type="submit" title="Guardar"><i class="bi bi-check"></i></button>
+      </form>
+    {% else %}<p class="text-body-secondary">Sem ativos.</p>{% endfor %}
+  </div></div>
+</div>
+{% endblock %}

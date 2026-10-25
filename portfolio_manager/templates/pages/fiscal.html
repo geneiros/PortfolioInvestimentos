@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help, empty %}
+{% if not y %}
+  {{ empty("Sem movimentos com relevância fiscal", "Vendas, dividendos e juros aparecem aqui agrupados por ano.", "/importar", "Importar extrato") }}
+{% else %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+  <h5 class="m-0 fw-bold">Resumo fiscal</h5>
+  <ul class="nav nav-pills ms-auto">
+    {% for yr in years %}<li class="nav-item"><a class="nav-link {{ 'active' if yr == year }}" href="?ano={{ yr }}">{{ yr }}</a></li>{% endfor %}
+  </ul>
+</div>
+<div class="alert alert-secondary small"><i class="bi bi-info-circle"></i>
+  Estimativa para Portugal com a taxa autónoma de 28% (mais-valias, Anexo G/J) e taxa liberatória de 28% (dividendos e juros, com crédito pela retenção estrangeira até ao limite português).
+  Não substitui o aconselhamento de um contabilista — confirma os valores antes de submeter a declaração.</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-6 col-xl-3"><div class="pm-card pm-card-sm">
+    <div class="pm-label">Saldo de mais-valias {{ help("Ganhos menos perdas das vendas do ano, pelo método FIFO.") }}</div>
+    <div class="pm-mid {{ y.balance|tone }} money">{{ y.balance|money(2, sign=True) }}</div>
+    <div class="small text-secondary">ganhos <span class="money">{{ y.gains|money(2) }}</span> · perdas <span class="money">{{ y.losses|money(2) }}</span></div>
+  </div></div>
+  <div class="col-md-6 col-xl-3"><div class="pm-card pm-card-sm">
+    <div class="pm-label">Dividendos brutos</div>
+    <div class="pm-mid text-up money">{{ y.div_gross|money(2) }}</div>
+    <div class="small text-secondary">retido na fonte <span class="money">{{ y.div_tax|money(2) }}</span></div>
+  </div></div>
+  <div class="col-md-6 col-xl-3"><div class="pm-card pm-card-sm">
+    <div class="pm-label">Juros</div>
+    <div class="pm-mid text-up money">{{ y.interest|money(2) }}</div>
+    <div class="small text-secondary">juros da conta líquidos</div>
+  </div></div>
+  <div class="col-md-6 col-xl-3"><div class="pm-card pm-card-sm">
+    <div class="pm-label">Imposto estimado (28%) {{ help("Mais-valias + diferença a pagar sobre dividendos + juros. Saldos negativos de mais-valias podem ser reportados nos 5 anos seguintes se optares pelo englobamento.") }}</div>
+    <div class="pm-mid text-down money">{{ (y.tax_gains + y.tax_dividends)|money(2) }}</div>
+    <div class="small text-secondary">mais-valias <span class="money">{{ y.tax_gains|money(2) }}</span> · dividendos <span class="money">{{ y.tax_dividends|money(2) }}</span></div>
+  </div></div>
+</div>
+
+<div class="pm-card">
+  <div class="d-flex align-items-center mb-3"><div class="pm-label">Vendas de {{ year }} · {{ y.sales|length }} linhas FIFO</div>
+    <button class="btn btn-pm btn-sm ms-auto" id="csvBtn"><i class="bi bi-download"></i> Exportar CSV</button></div>
+  {% if y.sales %}
+  <div class="pm-table-wrap"><table class="table pm-table" id="salesTable">
+    <thead><tr><th data-sort="text">Data venda</th><th data-sort="text">Ativo</th><th data-sort="text">Data aquisição</th>
+      <th data-sort="num" class="text-end">Quantidade</th><th data-sort="num" class="text-end">Valor realização</th>
+      <th data-sort="num" class="text-end">Valor aquisição</th><th data-sort="num" class="text-end">Mais/menos-valia</th></tr></thead>
+    <tbody>{% for sl in y.sales %}
+      <tr><td data-v="{{ sl.date }}">{{ sl.date|ddmmyyyy }}</td><td><b>{{ sl.asset.ticker }}</b> <span class="sub">{{ sl.asset.name }}</span></td>
+        <td data-v="{{ sl.acquired }}">{{ sl.acquired|ddmmyyyy if sl.acquired else 'anterior ao histórico' }}</td><td class="text-end" data-v="{{ sl.qty }}">{{ sl.qty|number(4) }}</td>
+        <td class="text-end money" data-v="{{ sl.proceeds_eur }}">{{ sl.proceeds_eur|money(2) }}</td>
+        <td class="text-end money" data-v="{{ sl.cost_eur }}">{{ sl.cost_eur|money(2) }}</td>
+        <td class="text-end {{ sl.gain_eur|tone }} money" data-v="{{ sl.gain_eur }}">{{ sl.gain_eur|money(2, sign=True) }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="text-secondary">Sem vendas neste ano.</p>{% endif %}
+</div>
+{% endif %}
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("csvBtn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const rows = [...document.querySelectorAll("#salesTable tr")].map((tr) =>
+      [...tr.cells].map((c) => `"${(c.dataset.v ?? c.textContent.trim()).toString().replace(/"/g, '""')}"`).join(";"));
+    const blob = new Blob(["﻿" + rows.join("\n")], { type: "text/csv" });
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "mais-valias-{{ year }}.csv" });
+    a.click();
+  });
+});
+</script>
+{% endblock %}

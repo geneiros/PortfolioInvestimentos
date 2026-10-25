@@ -1,0 +1,8 @@
+.venv/
+.venv-android/
+__pycache__/
+*.pyc
+instance/
+*.db
+.pytest_cache/
+dump.rdb

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} · Portfolio Manager</title>
+  <script>
+    // modos de cor nativos do Bootstrap: light | dark | auto (segue o sistema operativo)
+    (function () {
+      let pref = "auto";
+      try { pref = localStorage.getItem("pm-theme") || "auto"; } catch (e) {}
+      const dark = pref === "dark" || (pref === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+    })();
+  </script>
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <meta name="theme-color" content="#0d6efd">
+  <link rel="icon" href="{{ url_for('static', filename='icons/favicon.svg') }}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
+  <link rel="preload" href="{{ url_for('static', filename='vendor/bootstrap-icons/fonts/bootstrap-icons.woff2') }}?dd67030699838ea613ee6dbda90effa6" as="font" type="font/woff2" crossorigin>
+  <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/pm.css') }}" rel="stylesheet">
+  <script>window.csrf_token = "{{ csrf_token }}";</script>
+</head>
+{% from "macros.html" import broker_badge %}
+<body>
+<div class="pm-shell">
+  <aside class="pm-sidebar d-flex flex-column p-3 bg-body-tertiary border-end">
+    <a class="d-flex align-items-center gap-2 mb-3 link-body-emphasis text-decoration-none" href="/">
+      <svg class="pm-logo text-primary" width="24" height="24" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h1v15h15v1H0zm10 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V4.9l-3.613 4.417a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61L13.445 4H10.5a.5.5 0 0 1-.5-.5"/></svg><span class="label fs-5 fw-semibold text-nowrap">Portfolio Manager</span>
+    </a>
+    <hr class="mt-0">
+    <ul class="nav nav-pills flex-column mb-auto">
+      {% for key, label, url, icon in nav %}
+      <li class="nav-item">
+        <a href="{{ url }}" class="nav-link {{ 'active' if active == key else 'link-body-emphasis' }}"><i class="bi {{ icon }}"></i><span class="label">{{ label }}</span></a>
+      </li>
+      {% endfor %}
+      <li><hr></li>
+      {% for key, label, url, icon in nav_bottom %}
+      <li class="nav-item"><a href="{{ url }}" class="nav-link {{ 'active' if active == key else 'link-body-emphasis' }}"><i class="bi {{ icon }}"></i><span class="label">{{ label }}</span></a></li>
+      {% endfor %}
+    </ul>
+    <hr>
+    <div class="d-flex align-items-center gap-2">
+      <div class="dropup">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Tema">
+          <i class="bi bi-circle-half"></i><span class="label ms-1">Tema</span>
+        </button>
+        <ul class="dropdown-menu">
+          <li><button class="dropdown-item" data-pm-theme="light"><i class="bi bi-sun me-2"></i>Claro</button></li>
+          <li><button class="dropdown-item" data-pm-theme="dark"><i class="bi bi-moon-stars me-2"></i>Escuro</button></li>
+          <li><button class="dropdown-item" data-pm-theme="auto"><i class="bi bi-circle-half me-2"></i>Automático</button></li>
+        </ul>
+      </div>
+      {% if auth_enabled %}
+      <button class="btn btn-sm btn-outline-secondary" data-pm-action="logout" title="Sair"><i class="bi bi-box-arrow-right"></i><span class="label ms-1">Sair</span></button>
+      {% endif %}
+      <button class="btn btn-sm btn-outline-secondary ms-auto d-none d-lg-inline-block" data-pm-toggle="collapse" title="Recolher menu"><i class="bi bi-layout-sidebar"></i></button>
+    </div>
+  </aside>
+
+  <div class="pm-main">
+    <nav class="navbar bg-body border-bottom sticky-top px-3 gap-2">
+      <button class="btn btn-outline-secondary btn-icon d-lg-none" data-pm-toggle="menu"><i class="bi bi-list"></i></button>
+      <div class="dropdown">
+        <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown">
+          {% if broker_doc %}{{ broker_badge(broker_doc) }} {{ broker_doc.broker_name }}
+          {% else %}<i class="bi bi-collection"></i> Todas as corretoras{% endif %}
+        </button>
+        <div class="dropdown-menu" style="min-width: 320px">
+          <h6 class="dropdown-header">Ver dados de</h6>
+          <a class="dropdown-item d-flex gap-2 align-items-center {{ 'active' if not broker }}" href="#" data-pm-broker="">
+            <i class="bi bi-collection"></i>
+            <div class="flex-grow-1">Todas as corretoras<div class="small opacity-75">{{ total_positions }} {{ 'posição' if total_positions == 1 else 'posições' }}</div></div>
+          </a>
+          {% for b in brokers %}
+          <a class="dropdown-item d-flex gap-2 align-items-center {{ 'active' if broker == b.name }}" href="#" data-pm-broker="{{ b.name }}">
+            {{ broker_badge(b) }}
+            <div class="flex-grow-1">{{ b.broker_name }}
+              <div class="small opacity-75">{{ b.positions }} {{ 'posição' if b.positions == 1 else 'posições' }}{% if b.since %} · desde {{ b.since|month_label|lower }}{% endif %}</div></div>
+          </a>
+          {% endfor %}
+          <div class="dropdown-divider"></div>
+          <a class="dropdown-item" href="/importar"><i class="bi bi-plus-lg me-2"></i>Adicionar corretora</a>
+        </div>
+      </div>
+
+      <div class="mx-auto d-none d-md-flex align-items-center gap-2">
+        <button class="btn btn-outline-secondary btn-icon" data-pm-toggle="private" title="Esconder valores"><i class="bi bi-eye"></i></button>
+        {% set dc = day_change %}
+        {% if has_data %}
+        <span class="badge rounded-pill {{ 'text-bg-success' if dc[0] > 0 else ('text-bg-danger' if dc[0] < 0 else 'text-bg-secondary') }} fs-6 fw-normal">
+          <span class="money">{{ dc[0]|money(2, sign=True) }}</span> ({{ dc[1]|pct(2) }}) · {{ p.as_of|ddmm }}</span>
+        {% endif %}
+        <span class="badge rounded-pill {{ 'text-bg-success' if market.open else 'bg-body-secondary text-body border' }} fs-6 fw-normal">{{ market.label }} · {{ market.detail }}</span>
+      </div>
+      <span class="small text-body-secondary d-none d-xl-inline">{% if eurusd %}EUR/USD {{ eurusd|number(4) }}{% endif %}</span>
+    </nav>
+
+    {% if is_demo %}
+    <div class="alert alert-warning rounded-0 border-0 border-bottom mb-0 py-2 small d-flex align-items-center gap-2">
+      <i class="bi bi-info-circle"></i> Estás a ver <b>dados de demonstração</b> (empresas fictícias e preços sintéticos).
+      <a href="/definicoes" class="alert-link ms-auto">Apagar e começar com os teus dados</a>
+    </div>
+    {% elif not hide_banner %}
+    <div class="alert alert-primary alert-dismissible rounded-0 border-0 border-bottom mb-0 d-flex align-items-center gap-3 flex-wrap">
+      <div class="flex-grow-1">
+        {% if not has_data %}
+          <b>Bem-vindo! Começa por importar o extrato da tua corretora</b> ou experimenta com dados de demonstração.
+        {% else %}
+          <b>Os teus dados ficam só neste computador.</b> Faz cópias de segurança em Definições.
+        {% endif %}
+      </div>
+      {% if not has_data %}<button class="btn btn-sm btn-outline-primary" data-pm-action="load_demo">Ver demonstração</button>{% endif %}
+      <a class="btn btn-sm btn-primary" href="{{ '/importar' if not has_data else '/definicoes' }}">{{ 'Importar' if not has_data else 'Definições' }}</a>
+      <button type="button" class="btn-close" data-pm-action="hide_banner" aria-label="Fechar"></button>
+    </div>
+    {% endif %}
+
+    <main class="pm-content">
+      {% if warnings and active in ("overview", "carteira", "desempenho", "fiscal", "importar") %}
+        {% for w in warnings %}
+        <div class="alert alert-warning alert-dismissible fade show d-flex gap-2 align-items-start small" data-pm-warning="{{ w }}">
+          <i class="bi bi-exclamation-triangle mt-1"></i><div>{{ w }}</div>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+        </div>
+        {% endfor %}
+        <script>
+          // avisos fechados não voltam a aparecer enquanto o texto for o mesmo (escondidos antes de pintar a página)
+          (function () {
+            let closed = [];
+            try { closed = JSON.parse(localStorage.getItem("pm-closed-warnings") || "[]"); } catch (e) {}
+            document.querySelectorAll("[data-pm-warning]").forEach((el) => { if (closed.includes(el.dataset.pmWarning)) el.remove(); });
+          })();
+        </script>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pm.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

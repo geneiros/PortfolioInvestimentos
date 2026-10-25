@@ -1,0 +1,235 @@
+"""Testes do motor de cálculo (Python puro, não precisam do Frappe)."""
+from datetime import date, timedelta
+
+import pytest
+
+from portfolio_manager.engine.portfolio import (
+    Instrument, Portfolio, PriceBook, Tx, drawdown, period_returns, streak, xirr,
+)
+
+ACME = Instrument("ACME", "Acme Corp", currency="EUR", sector="Tecnologia")
+USCO = Instrument("USCO", "US Co", currency="USD")
+SPX = Instrument("^GSPC", "S&P 500", kind="index", currency="USD")
+
+
+def weekdays(start, end):
+    d = start
+    while d <= end:
+        if d.weekday() < 5:
+            yield d
+        d += timedelta(days=1)
+
+
+def book_linear(ticker, start, end, p0, p1):
+    days = list(weekdays(start, end))
+    n = len(days) - 1
+    return {ticker: [(d, p0 + (p1 - p0) * i / n) for i, d in enumerate(days)]}
+
+
+def test_fifo_realized_and_unrealized():
+    d0 = date(2024, 1, 2)
+    prices = {"ACME": [(d0, 10.0), (date(2024, 3, 1), 15.0), (date(2024, 6, 3), 20.0)]}
+    txs = [
+        Tx(d0, "DEPOSIT", amount=3000),
+        Tx(d0, "BUY", ACME, quantity=100, price=10, fees=1),
+        Tx(date(2024, 3, 1), "BUY", ACME, quantity=100, price=15, fees=1),
+        Tx(date(2024, 6, 3), "SELL", ACME, quantity=150, price=20, fees=2),
+    ]
+    p = Portfolio(txs, PriceBook(prices), as_of=date(2024, 6, 3))
+    pos = p.positions["ACME"]
+    # FIFO: 100 @ (1001/100) + 50 @ (1501/100 por unidade)
+    cost = 1001 + 1501 / 2
+    assert p.realized == pytest.approx(150 * 20 - 2 - cost)
+    assert pos.qty == pytest.approx(50)
+    assert pos.invested_eur == pytest.approx(1501 / 2)
+    assert pos.value_eur == pytest.approx(1000)
+    assert p.sales[0].acquired == d0 and p.sales[1].acquired == date(2024, 3, 1)
+
+
+def test_implicit_deposit_and_total_return():
+    d0 = date(2024, 1, 1)
+    prices = book_linear("ACME", d0, date(2024, 12, 31), 10, 12)
+    txs = [Tx(d0, "BUY", ACME, quantity=10, price=10)]
+    p = Portfolio(txs, PriceBook(prices), as_of=date(2024, 12, 31))
+    assert p.implicit_deposits == pytest.approx(100)
+    assert p.net_deposits == pytest.approx(100)
+    assert p.total_value == pytest.approx(120)
+    assert p.total_return_pct == pytest.approx(0.20)
+    perf = p.performance("MAX")
+    assert perf["twr_total"] == pytest.approx(0.20)
+    assert perf["irr"] == pytest.approx(0.20, abs=0.01)
+
+
+def test_twr_ignores_cash_flows():
+    d0 = date(2024, 1, 1)
+    prices = book_linear("ACME", d0, date(2024, 12, 31), 10, 20)
+    mid = date(2024, 7, 1)
+    mid_price = PriceBook(prices).price("ACME", mid)
+    txs = [
+        Tx(d0, "BUY", ACME, quantity=10, price=10),
+        Tx(mid, "BUY", ACME, quantity=100, price=mid_price),  # grande entrada a meio
+    ]
+    p = Portfolio(txs, PriceBook(prices), as_of=date(2024, 12, 31))
+    # o TWR depende só do preço (10 -> 20), não da entrada a meio do ano
+    assert p.performance("MAX")["twr_total"] == pytest.approx(1.0, rel=1e-6)
+
+
+def test_currency_conversion_and_fx_effect():
+    d0 = date(2024, 1, 2)
+    d1 = date(2024, 2, 1)
+    book = PriceBook({"USCO": [(d0, 100.0), (d1, 100.0)]}, {"USD": [(d0, 1.0), (d1, 1.25)]})
+    p = Portfolio([Tx(d0, "BUY", USCO, quantity=10, price=100, currency="USD")], book, as_of=d1)
+    pos = p.positions["USCO"]
+    assert pos.invested_eur == pytest.approx(1000)
+    assert pos.value_eur == pytest.approx(800)
+    assert pos.fx_effect_eur == pytest.approx(-200)
+
+
+def test_dividends_and_fiscal():
+    d0 = date(2023, 1, 2)
+    prices = book_linear("ACME", d0, date(2024, 12, 31), 10, 10)
+    txs = [Tx(d0, "BUY", ACME, quantity=100, price=10)]
+    for y in (2023, 2024):
+        for m in (3, 9):
+            txs.append(Tx(date(y, m, 15), "DIVIDEND", ACME, quantity=100, amount=20, tax=3))
+    txs.append(Tx(date(2024, 10, 1), "INTEREST", amount=10))
+    p = Portfolio(txs, PriceBook(prices), as_of=date(2024, 12, 31))
+    s = p.dividend_summary()
+    assert s["gross"] == pytest.approx(80) and s["tax"] == pytest.approx(12)
+    assert s["net"] == pytest.approx(68)
+    assert s["months_with"] == 4
+    assert s["forward_gross"] == pytest.approx(40)
+    fiscal = p.fiscal_years()
+    assert fiscal[2024]["div_gross"] == pytest.approx(40)
+    assert fiscal[2024]["tax_dividends"] == pytest.approx(40 * 0.28 - 6)
+    assert fiscal[2024]["interest"] == pytest.approx(10)
+
+
+def test_benchmark_merit_and_risk():
+    d0, d1 = date(2022, 1, 3), date(2024, 12, 31)
+    prices = book_linear("ACME", d0, d1, 100, 150)
+    prices.update(book_linear("^GSPC", d0, d1, 4000, 5000))
+    p = Portfolio([Tx(d0, "BUY", ACME, quantity=1, price=100)], PriceBook(prices), [SPX], as_of=d1)
+    perf = p.performance("MAX")
+    assert perf["benchmarks"][0]["total"] == pytest.approx(0.25)
+    assert perf["merit"]["excess_cagr"] > 0
+    assert perf["risk"]["max_drawdown"] == pytest.approx(0.0)
+    assert len(perf["yearly"]) == 3
+
+
+def test_period_filter_rebases():
+    d0, d1 = date(2023, 1, 2), date(2024, 12, 31)
+    prices = book_linear("ACME", d0, d1, 100, 200)
+    p = Portfolio([Tx(d0, "BUY", ACME, quantity=1, price=100)], PriceBook(prices), as_of=d1)
+    ytd = p.performance("YTD")
+    assert ytd["twr"][0] == pytest.approx(0.0)
+    start_price = PriceBook(prices).price("ACME", date(2023, 12, 29))
+    assert ytd["twr_total"] == pytest.approx(200 / start_price - 1, rel=1e-6)
+
+
+def test_helpers():
+    assert drawdown([1, 1.2, 0.9, 1.3]) == pytest.approx([0, 0, -0.25, 0])
+    dates = [date(2024, 1, 31), date(2024, 2, 29), date(2024, 3, 29)]
+    out = period_returns(dates, [1.0, 1.1, 0.99], "month")
+    assert [k for k, _ in out] == ["2024-01", "2024-02", "2024-03"]
+    assert [r for _, r in out] == pytest.approx([0.0, 0.1, -0.1])
+    assert streak([("a", 0.1), ("b", -0.1), ("c", 0.2), ("d", 0.1)]) == (2, "up")
+    r = xirr([(date(2020, 1, 1), -100), (date(2021, 1, 1), 110)])
+    assert r == pytest.approx(0.10, abs=1e-3)
+
+
+def test_opening_position_uses_broker_result():
+    """Venda de ações compradas antes do histórico: custo estimado pelo resultado da corretora."""
+    d0, d1 = date(2026, 1, 2), date(2026, 3, 2)
+    book = PriceBook({"ACME": [(d0, 10.0), (d1, 12.0)]})
+    txs = [Tx(d0, "DEPOSIT", amount=100),
+           Tx(d1, "SELL", ACME, quantity=50, price=12, fees=1, result=99)]  # custo = 600 - 1 - 99 = 500
+    p = Portfolio(txs, book, as_of=d1)
+    assert len(p.opening) == 1 and p.warnings
+    assert p.realized == pytest.approx(99)
+    assert p.sales[0].acquired is None
+    assert p.positions["ACME"].qty == pytest.approx(0)
+
+
+def test_transfer_out_has_no_realized_gain():
+    d0, d1 = date(2026, 1, 2), date(2026, 2, 2)
+    book = PriceBook({"ACME": [(d0, 10.0), (d1, 15.0)]})
+    txs = [Tx(d0, "BUY", ACME, quantity=10, price=10), Tx(d1, "TRANSFER_OUT", ACME, quantity=10, price=15)]
+    p = Portfolio(txs, book, as_of=d1)
+    assert p.sales == [] and p.realized == 0
+    assert p.holdings_value == pytest.approx(0)
+    # a saída das ações é um fluxo externo: o TWR reflete só a valorização (10 -> 15)
+    assert p.performance("MAX")["twr_total"] == pytest.approx(0.5)
+
+
+def test_twr_survives_nearly_empty_portfolio():
+    """Depois de vender quase tudo, um resíduo de cêntimos não pode gerar retornos absurdos."""
+    d = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
+    book = PriceBook({"ACME": [(d[0], 10.0), (d[2], 10.0), (d[3], 10.5), (d[5], 11.0)]})
+    txs = [Tx(d[0], "BUY", ACME, quantity=10, price=10),
+           Tx(d[2], "SELL", ACME, quantity=9.999, price=10),
+           Tx(d[2], "WITHDRAWAL", amount=99.99),
+           Tx(d[3], "BUY", ACME, quantity=10, price=10.5)]   # volta a investir com nova entrada
+    p = Portfolio(txs, book, as_of=d[5])
+    twr = p.performance("MAX")["twr_total"]
+    assert -0.5 < twr < 0.5
+
+
+def test_fund_conversion_keeps_cost_and_dates():
+    """Conversão de fundo (ex.: PRAW -> F50A): custo e datas de compra passam para o novo ativo."""
+    old, new = Instrument("OLD"), Instrument("NEW")
+    d0, d1, d2 = date(2024, 1, 2), date(2024, 6, 3), date(2024, 9, 2)
+    book = PriceBook({"OLD": [(d0, 10.0)], "NEW": [(d1, 12.0), (d2, 13.0)]})
+    txs = [Tx(d0, "BUY", old, quantity=100, price=10),
+           Tx(d1, "CONVERT_IN", new, quantity=100),
+           Tx(d1, "CONVERT_OUT", old, quantity=100, result=-1000),
+           Tx(d2, "SELL", new, quantity=100, price=13)]
+    p = Portfolio(txs, book, as_of=d2)
+    assert p.realized == pytest.approx(300)            # 1300 - 1000, sem a perda falsa da conversão
+    assert p.sales[-1].acquired == d0                  # data de compra original (FIFO no IRS)
+    assert p.positions["OLD"].realized_eur == 0
+
+
+def test_total_return_pct_not_inflated_by_withdrawals():
+    # deposita 10 000, duplica, levanta quase tudo: o líquido depositado fica negativo/minúsculo
+    d0, d1, end = date(2024, 1, 2), date(2024, 12, 31), date(2025, 6, 30)
+    prices = book_linear("ACME", d0, d1, 10.0, 20.0)
+    prices["ACME"] += [(d, 20.0) for d in weekdays(d1 + timedelta(days=1), end)]
+    txs = [
+        Tx(d0, "DEPOSIT", amount=10000),
+        Tx(d0, "BUY", ACME, quantity=1000, price=10),
+        Tx(d1, "SELL", ACME, quantity=900, price=20),
+        Tx(d1, "WITHDRAWAL", amount=17500),
+    ]
+    p = Portfolio(txs, PriceBook(prices), as_of=end)
+    assert p.total_return == pytest.approx(10000, abs=1)
+    assert p.total_return_pct == pytest.approx(1.0, abs=0.01)  # a ação duplicou: +100%, não +∞
+    perf = p.performance("MAX")
+    assert perf["return_pct"] == pytest.approx(1.0, abs=0.01)
+
+
+def test_overview_pct_matches_euros():
+    d0 = date(2024, 1, 2)
+    prices = {"ACME": [(d0, 10.0), (date(2025, 1, 2), 12.0), (date(2025, 6, 30), 15.0)]}
+    txs = [Tx(d0, "DEPOSIT", amount=1000), Tx(d0, "BUY", ACME, quantity=100, price=10),
+           Tx(date(2025, 1, 2), "DEPOSIT", amount=1200), Tx(date(2025, 1, 2), "BUY", ACME, quantity=100, price=12)]
+    p = Portfolio(txs, PriceBook(prices), as_of=date(2025, 6, 30))
+    assert p.total_return == pytest.approx(800)  # 3 000 de valor - 2 200 depositados
+    assert p.total_return_pct == pytest.approx(800 / 2200)
+    gain, pct = p.year_to_date()
+    assert gain == pytest.approx(800)  # 3 000 - 1 000 a 31/12 - 1 200 depositados no ano
+    assert pct == pytest.approx(800 / 2200)
+
+
+def test_day_change_ignores_weekend_movements():
+    # sexta 23/10 e quinta 22/10 com cotações; juros no sábado 24/10 prolongam a série
+    thu, fri, sat = date(2026, 10, 22), date(2026, 10, 23), date(2026, 10, 24)
+    prices = {"ACME": [(date(2026, 10, 21), 10.0), (thu, 10.0), (fri, 11.0)], "^GSPC": [(thu, 100.0), (fri, 102.0)]}
+    txs = [Tx(date(2026, 10, 21), "DEPOSIT", amount=1000), Tx(date(2026, 10, 21), "BUY", ACME, quantity=100, price=10),
+           Tx(sat, "INTEREST", amount=0.5)]
+    p = Portfolio(txs, PriceBook(prices), benchmarks=[SPX], as_of=fri)
+    assert p.series.dates[-1] == sat
+    diff, pct = p.day_change()
+    assert diff == pytest.approx(100) and pct == pytest.approx(0.1)  # sexta vs quinta, não sábado vs sexta
+    assert p.positions["ACME"].day_change_pct == pytest.approx(0.1)
+    assert p.benchmark_day_change(SPX) == pytest.approx(0.02)
