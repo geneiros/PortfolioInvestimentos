@@ -18,8 +18,8 @@ if [ -z "$PREFIX" ] || [ "${PREFIX#*com.termux}" = "$PREFIX" ]; then
   exit 1
 fi
 
-PORT=${PORT:-5000}
-URL="http://127.0.0.1:$PORT/"
+PORT=${PORT:-}  # vazio: a aplicação usa a 5000 ou, se estiver ocupada, a primeira porta livre
+URL_FILE="${TMPDIR:-$PREFIX/tmp}/portfolio-investimentos-url"
 VENV=.venv-android
 DEPS="Flask>=3.0 Flask-SQLAlchemy>=3.1 waitress>=3.0 openpyxl>=3.1 tzdata"
 
@@ -60,15 +60,16 @@ if command -v termux-wake-lock >/dev/null 2>&1; then
 fi
 
 echo
-echo "Portfolio Investimentos a correr em $URL"
 echo "No Chrome: menu ⋮ → Adicionar ao ecrã principal, para a abrires como uma aplicação."
 echo "Para terminar: Ctrl+C (no teclado do Termux: CTRL e depois C)."
 echo
 
-# abre o browser assim que o servidor estiver a responder
+# abre o browser no endereço que a aplicação escolher, assim que estiver a responder
+rm -f "$URL_FILE"
 (
   for _ in $(seq 1 30); do
-    if "$VENV/bin/python" -c "import urllib.request,sys; urllib.request.urlopen(sys.argv[1], timeout=1)" "$URL" 2>/dev/null; then
+    URL=$(cat "$URL_FILE" 2>/dev/null)
+    if [ -n "$URL" ] && "$VENV/bin/python" -c "import urllib.request,sys; urllib.request.urlopen(sys.argv[1], timeout=1)" "$URL" 2>/dev/null; then
       command -v termux-open-url >/dev/null 2>&1 && termux-open-url "$URL"
       break
     fi
@@ -76,4 +77,4 @@ echo
   done
 ) &
 
-"$VENV/bin/python" -m portfolio_investimentos --no-browser --port "$PORT" "$@"
+PORTFOLIO_URL_FILE="$URL_FILE" "$VENV/bin/python" -m portfolio_investimentos --no-browser ${PORT:+--port "$PORT"} "$@"

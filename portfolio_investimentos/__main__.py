@@ -8,7 +8,8 @@ from . import create_app, data_dir
 
 def main():
     parser = argparse.ArgumentParser(prog="portfolio_investimentos", description="Gestor de carteira (local)")
-    parser.add_argument("--port", type=int, default=5000, help="porta (por omissão 5000)")
+    parser.add_argument("--port", type=int, default=None,
+                        help="porta (por omissão 5000; se estiver ocupada, usa a primeira livre até 5020)")
     parser.add_argument("--host", default="127.0.0.1",
                         help="endereço (por omissão 127.0.0.1; 0.0.0.0 abre-a na rede local e exige palavra-passe)")
     parser.add_argument("--no-browser", action="store_true", help="não abrir o browser automaticamente")
@@ -34,19 +35,24 @@ def main():
                 print(refresh_all())
         return
 
-    url = f"http://127.0.0.1:{args.port}/"
-    if _port_in_use(args.host, args.port):
-        if _is_this_app(url):
-            # outra janela (ou uma sessão do Termux em segundo plano) já tem a aplicação aberta: usa essa
-            print(f"O Portfolio Investimentos já está a correr em {url}")
-            print("Para o parares: fecha a outra janela, ou corre  pkill -f portfolio_investimentos")
-            if not args.no_browser:
-                webbrowser.open(url)
-            return
+    port, running = _choose_port(args.host, args.port)
+    if port is None:
         print(f"A porta {args.port} está ocupada por outro programa. Usa outra porta, por exemplo:")
         print(f"  python -m portfolio_investimentos --port {args.port + 1}"
               f"      (no Android: PORT={args.port + 1} bash iniciar-android.sh)")
         raise SystemExit(1)
+    url = f"http://127.0.0.1:{port}/"
+    _announce(url)
+    if running:
+        # outra janela (ou uma sessão do Termux em segundo plano) já tem a aplicação aberta: usa essa
+        print(f"O Portfolio Investimentos já está a correr em {url}")
+        print("Para o parares: fecha a outra janela, ou corre  pkill -f portfolio_investimentos")
+        if not args.no_browser:
+            webbrowser.open(url)
+        return
+    if args.port is None and port != DEFAULT_PORT:
+        print(f"A porta {DEFAULT_PORT} está ocupada por outro programa; a usar a {port}.")
+    args.port = port
     print(f"Portfolio Investimentos a correr em {url}")
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print(f"Aberta na rede em {args.host}:{args.port}. Os outros dispositivos só entram depois de definires "
@@ -61,6 +67,32 @@ def main():
         serve(app, host=args.host, port=args.port, threads=4)
     except ImportError:
         app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
+
+
+DEFAULT_PORT = 5000
+
+
+def _choose_port(host, wanted):
+    """Devolve (porta, já_a_correr). Sem porta indicada, procura uma livre (ou esta aplicação) até 5020."""
+    candidates = [wanted] if wanted else range(DEFAULT_PORT, DEFAULT_PORT + 21)
+    for port in candidates:
+        if not _port_in_use(host, port):
+            return port, False
+        if _is_this_app(f"http://127.0.0.1:{port}/"):
+            return port, True
+    return None, False
+
+
+def _announce(url):
+    """Escreve o endereço escolhido onde o script do Android o vai buscar para abrir o browser."""
+    import os
+    target = os.environ.get("PORTFOLIO_URL_FILE")
+    if target:
+        try:
+            with open(target, "w") as fh:
+                fh.write(url)
+        except OSError:
+            pass
 
 
 def _port_in_use(host, port):

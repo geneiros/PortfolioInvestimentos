@@ -520,3 +520,15 @@ def test_detect_broker_and_cli_import(app, tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "xtb.xlsx (xtb): 8 novas transações" in out and "nao-existe.csv: não foi possível ler" in out
     assert exit_.value.code == 1
+
+
+def test_choose_port(monkeypatch):
+    from portfolio_investimentos import __main__ as cli
+    busy, ours = {5000, 5001}, {5001}
+    monkeypatch.setattr(cli, "_port_in_use", lambda host, port: port in busy)
+    monkeypatch.setattr(cli, "_is_this_app", lambda url: any(f":{p}/" in url for p in ours))
+    assert cli._choose_port("127.0.0.1", None) == (5001, True)       # a aplicação já está na 5001
+    ours.clear()
+    assert cli._choose_port("127.0.0.1", None) == (5002, False)      # 5000 e 5001 ocupadas por outros
+    assert cli._choose_port("127.0.0.1", 5000) == (None, False)      # porta indicada e ocupada: erro
+    assert cli._choose_port("127.0.0.1", 6000) == (6000, False)
