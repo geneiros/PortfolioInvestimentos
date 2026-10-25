@@ -53,7 +53,7 @@ O script abre a aplicação no browser do telemóvel. No Chrome, **menu ⋮ → 
 
 | Sistema | Pasta |
 | --- | --- |
-| Windows | `%APPDATA%\PortfolioManager\portfolio.db` |
+| Windows | `%APPDATA%\PortfolioInvestimentos\portfolio.db` (a pasta `PortfolioManager` das versões anteriores muda de nome sozinha) |
 | macOS / Linux | `~/.portfolio-manager/portfolio.db` |
 
 Podes escolher outra pasta com a variável `PORTFOLIO_DATA_DIR` (por exemplo, uma pasta sincronizada com a cloud). Em **Definições** há botões para descarregar uma cópia de segurança (`.db`), exportar as transações em CSV e apagar todos os dados.

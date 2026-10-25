@@ -468,3 +468,15 @@ def test_portfolio_cache_invalidated_on_changes(app, client):
         db.session.commit()
     with app.test_request_context():
         assert data.load_portfolio(None).holdings_value == pytest.approx(500)
+
+
+def test_legacy_data_dir_is_renamed(tmp_path):
+    from portfolio_manager import _adopt_legacy
+    old, new = tmp_path / "PortfolioManager", tmp_path / "PortfolioInvestimentos"
+    old.mkdir()
+    (old / "portfolio.db").write_text("dados")
+    assert _adopt_legacy(old, new) == new
+    assert (new / "portfolio.db").read_text() == "dados" and not old.exists()
+    # já com a pasta nova: não mexe em nada
+    old.mkdir()
+    assert _adopt_legacy(old, new) == new and old.exists()

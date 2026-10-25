@@ -10,13 +10,27 @@ from flask import Flask, session
 __version__ = "0.2.0"
 
 
+def _adopt_legacy(old, new):
+    """Passa a pasta de dados das versões anteriores para o nome novo, sem perder os dados.
+
+    Se não for possível mudar o nome (ex.: ficheiro aberto noutro programa), continua a usar a antiga.
+    """
+    if old.is_dir() and not new.exists():
+        try:
+            old.rename(new)
+        except OSError:
+            return old
+    return new
+
+
 def data_dir():
     """Pasta dos dados do utilizador (pode ser alterada com PORTFOLIO_DATA_DIR)."""
     custom = os.environ.get("PORTFOLIO_DATA_DIR")
     if custom:
         path = Path(custom)
     elif os.name == "nt":
-        path = Path(os.environ.get("APPDATA", Path.home())) / "PortfolioManager"
+        appdata = Path(os.environ.get("APPDATA", Path.home()))
+        path = _adopt_legacy(appdata / "PortfolioManager", appdata / "PortfolioInvestimentos")
     else:
         path = Path.home() / ".portfolio-manager"
     path.mkdir(parents=True, exist_ok=True)
