@@ -27,9 +27,12 @@
 <body>
 <div class="pm-shell">
   <aside class="pm-sidebar d-flex flex-column p-3 bg-body-tertiary border-end">
-    <a class="d-flex align-items-center gap-2 mb-3 link-body-emphasis text-decoration-none" href="/">
-      <svg class="pm-logo text-primary" width="24" height="24" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h1v15h15v1H0zm10 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V4.9l-3.613 4.417a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61L13.445 4H10.5a.5.5 0 0 1-.5-.5"/></svg><span class="label fs-5 fw-semibold lh-sm">Portfolio<br>Investimentos</span>
-    </a>
+    <div class="d-flex align-items-start gap-2 mb-3">
+      <a class="d-flex align-items-center gap-2 link-body-emphasis text-decoration-none" href="/">
+        <svg class="pm-logo text-primary" width="24" height="24" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h1v15h15v1H0zm10 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V4.9l-3.613 4.417a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61L13.445 4H10.5a.5.5 0 0 1-.5-.5"/></svg><span class="label fs-5 fw-semibold lh-sm">Portfolio<br>Investimentos</span>
+      </a>
+      <button class="btn btn-sm btn-outline-secondary ms-auto d-lg-none" data-pm-toggle="menu" aria-label="Fechar menu" title="Fechar menu"><i class="bi bi-x-lg"></i></button>
+    </div>
     <hr class="mt-0">
     <ul class="nav nav-pills flex-column mb-auto">
       {% for key, label, url, icon in nav %}
@@ -43,7 +46,7 @@
       {% endfor %}
     </ul>
     <hr>
-    <div class="d-flex align-items-center gap-2">
+    <div class="pm-sidebar-foot d-flex align-items-center gap-2">
       <div class="dropup">
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Tema">
           <i class="bi bi-circle-half"></i><span class="label ms-1">Tema</span>
@@ -57,9 +60,10 @@
       {% if auth_enabled %}
       <button class="btn btn-sm btn-outline-secondary" data-pm-action="logout" title="Sair"><i class="bi bi-box-arrow-right"></i><span class="label ms-1">Sair</span></button>
       {% endif %}
-      <button class="btn btn-sm btn-outline-secondary ms-auto d-none d-lg-inline-block" data-pm-toggle="collapse" title="Recolher menu"><i class="bi bi-layout-sidebar"></i></button>
+      <button class="btn btn-sm btn-outline-secondary ms-auto d-none d-lg-inline-block" data-pm-toggle="collapse" title="Recolher ou expandir o menu" aria-label="Recolher ou expandir o menu"><i class="bi bi-layout-sidebar"></i></button>
     </div>
   </aside>
+  <div class="pm-backdrop d-lg-none" data-pm-toggle="menu" aria-hidden="true"></div>
 
   <div class="pm-main">
     <nav class="navbar bg-body border-bottom sticky-top px-3 gap-2">

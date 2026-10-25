@@ -184,6 +184,9 @@
     document.querySelectorAll("[data-pm-toggle=menu]").forEach((b) => b.addEventListener("click", () => {
       document.body.classList.toggle("pm-menu-open");
     }));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") document.body.classList.remove("pm-menu-open");
+    });
     document.querySelectorAll("[data-pm-broker]").forEach((a) => a.addEventListener("click", async (e) => {
       e.preventDefault();
       await pm.call("set_broker", { broker: a.dataset.pmBroker || "" });
