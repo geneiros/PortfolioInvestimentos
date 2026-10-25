@@ -20,7 +20,7 @@ fi
 PORT=${PORT:-5000}
 URL="http://127.0.0.1:$PORT/"
 VENV=.venv-android
-DEPS="Flask>=3.0 Flask-SQLAlchemy>=3.1 waitress>=3.0 openpyxl>=3.1"
+DEPS="Flask>=3.0 Flask-SQLAlchemy>=3.1 waitress>=3.0 openpyxl>=3.1 tzdata"
 
 if [ "$1" = "--atualizar" ]; then
   shift
@@ -35,13 +35,14 @@ if ! command -v python >/dev/null 2>&1; then
   pkg update -y && pkg install -y python
 fi
 
-if [ ! -f "$VENV/.pronto" ]; then
-  echo "A preparar o ambiente (só na primeira vez; pode demorar alguns minutos)..."
-  python -m venv "$VENV"
+# o marcador guarda a lista instalada: se a lista mudar numa versão nova, volta a instalar
+if [ "$(cat "$VENV/.pronto" 2>/dev/null)" != "$DEPS" ]; then
+  echo "A preparar o ambiente (pode demorar alguns minutos)..."
+  [ -x "$VENV/bin/python" ] || python -m venv "$VENV"
   "$VENV/bin/python" -m pip install --upgrade pip >/dev/null
   # shellcheck disable=SC2086
   "$VENV/bin/python" -m pip install $DEPS
-  touch "$VENV/.pronto"
+  printf '%s' "$DEPS" > "$VENV/.pronto"
 fi
 
 # impede o Android de suspender o Termux enquanto a aplicação está aberta

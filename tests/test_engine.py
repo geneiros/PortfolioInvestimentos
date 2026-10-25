@@ -233,3 +233,15 @@ def test_day_change_ignores_weekend_movements():
     assert diff == pytest.approx(100) and pct == pytest.approx(0.1)  # sexta vs quinta, não sábado vs sexta
     assert p.positions["ACME"].day_change_pct == pytest.approx(0.1)
     assert p.benchmark_day_change(SPX) == pytest.approx(0.02)
+
+
+def test_lisbon_fallback_matches_zoneinfo():
+    # sem base de fusos (ex.: Termux sem tzdata) a hora de Lisboa calculada tem de coincidir com a oficial
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    from portfolio_investimentos.services.market import _LisbonFallback
+    real, fallback = ZoneInfo("Europe/Lisbon"), _LisbonFallback()
+    t = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    while t < datetime(2028, 1, 1, tzinfo=timezone.utc):
+        assert t.astimezone(fallback).replace(tzinfo=None) == t.astimezone(real).replace(tzinfo=None), t
+        t += timedelta(minutes=30)

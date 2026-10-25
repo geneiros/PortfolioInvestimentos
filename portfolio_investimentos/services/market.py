@@ -6,16 +6,58 @@ rede, a aplicação continua a funcionar com as cotações já guardadas.
 import logging
 import math
 import threading
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from statistics import median
 from types import SimpleNamespace
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..engine.formatting import WEEKDAYS
 from ..models import Alert, Event, FxRate, Instrument, News, Price, Setting, Transaction, db
 
 log = logging.getLogger(__name__)
-LISBON = ZoneInfo("Europe/Lisbon")
+
+
+class _LisbonFallback(tzinfo):
+    """Hora de Portugal continental sem base de dados de fusos (ex.: Android/Termux sem `tzdata`).
+
+    Regra europeia: UTC+0 no inverno e UTC+1 entre o último domingo de março e o último domingo de
+    outubro, com a mudança à 01:00 UTC.
+    """
+
+    @staticmethod
+    def _last_sunday(year, month):
+        d = date(year, month, 31)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+
+    def _summer(self, utc):
+        start = datetime.combine(self._last_sunday(utc.year, 3), time(1))
+        end = datetime.combine(self._last_sunday(utc.year, 10), time(1))
+        return start <= utc < end
+
+    def utcoffset(self, dt):
+        if dt is None:
+            return timedelta(0)
+        return timedelta(hours=1) if self._summer(dt.replace(tzinfo=None) - timedelta(hours=1)) else timedelta(0)
+
+    def dst(self, dt):
+        return self.utcoffset(dt)
+
+    def tzname(self, dt):
+        return "WEST" if self.utcoffset(dt) else "WET"
+
+    def fromutc(self, dt):
+        utc = dt.replace(tzinfo=None)
+        return (utc + (timedelta(hours=1) if self._summer(utc) else timedelta(0))).replace(tzinfo=self)
+
+
+def _lisbon():
+    try:
+        return ZoneInfo("Europe/Lisbon")
+    except ZoneInfoNotFoundError:  # sistema sem base de fusos e sem o pacote tzdata
+        return _LisbonFallback()
+
+
+LISBON = _lisbon()
 OPEN, CLOSE = time(8, 0), time(16, 30)  # Euronext, hora de Lisboa
 
 DEFAULT_BENCHMARKS = [

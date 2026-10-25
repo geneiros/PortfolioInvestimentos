@@ -11,6 +11,6 @@ if [ ! -d .venv ]; then
   echo "A preparar o ambiente (só na primeira vez)..."
   "$PY" -m venv .venv
   .venv/bin/python -m pip install --upgrade pip >/dev/null
-  .venv/bin/python -m pip install -r requirements.txt || .venv/bin/python -m pip install Flask Flask-SQLAlchemy waitress openpyxl
+  .venv/bin/python -m pip install -r requirements.txt || .venv/bin/python -m pip install Flask Flask-SQLAlchemy waitress openpyxl tzdata
 fi
 exec .venv/bin/python -m portfolio_investimentos "$@"

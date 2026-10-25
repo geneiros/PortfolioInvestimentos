@@ -2,5 +2,7 @@ Flask>=3.0
 Flask-SQLAlchemy>=3.1
 waitress>=3.0
 openpyxl>=3.1
+# fusos horários (o Windows e o Android/Termux não têm base de dados de fusos do sistema)
+tzdata
 # cotações, câmbios, notícias e eventos (opcional, precisa de internet)
 yfinance>=0.2

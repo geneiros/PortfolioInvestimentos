@@ -6,7 +6,7 @@ if not exist .venv (
   echo A preparar o ambiente - so na primeira vez...
   %PY% -m venv .venv || (echo Python 3.10+ nao encontrado. Instala-o em https://www.python.org/downloads/ & pause & exit /b 1)
   .venv\Scripts\python -m pip install --upgrade pip
-  .venv\Scripts\python -m pip install -r requirements.txt || .venv\Scripts\python -m pip install Flask Flask-SQLAlchemy waitress openpyxl
+  .venv\Scripts\python -m pip install -r requirements.txt || .venv\Scripts\python -m pip install Flask Flask-SQLAlchemy waitress openpyxl tzdata
 )
 .venv\Scripts\python -m portfolio_investimentos %*
 pause

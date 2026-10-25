@@ -480,3 +480,24 @@ def test_legacy_data_dir_is_renamed(tmp_path):
     # já com a pasta nova: não mexe em nada
     old.mkdir()
     assert _adopt_legacy(old, new) == new and old.exists()
+
+
+def test_starts_without_timezone_database(monkeypatch, tmp_path):
+    """No Android/Termux sem tzdata, ZoneInfo falha: a aplicação tem de arrancar na mesma."""
+    import importlib
+    import zoneinfo
+    from portfolio_investimentos.services import market
+
+    def no_tz(key):
+        raise zoneinfo.ZoneInfoNotFoundError(key)
+    monkeypatch.setattr(zoneinfo, "ZoneInfo", no_tz)
+    try:
+        importlib.reload(market)
+        assert isinstance(market.LISBON, market._LisbonFallback)
+        assert market.market_status()["label"] in ("Aberto", "Fechado")
+        monkeypatch.setenv("PORTFOLIO_DATA_DIR", str(tmp_path))
+        app = create_app({"TESTING": True})
+        assert app.test_client().get("/").status_code == 200
+    finally:
+        monkeypatch.undo()
+        importlib.reload(market)
