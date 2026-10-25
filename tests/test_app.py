@@ -532,3 +532,48 @@ def test_choose_port(monkeypatch):
     assert cli._choose_port("127.0.0.1", None) == (5002, False)      # 5000 e 5001 ocupadas por outros
     assert cli._choose_port("127.0.0.1", 5000) == (None, False)      # porta indicada e ocupada: erro
     assert cli._choose_port("127.0.0.1", 6000) == (6000, False)
+
+
+# resposta do endpoint "chart" do Yahoo (formato real, valores fictícios)
+YAHOO_CHART = {"chart": {"result": [{
+    "meta": {"currency": "EUR", "symbol": "ACME.DE", "gmtoffset": 7200},
+    "timestamp": [1760943600, 1761030000, 1761116400],          # 20, 21 e 22/10/2025 às 07:00 UTC
+    "events": {"splits": {"1761116400": {"date": 1761116400, "numerator": 2, "denominator": 1}}},
+    "indicators": {"quote": [{"close": [50.0, None, 26.0]}]},
+}], "error": None}}
+
+
+def test_yahoo_direct_parse():
+    from portfolio_investimentos.services import yahoo
+    from portfolio_investimentos.services.market import _closes
+    hist, meta = yahoo._parse_chart(YAHOO_CHART)
+    assert meta == {"currency": "EUR"} and not hist.empty
+    # dia sem fecho ignorado; antes do desdobramento 2:1 o preço negociado era o dobro do ajustado
+    assert _closes(hist) == [(date(2025, 10, 20), 100.0), (date(2025, 10, 22), 26.0)]
+    assert yahoo._parse_chart({"chart": {"result": None, "error": {"code": "Not Found"}}})[0].empty
+
+
+def test_refresh_without_yfinance(app, monkeypatch):
+    """Sem o yfinance (ex.: Android), a atualização usa o acesso direto ao Yahoo."""
+    import sys
+    from portfolio_investimentos.models import Instrument, Price
+    from portfolio_investimentos.services import market, yahoo
+    monkeypatch.setitem(sys.modules, "yfinance", None)  # import yfinance → ImportError
+    calls = []
+
+    def fake_get(url, params):
+        calls.append(url)
+        if "search" in url:
+            return {"quotes": [{"symbol": "ACME.DE"}], "news": []}
+        return YAHOO_CHART if "ACME.DE" in url else {"chart": {"result": None}}
+    monkeypatch.setattr(yahoo, "_get_json", fake_get)
+    with app.app_context():
+        db.session.add_all([Instrument(ticker="ACME", currency="EUR", isin="DE0000000001"),
+                            Transaction(date=date(2025, 10, 1), type="BUY", instrument="ACME", quantity=1,
+                                        price=95.0, currency="EUR")])
+        db.session.commit()
+        assert market.yfinance_available()
+        market.refresh_all(start=date(2025, 10, 1))
+        assert db.session.get(Instrument, "ACME").data_symbol == "ACME.DE"
+        assert [p.close for p in Price.query.filter_by(instrument="ACME").order_by(Price.date)] == [100.0, 26.0]
+    assert any("chart/ACME.DE" in u for u in calls)

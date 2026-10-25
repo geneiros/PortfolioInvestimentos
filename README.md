@@ -54,8 +54,7 @@ A corretora é detetada pelo conteúdo do ficheiro (XTB, Trading 212, Trade Repu
 
 O script abre a aplicação no browser do telemóvel. No Chrome, **menu ⋮ → Adicionar ao ecrã principal** para a abrires como uma aplicação. Enquanto está aberta, o Termux fica acordado (`termux-wake-lock`). Para terminar, carrega em Ctrl+C no Termux.
 
-- O `yfinance` não é instalado, porque precisa de pandas e numpy, que raramente compilam no Android. A aplicação funciona com as cotações já guardadas, mas sem o botão de atualizar.
-- Para ter cotações atuais, atualiza-as no computador, faz **Definições → Cópia de segurança** e copia o ficheiro para `~/.portfolio-investimentos/portfolio.db` no Termux.
+- O `yfinance` não instala no Android (a dependência `curl_cffi` não suporta estes processadores). Sem ele, **Definições → Atualizar cotações agora** vai buscar as cotações, os câmbios e as notícias diretamente ao Yahoo Finance, só com a biblioteca padrão do Python. Os eventos (datas de resultados e de dividendos) e o setor dos ativos só vêm com o `yfinance`.
 - Os dados do telemóvel e do computador são independentes. Se preferires uma só cópia, corre a aplicação no computador com `--host 0.0.0.0` e palavra-passe, e abre-a no telemóvel.
 
 ### Onde ficam os dados
@@ -145,7 +144,7 @@ Também há um seletor de corretora (todas ou uma conta específica) e um botão
 
 ### Cotações e notícias
 
-As cotações, câmbios, notícias e eventos vêm do Yahoo Finance através do pacote `yfinance`, instalado pelos scripts de arranque. Para atualizar, usa **Definições → Atualizar cotações agora**, que precisa de internet. Confirma em **Definições → Ativos** o *símbolo de dados* de cada ativo (código do Yahoo Finance, ex.: `VWCE.DE`, `IWDA.AS`, `AAPL`).
+As cotações, câmbios, notícias e eventos vêm do Yahoo Finance através do pacote `yfinance`, instalado pelos scripts de arranque. Onde o `yfinance` não pode ser instalado (ex.: Android), a aplicação vai buscar as cotações, os câmbios e as notícias diretamente ao Yahoo. Para atualizar, usa **Definições → Atualizar cotações agora**, que precisa de internet. Confirma em **Definições → Ativos** o *símbolo de dados* de cada ativo (código do Yahoo Finance, ex.: `VWCE.DE`, `IWDA.AS`, `AAPL`).
 
 O símbolo é escolhido automaticamente pelo ISIN e pelo ticker. Só é aceite um símbolo cotado na moeda do ativo e com preços perto dos das transações. Assim, uma ação americana comprada em euros (ex.: Apple na Xetra, `APC.DE`) não fica com a cotação em dólares, e as cotações de Londres em pence são convertidas para libras.
 
@@ -208,7 +207,7 @@ Tipos aceites: `BUY`, `SELL`, `DIVIDEND`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `INTER
 ```
 portfolio_investimentos/
 ├── engine/        # motor de cálculo em Python puro (FIFO, TWR, IRR, risco, dividendos, fiscal)
-├── services/      # ligação à base de dados, importação, mercado (yfinance), demonstração
+├── services/      # ligação à base de dados, importação, mercado (yfinance ou acesso direto ao Yahoo), demonstração
 ├── templates/     # páginas Jinja + Bootstrap 5.3
 ├── static/        # CSS/JS da app e bibliotecas (Bootstrap, Bootstrap Icons, Chart.js), sem CDN
 ├── models.py      # tabelas SQLite (SQLAlchemy)

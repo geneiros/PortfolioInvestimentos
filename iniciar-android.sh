@@ -7,9 +7,8 @@
 #   PORT=8080 bash iniciar-android.sh     usa outra porta
 #   bash iniciar-android.sh --importar ~/storage/downloads/ficheiro.xlsx   importa um extrato e sai
 #
-# O yfinance (cotações) não é instalado: precisa de pandas/numpy, que no Android raramente compilam.
-# Sem ele a aplicação funciona com as cotações já guardadas; podes atualizá-las no computador e
-# copiar o ficheiro de dados (Definições → Cópia de segurança) para ~/.portfolio-investimentos/portfolio.db.
+# O yfinance não é instalado (a dependência curl_cffi não compila no Android): a atualização de
+# cotações usa o acesso direto ao Yahoo Finance, só com a biblioteca padrão do Python.
 set -e
 cd "$(dirname "$0")"
 

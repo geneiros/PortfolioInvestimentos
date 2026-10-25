@@ -147,19 +147,23 @@ _lock = threading.Lock()
 
 
 def yfinance_available():
+    """Há sempre forma de obter cotações: o yfinance, se instalado, ou o acesso direto (`yahoo.py`)."""
+    return True
+
+
+def _yahoo_client():
+    """O yfinance quando está instalado; senão o acesso direto, só com a biblioteca padrão (ex.: Android)."""
     try:
-        import yfinance  # noqa: F401
-        return True
+        import yfinance
+        return yfinance
     except ImportError:
-        return False
+        from . import yahoo
+        return yahoo
 
 
 def refresh_all(start=None):
     """Atualiza cotações, câmbios, notícias e eventos. Devolve um resumo textual."""
-    try:
-        import yfinance as yf
-    except ImportError:
-        return "O pacote yfinance não está instalado (pip install yfinance)."
+    yf = _yahoo_client()
     if not _lock.acquire(blocking=False):
         return "Já existe uma atualização em curso."
     try:
