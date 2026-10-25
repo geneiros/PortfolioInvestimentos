@@ -19,8 +19,12 @@ def main():
                         help="importar extratos (XTB .xlsx, Trading 212, Trade Republic ou CSV genérico) e sair")
     parser.add_argument("--corretora", choices=["generic", "trading212", "traderepublic", "xtb"],
                         help="corretora dos extratos de --importar (por omissão, detetada pelo conteúdo)")
+    parser.add_argument("--testar-yahoo", action="store_true",
+                        help="testar a ligação ao Yahoo Finance (cotações, câmbios e pesquisa) e sair")
     args = parser.parse_args()
 
+    if args.testar_yahoo:
+        raise SystemExit(_test_yahoo())
     app = create_app()
     if args.importar:
         with app.app_context():
@@ -113,6 +117,35 @@ def _is_this_app(url):
             return b"Portfolio Investimentos" in resp.read(4096)
     except (OSError, ValueError):
         return False
+
+
+def _test_yahoo():
+    """Diagnóstico da ligação ao Yahoo: mostra o que corre bem e o erro exato do que falha."""
+    from datetime import date, timedelta
+
+    from .services.market import _yahoo_client
+    yf = _yahoo_client()
+    print("A usar:", "yfinance" if yf.__name__ == "yfinance" else "acesso direto (sem yfinance)")
+    start = date.today() - timedelta(days=10)
+    ok = True
+    for symbol in ("AAPL", "ADB.DE", "EURUSD=X"):
+        try:
+            t = yf.Ticker(symbol)
+            hist = t.history(start=start, auto_adjust=False)
+            rows = list(hist.iterrows())
+            last = rows[-1][1]["Close"] if rows else None
+            cur = (getattr(t, "history_metadata", None) or {}).get("currency")
+            print(f"  {symbol:9} {len(rows)} dias, último fecho {last} {cur or ''}")
+        except Exception as exc:
+            ok = False
+            print(f"  {symbol:9} ERRO: {exc}")
+    try:
+        quotes = yf.Search("US00724F1012", max_results=5).quotes or []
+        print("  pesquisa ISIN US00724F1012:", ", ".join(q.get("symbol", "?") for q in quotes) or "(vazio)")
+    except Exception as exc:
+        ok = False
+        print("  pesquisa ISIN: ERRO:", exc)
+    return 0 if ok else 1
 
 
 def _import_files(paths, broker=None):

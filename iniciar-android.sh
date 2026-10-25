@@ -47,6 +47,9 @@ fi
 
 # importar sem o seletor de ficheiros do browser (que pode levar o Android a fechar o Termux):
 #   bash iniciar-android.sh --importar ~/storage/downloads/EUR_*.xlsx
+if [ "$1" = "--testar-yahoo" ]; then
+  exec "$VENV/bin/python" -m portfolio_investimentos --testar-yahoo
+fi
 if [ "$1" = "--importar" ]; then
   [ -d "$HOME/storage" ] || termux-setup-storage  # acesso às Transferências (só na primeira vez)
   exec "$VENV/bin/python" -m portfolio_investimentos "$@"

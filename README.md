@@ -55,6 +55,7 @@ A corretora é detetada pelo conteúdo do ficheiro (XTB, Trading 212, Trade Repu
 O script abre a aplicação no browser do telemóvel. No Chrome, **menu ⋮ → Adicionar ao ecrã principal** para a abrires como uma aplicação. Enquanto está aberta, o Termux fica acordado (`termux-wake-lock`). Para terminar, carrega em Ctrl+C no Termux.
 
 - O `yfinance` não instala no Android (a dependência `curl_cffi` não suporta estes processadores). Sem ele, **Definições → Atualizar cotações agora** vai buscar as cotações, os câmbios e as notícias diretamente ao Yahoo Finance, só com a biblioteca padrão do Python. Os eventos (datas de resultados e de dividendos) e o setor dos ativos só vêm com o `yfinance`.
+- Se aparecer "Sem cotações do Yahoo Finance", vê o motivo em **Definições → Resultado por ativo**, ou testa a ligação no Termux com `bash iniciar-android.sh --testar-yahoo`.
 - Os dados do telemóvel e do computador são independentes. Se preferires uma só cópia, corre a aplicação no computador com `--host 0.0.0.0` e palavra-passe, e abre-a no telemóvel.
 
 ### Onde ficam os dados
@@ -87,6 +88,7 @@ python -m portfolio_investimentos --no-browser # não abre o browser
 python -m portfolio_investimentos --demo       # carrega os dados de demonstração e sai
 python -m portfolio_investimentos --refresh    # atualiza as cotações e sai
 python -m portfolio_investimentos --importar extrato.xlsx  # importa extratos (corretora detetada) e sai
+python -m portfolio_investimentos --testar-yahoo  # testa a ligação ao Yahoo Finance e sai
 ```
 
 ## Capturas de ecrã

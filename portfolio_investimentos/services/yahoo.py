@@ -6,6 +6,7 @@ Usado quando o `yfinance` não pode ser instalado, por exemplo no Android/Termux
 """
 import json
 import time as _time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -17,10 +18,70 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KH
                          "Chrome/128.0 Mobile Safari/537.36", "Accept": "application/json"}
 
 
+HOSTS = ("query1.finance.yahoo.com", "query2.finance.yahoo.com")
+_state = {"opener": None, "crumb": None}
+
+
+class YahooError(OSError):
+    """Falha ao contactar o Yahoo, com uma mensagem legível para o resumo da atualização."""
+
+
+def _opener():
+    if _state["opener"] is None:
+        import http.cookiejar
+        _state["opener"] = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    return _state["opener"]
+
+
+def _fetch(url):
+    req = urllib.request.Request(url, headers=HEADERS)
+    with _opener().open(req, timeout=20) as resp:
+        return resp.read()
+
+
+def _crumb():
+    """Cookie + "crumb" que o Yahoo exige por vezes (respostas 401/403) a quem não é um browser."""
+    if _state["crumb"] is None:
+        try:
+            _fetch("https://fc.yahoo.com/")  # só serve para receber o cookie; responde muitas vezes 404
+        except urllib.error.HTTPError:
+            pass
+        _state["crumb"] = _fetch("https://query1.finance.yahoo.com/v1/test/getcrumb").decode().strip()
+    return _state["crumb"]
+
+
+def _describe(exc):
+    if isinstance(exc, urllib.error.HTTPError):
+        hint = {401: "o Yahoo pediu autorização", 403: "o Yahoo recusou o pedido",
+                404: "símbolo inexistente", 429: "o Yahoo limitou os pedidos; tenta mais tarde"}.get(exc.code, "")
+        return f"HTTP {exc.code}" + (f": {hint}" if hint else "")
+    reason = getattr(exc, "reason", None) or exc
+    return f"sem ligação ao Yahoo ({reason})"
+
+
 def _get_json(url, params):
-    req = urllib.request.Request(url + "?" + urllib.parse.urlencode(params), headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode())
+    """GET com o servidor alternativo do Yahoo, nova tentativa em 429 e cookie/crumb em 401/403."""
+    path = urllib.parse.urlsplit(url).path
+    last = None
+    for attempt in range(4):
+        host = HOSTS[attempt % 2]
+        query = dict(params)
+        if attempt >= 2 and _state["crumb"] is not False:
+            try:
+                query["crumb"] = _crumb()
+            except OSError:
+                _state["crumb"] = False  # sem crumb: continua a tentar sem ele
+        try:
+            return json.loads(_fetch(f"https://{host}{path}?" + urllib.parse.urlencode(query)).decode())
+        except urllib.error.HTTPError as exc:
+            last = exc
+            if exc.code == 404:
+                break  # símbolo inexistente: não vale a pena insistir
+            if exc.code == 429:
+                _time.sleep(1.5 * (attempt + 1))
+        except (OSError, ValueError) as exc:
+            last = exc
+    raise YahooError(_describe(last))
 
 
 class History:

@@ -178,15 +178,17 @@ def refresh_all(start=None):
         # os ativos de demonstração são fictícios: não existem no Yahoo Finance
         insts = [i for i in Instrument.query.all() if not i.ticker.startswith("DEMO-")]
         for inst in insts:
+            problems = []
             try:
-                found = _resolve_symbol(yf, inst, start)
+                found = _resolve_symbol(yf, inst, start, problems)
             except Exception as exc:  # um símbolo inválido não deve parar o resto
                 missing.append(inst.ticker)
                 report.append(f"{inst.ticker}: erro ({exc})")
                 continue
             if found is None:
                 missing.append(inst.ticker)
-                report.append(f"{inst.ticker}: sem cotações em {inst.currency} (define o símbolo de dados em Ativos)")
+                why = "; ".join(dict.fromkeys(problems)) if problems else "nenhum símbolo encontrado"
+                report.append(f"{inst.ticker}: sem cotações em {inst.currency} ({why[:300]})")
                 continue
             symbol, hist, scale = found
             if symbol != inst.data_symbol:
@@ -279,7 +281,7 @@ def _reference_price(inst):
     return (t.date, t.price) if t else None
 
 
-def _resolve_symbol(yf, inst, start):
+def _resolve_symbol(yf, inst, start, problems=None):
     """Escolhe o símbolo cujas cotações estão na moeda do ativo e perto dos preços das transações.
 
     Devolve (símbolo, histórico, fator) ou None. O fator converte subunidades (ex.: pence) na moeda.
@@ -290,13 +292,19 @@ def _resolve_symbol(yf, inst, start):
         t = yf.Ticker(symbol)
         try:
             hist = t.history(start=start, auto_adjust=False)
-        except Exception:
+        except Exception as exc:  # guardado para o resumo: sem isto só se via "sem cotações"
+            if problems is not None:
+                problems.append(f"{symbol}: {exc}")
             continue
         if hist is None or hist.empty:
+            if problems is not None:
+                problems.append(f"{symbol}: sem dados")
             continue
         cur = (getattr(t, "history_metadata", None) or {}).get("currency")
         cur, scale = SUBUNITS.get(cur, (cur, 1.0))
         if cur and cur != inst.currency:
+            if problems is not None:
+                problems.append(f"{symbol}: cotado em {cur}")
             continue
         if ref is None:
             return symbol, hist, scale

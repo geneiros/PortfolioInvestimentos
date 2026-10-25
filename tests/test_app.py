@@ -577,3 +577,52 @@ def test_refresh_without_yfinance(app, monkeypatch):
         assert db.session.get(Instrument, "ACME").data_symbol == "ACME.DE"
         assert [p.close for p in Price.query.filter_by(instrument="ACME").order_by(Price.date)] == [100.0, 26.0]
     assert any("chart/ACME.DE" in u for u in calls)
+
+
+def test_yahoo_direct_retries_and_crumb(monkeypatch):
+    import io as _io
+    import json as _json
+    import urllib.error
+    from portfolio_investimentos.services import yahoo
+    monkeypatch.setattr(yahoo, "_state", {"opener": None, "crumb": None})
+    monkeypatch.setattr(yahoo._time, "sleep", lambda s: None)
+    seen = []
+
+    def http_error(url, code):
+        return urllib.error.HTTPError(url, code, "x", {}, _io.BytesIO(b""))
+
+    def fake_fetch(url):
+        seen.append(url)
+        if "fc.yahoo.com" in url:
+            raise http_error(url, 404)
+        if "getcrumb" in url:
+            return b"abc123"
+        if "crumb=abc123" in url:
+            return _json.dumps({"ok": True}).encode()
+        raise http_error(url, 401 if "query2" in url else 429)
+    monkeypatch.setattr(yahoo, "_fetch", fake_fetch)
+    assert yahoo._get_json(yahoo.CHART_URL.format(symbol="AAPL"), {"interval": "1d"}) == {"ok": True}
+    assert "query1" in seen[0] and "query2" in seen[1] and any("getcrumb" in u for u in seen)
+
+    # sem ligação nenhuma: erro legível, para o resumo da atualização
+    monkeypatch.setattr(yahoo, "_state", {"opener": None, "crumb": None})
+    monkeypatch.setattr(yahoo, "_fetch", lambda url: (_ for _ in ()).throw(urllib.error.URLError("rede em baixo")))
+    with pytest.raises(yahoo.YahooError, match="sem ligação ao Yahoo"):
+        yahoo._get_json(yahoo.CHART_URL.format(symbol="AAPL"), {})
+
+
+def test_refresh_report_shows_yahoo_error(app, monkeypatch):
+    import sys
+    from portfolio_investimentos.models import Instrument, Setting
+    from portfolio_investimentos.services import market, yahoo
+    monkeypatch.setitem(sys.modules, "yfinance", None)
+
+    def fail(url, params):
+        raise yahoo.YahooError("HTTP 429: o Yahoo limitou os pedidos; tenta mais tarde")
+    monkeypatch.setattr(yahoo, "_get_json", fail)
+    with app.app_context():
+        db.session.add(Instrument(ticker="ACME", currency="EUR", data_symbol="ACME.DE"))
+        db.session.commit()
+        market.refresh_all(start=date(2025, 10, 1))
+        report = Setting.get("refresh_report")
+    assert "ACME: sem cotações em EUR (ACME.DE: HTTP 429" in report
