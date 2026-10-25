@@ -8,7 +8,7 @@ from flask import g
 from sqlalchemy import event, func
 from sqlalchemy.orm import Session
 
-from ..engine.portfolio import Instrument as EngineInstrument, Portfolio, PriceBook, Tx
+from ..engine.portfolio import RISK_FREE, Instrument as EngineInstrument, Portfolio, PriceBook, Tx
 from ..models import Broker, FxRate, Instrument, Price, Setting, Transaction, db
 
 
@@ -224,3 +224,11 @@ def selected_broker():
     if b and b.isdigit() and db.session.get(Broker, int(b)):
         return b
     return None
+
+
+def risk_free():
+    """Taxa sem risco anual (fração) usada no Sharpe, Sortino e alfa; configurável em Definições."""
+    try:
+        return float(Setting.get("risk_free")) / 100
+    except (TypeError, ValueError):
+        return RISK_FREE

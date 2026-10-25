@@ -70,7 +70,7 @@
   </div></div>
   {% endfor %}
   <div class="col-6 col-xl"><div class="pm-card pm-card-sm">
-    <div class="pm-label">Sequência atual {{ help("Meses consecutivos a subir ou a descer.") }}</div>
+    <div class="pm-label">Sequência atual {{ help("Meses completos consecutivos a subir ou a descer (o mês em curso não conta).") }}</div>
     <div class="pm-mid {{ 'text-up' if perf.streak[1] == 'up' else 'text-down' }}">{{ perf.streak[0] }} {{ 'mês' if perf.streak[0] == 1 else 'meses' }}</div>
     <div class="small text-secondary">{{ 'a subir ↑' if perf.streak[1] == 'up' else 'a descer ↓' }}</div>
   </div></div>
@@ -136,8 +136,8 @@
   <div class="pm-label mb-3">Risco & detalhe</div>
   <div class="row g-3">
     {% for label, v, fmt, rate, hint in [
-      ("Sharpe", r.sharpe, "n", ratings.sharpe, "Retorno anual por unidade de volatilidade."),
-      ("Sortino", r.sortino, "n", ratings.sortino, "Como o Sharpe, mas só penaliza a volatilidade negativa."),
+      ("Sharpe", r.sharpe, "n", ratings.sharpe, "Retorno anual acima da taxa sem risco (" ~ (perf.risk_free * 100)|round(2) ~ "%, em Definições) por unidade de volatilidade."),
+      ("Sortino", r.sortino, "n", ratings.sortino, "Como o Sharpe (também acima da taxa sem risco), mas só penaliza a volatilidade negativa."),
       ("Calmar", r.calmar, "n", ratings.calmar, "CAGR dividido pela maior queda."),
       ("Volatilidade", r.volatility, "p", ratings.volatility ~ (" · ~" ~ ((r.volatility / m.volatility)|number(1)) ~ "× a do " ~ merit_name ~ " (" ~ (m.volatility|pct(2, sign=False)) ~ ")" if m and m.volatility else ""), "Desvio-padrão anualizado dos retornos diários."),
       ("Max drawdown", r.max_drawdown, "p", ratings.max_drawdown, "Maior queda desde um máximo."),

@@ -42,22 +42,29 @@ def build(active, title, **extra):
         has_data=bool(p.transactions), auth_enabled=auth.password_enabled(), MONTHS=MONTHS, js_json=js_json, warnings=list(p.warnings),
     )
     if ctx["has_data"] and not ctx["is_demo"]:
-        ctx["warnings"] += _refresh_warnings(p)
+        ctx["warnings"] += _refresh_warnings(p, active)
     ctx.update(extra)
     return ctx
 
 
-def _refresh_warnings(p):
+PERF_NOTE = (" No Desempenho, a volatilidade, o drawdown, o Sharpe e a comparação com o mercado ficam distorcidos, "
+             "porque o valor só muda nos dias com transações.")
+
+
+def _refresh_warnings(p, active=None):
     running, error, missing = refresh_state()
     if running:
         return ["A atualizar as cotações… Pode demorar alguns minutos; recarrega a página para ver os valores novos."]
     if error:
         return [f"A última atualização de cotações falhou ({error}). Tenta de novo em Definições → Atualizar cotações agora."]
     if not Setting.get("last_refresh"):
+        note = PERF_NOTE if active == "desempenho" else ""
         return ["Ainda não atualizaste as cotações: os valores e os gráficos usam os preços das tuas próprias "
-                "transações, por isso podem ter saltos. Atualiza em Definições → Atualizar cotações agora (precisa de internet)."]
+                "transações, por isso podem ter saltos. Atualiza em Definições → Atualizar cotações agora (precisa de internet)."
+                + note]
     held = sorted(pos.asset.ticker for pos in p.open_positions if pos.asset.ticker in missing)
     if held:
+        note = PERF_NOTE if active == "desempenho" else ""
         return [f"Sem cotações do Yahoo Finance para {', '.join(held)}: estes ativos usam o preço da última transação. "
-                "Define o símbolo de dados em Definições → Ativos."]
+                "Define o símbolo de dados em Definições → Ativos." + note]
     return []

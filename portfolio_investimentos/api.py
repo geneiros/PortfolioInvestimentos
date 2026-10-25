@@ -269,6 +269,15 @@ def refresh_market():
 
 
 @action
+def set_risk_free(rate):
+    value = _float(rate)
+    if not 0 <= value <= 20:
+        raise ApiError("Indica uma taxa entre 0 e 20%.")
+    Setting.set("risk_free", value)
+    return f"Taxa sem risco: {value:g}%."
+
+
+@action
 def refresh_status():
     running, error, missing = market.refresh_state()
     indices = {t for (t,) in db.session.query(Instrument.ticker).filter_by(kind="index")}

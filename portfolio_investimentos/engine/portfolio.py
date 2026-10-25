@@ -18,7 +18,7 @@ from datetime import date, timedelta
 EPS = 1e-9
 TRADING_DAYS = 252
 MERIT_BENCHMARK = "^GSPC"  # referência para beta, captura e alfa
-RISK_FREE = 0.0            # taxa sem risco anual usada em Sharpe/Sortino
+RISK_FREE = 0.02           # taxa sem risco anual por omissão (Sharpe, Sortino, alfa): ~ depósito do BCE
 TAX_RATE = 0.28            # taxa liberatória/autónoma em Portugal (estimativa)
 
 
@@ -748,8 +748,9 @@ class Portfolio:
         days = self.PERIODS.get(period)
         return end - timedelta(days=days) if days else s.dates[0]
 
-    def performance(self, period="MAX", benchmarks=None):
+    def performance(self, period="MAX", benchmarks=None, risk_free=None):
         """Dados para os gráficos e cartões da página Desempenho."""
+        rf = RISK_FREE if risk_free is None else risk_free
         s = self.series
         if not s.dates:
             return None
@@ -796,12 +797,15 @@ class Portfolio:
                 "yearly": period_returns(dates, bidx, "year"),
             })
 
-        best_m = max(monthly, key=lambda m: m[1]) if monthly else None
-        worst_m = min(monthly, key=lambda m: m[1]) if monthly else None
-        best_y = max(yearly, key=lambda m: m[1]) if yearly else None
-        worst_y = min(yearly, key=lambda m: m[1]) if yearly else None
+        # o mês e o ano ainda a decorrer não contam para o melhor/pior nem para a sequência atual
+        full_months = _complete(monthly, dates[-1], "month")
+        full_years = _complete(yearly, dates[-1], "year")
+        best_m = max(full_months, key=lambda m: m[1]) if full_months else None
+        worst_m = min(full_months, key=lambda m: m[1]) if full_months else None
+        best_y = max(full_years, key=lambda m: m[1]) if full_years else None
+        worst_y = min(full_years, key=lambda m: m[1]) if full_years else None
 
-        risk = risk_metrics(index, cagr, drawdown(index), yearly, dates)
+        risk = risk_metrics(index, cagr, drawdown(index), yearly, dates, rf)
         ref = next((b for b in bench_data if b["ticker"] == MERIT_BENCHMARK), None)
         if ref is None:
             ref_asset = next((b for b in self.benchmarks if b.ticker == MERIT_BENCHMARK), None)
@@ -818,7 +822,7 @@ class Portfolio:
         if ref:
             bidx = [1 + x for x in ref["twr"]]
             ref_monthly = period_returns(dates, bidx, "month")
-            merit = merit_metrics(monthly, ref_monthly, yearly, ref["yearly"], cagr, ref["cagr"])
+            merit = merit_metrics(monthly, ref_monthly, yearly, ref["yearly"], cagr, ref["cagr"], rf)
             merit["name"] = ref["name"]
             merit["volatility"] = annualized_vol(bidx, dates)
 
@@ -833,7 +837,9 @@ class Portfolio:
             "monthly": monthly, "yearly": yearly,
             "best_year": best_y, "worst_year": worst_y,
             "best_month": best_m, "worst_month": worst_m,
-            "streak": streak(monthly),
+            "streak": streak(full_months),
+            "risk_free": rf,
+            "partial_month": monthly[-1][0] if monthly and len(full_months) < len(monthly) else None,
             "benchmarks": bench_data,
         }
 
@@ -878,6 +884,21 @@ def period_returns(dates, index, granularity):
     if cur_key is not None:
         out.append((cur_key, last_val / prev_end - 1))
     return out
+
+
+def _last_business_day(year, month):
+    d = (date(year + month // 12, month % 12 + 1, 1) if month else date(year + 1, 1, 1)) - timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
+
+
+def _complete(periods, end, granularity):
+    """Retira o último período (mês ou ano) se ainda não terminou na data `end`."""
+    if not periods:
+        return []
+    month = end.month if granularity == "month" else 12
+    return periods if end >= _last_business_day(end.year, month) else periods[:-1]
 
 
 def drawdown(index):
@@ -952,7 +973,7 @@ def annualized_vol(index, dates=None):
     return _std(daily_returns(index, dates)) * TRADING_DAYS ** 0.5
 
 
-def risk_metrics(index, cagr, dd, yearly, dates=None):
+def risk_metrics(index, cagr, dd, yearly, dates=None, rf=RISK_FREE):
     rets = daily_returns(index, dates)
     vol = _std(rets) * TRADING_DAYS ** 0.5
     downside = [min(r, 0.0) for r in rets]
@@ -960,8 +981,8 @@ def risk_metrics(index, cagr, dd, yearly, dates=None):
     max_dd = min(dd) if dd else 0.0
     return {
         "volatility": vol,
-        "sharpe": (cagr - RISK_FREE) / vol if vol > EPS else None,
-        "sortino": (cagr - RISK_FREE) / down_dev if down_dev > EPS else None,
+        "sharpe": (cagr - rf) / vol if vol > EPS else None,
+        "sortino": (cagr - rf) / down_dev if down_dev > EPS else None,
         "calmar": cagr / abs(max_dd) if max_dd < -EPS else None,
         "max_drawdown": max_dd,
         "avg_year": _mean([r for _, r in yearly]),
@@ -969,7 +990,7 @@ def risk_metrics(index, cagr, dd, yearly, dates=None):
     }
 
 
-def merit_metrics(monthly, ref_monthly, yearly, ref_yearly, cagr, ref_cagr):
+def merit_metrics(monthly, ref_monthly, yearly, ref_yearly, cagr, ref_cagr, rf=RISK_FREE):
     """Comparação mês a mês com o índice de referência (captura, beta, alfa)."""
     ref = dict(ref_monthly)
     pairs = [(k, r, ref[k]) for k, r in monthly if k in ref]
@@ -982,7 +1003,7 @@ def merit_metrics(monthly, ref_monthly, yearly, ref_yearly, cagr, ref_cagr):
     mp, mb = _mean(ps), _mean(bs)
     var_b = sum((b - mb) ** 2 for b in bs)
     beta = sum((p - mp) * (b - mb) for p, b in zip(ps, bs)) / var_b if var_b > EPS else None
-    alpha = (cagr - RISK_FREE) - beta * (ref_cagr - RISK_FREE) if beta is not None else None
+    alpha = (cagr - rf) - beta * (ref_cagr - rf) if beta is not None else None
 
     ref_y = dict(ref_yearly)
     yearly_excess = [(k, r - ref_y[k]) for k, r in yearly if k in ref_y]

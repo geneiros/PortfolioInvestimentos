@@ -8,6 +8,7 @@ from .engine.portfolio import MERIT_BENCHMARK
 from .models import Alert, Broker, ImportBatch, Instrument, News, Price, Setting, Transaction, WatchItem, db
 from . import auth
 from .services import context as ctx
+from .services import data
 from .services.importer import BROKERS, INSTRUCTIONS
 from .services.market import check_alerts, upcoming_events, yfinance_available
 
@@ -31,7 +32,7 @@ def _int(v, default=0):
 
 
 def perf_payload(p, period, benchmarks=None):
-    perf = p.performance(period, benchmarks)
+    perf = p.performance(period, benchmarks, risk_free=data.risk_free())
     if not perf:
         return None
     perf["start"], perf["end"] = perf["start"].isoformat(), perf["end"].isoformat()
@@ -99,7 +100,7 @@ def desempenho():
     period = (request.args.get("periodo") or "MAX").upper()
     period = period if period in dict(PERIODS) else "MAX"
     bench = request.args.get("bench") or "URTH"
-    perf = p.performance(period) if p.transactions else None
+    perf = p.performance(period, risk_free=data.risk_free()) if p.transactions else None
     c.update(period=period, periods=PERIODS, period_label=dict(PERIODS)[period], bench_ticker=bench, perf=perf)
     if perf:
         b = next((x for x in perf["benchmarks"] if x["ticker"] == bench), None)
@@ -253,7 +254,7 @@ def definicoes():
     c.update(instruments=Instrument.query.filter(Instrument.ticker.in_(tickers or [""])).order_by(Instrument.ticker).all(),
              last_price=db.session.query(db.func.max(Price.date)).scalar(),
              db_path=current_app.config["DB_PATH"], yfinance=yfinance_available(),
-             last_refresh=Setting.get("last_refresh"), refresh_report=Setting.get("refresh_report"),
+             risk_free_pct=round(data.risk_free() * 100, 2), last_refresh=Setting.get("last_refresh"), refresh_report=Setting.get("refresh_report"),
              password_env=bool(auth.env_password()))
     return render_template("pages/definicoes.html", **c)
 

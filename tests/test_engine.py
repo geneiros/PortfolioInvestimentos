@@ -275,3 +275,21 @@ def test_volatility_ignores_weekend_points():
     weekdays_only = [x for d, x in zip(dates, index) if d.weekday() < 5]
     assert annualized_vol(index, dates) == pytest.approx(annualized_vol(weekdays_only))
     assert annualized_vol(index, dates) > annualized_vol(index)  # com os fins de semana ficava mais baixa
+
+
+def test_incomplete_periods_and_risk_free():
+    from portfolio_investimentos.engine.portfolio import _complete
+    months = [("2026-09", 0.05), ("2026-10", -0.30)]
+    assert _complete(months, date(2026, 10, 23), "month") == [("2026-09", 0.05)]   # outubro ainda a decorrer
+    assert _complete(months, date(2026, 10, 30), "month") == months                 # último dia útil: completo
+    d0, d1 = date(2024, 1, 2), date(2026, 10, 23)
+    prices = book_linear("ACME", d0, d1, 10.0, 20.0)
+    prices["ACME"][-1] = (d1, 12.0)  # queda forte no mês em curso
+    txs = [Tx(d0, "DEPOSIT", amount=1000), Tx(d0, "BUY", ACME, quantity=100, price=10)]
+    p = Portfolio(txs, PriceBook(prices), as_of=d1)
+    perf0, perf2 = p.performance("MAX", risk_free=0.0), p.performance("MAX", risk_free=0.02)
+    assert perf0["worst_month"][0] != "2026-10" and perf0["partial_month"] == "2026-10"
+    assert perf0["worst_year"][0] != "2026"
+    r0, r2 = perf0["risk"], perf2["risk"]
+    assert r2["sharpe"] == pytest.approx((perf2["cagr"] - 0.02) / r2["volatility"])
+    assert r2["sharpe"] < r0["sharpe"]
