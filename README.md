@@ -43,6 +43,15 @@ bash iniciar-android.sh               # na primeira vez instala o Python e as de
 bash iniciar-android.sh --atualizar   # descarrega a versão mais recente e arranca
 ```
 
+**Importar extratos no telemóvel:** o seletor de ficheiros do browser pode levar o Android a suspender o Termux (o que aparece como "Sem ligação à aplicação"). Em alternativa, importa diretamente no Termux. Descarrega os extratos para as Transferências e corre:
+
+```bash
+termux-setup-storage                                   # só na primeira vez: dá acesso às Transferências
+bash iniciar-android.sh --importar ~/storage/downloads/EUR_*.xlsx ~/storage/downloads/from_*.csv
+```
+
+A corretora é detetada pelo conteúdo do ficheiro (XTB, Trading 212, Trade Republic ou CSV genérico). Também funciona no computador: `python -m portfolio_investimentos --importar ficheiro.csv`.
+
 O script abre a aplicação no browser do telemóvel. No Chrome, **menu ⋮ → Adicionar ao ecrã principal** para a abrires como uma aplicação. Enquanto está aberta, o Termux fica acordado (`termux-wake-lock`). Para terminar, carrega em Ctrl+C no Termux.
 
 - O `yfinance` não é instalado, porque precisa de pandas e numpy, que raramente compilam no Android. A aplicação funciona com as cotações já guardadas, mas sem o botão de atualizar.
@@ -78,6 +87,7 @@ python -m portfolio_investimentos --host 0.0.0.0 # abre na rede local (exige pal
 python -m portfolio_investimentos --no-browser # não abre o browser
 python -m portfolio_investimentos --demo       # carrega os dados de demonstração e sai
 python -m portfolio_investimentos --refresh    # atualiza as cotações e sai
+python -m portfolio_investimentos --importar extrato.xlsx  # importa extratos (corretora detetada) e sai
 ```
 
 ## Capturas de ecrã

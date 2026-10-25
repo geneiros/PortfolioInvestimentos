@@ -14,9 +14,16 @@ def main():
     parser.add_argument("--no-browser", action="store_true", help="não abrir o browser automaticamente")
     parser.add_argument("--demo", action="store_true", help="carregar dados de demonstração e sair")
     parser.add_argument("--refresh", action="store_true", help="atualizar cotações (yfinance) e sair")
+    parser.add_argument("--importar", nargs="+", metavar="FICHEIRO",
+                        help="importar extratos (XTB .xlsx, Trading 212, Trade Republic ou CSV genérico) e sair")
+    parser.add_argument("--corretora", choices=["generic", "trading212", "traderepublic", "xtb"],
+                        help="corretora dos extratos de --importar (por omissão, detetada pelo conteúdo)")
     args = parser.parse_args()
 
     app = create_app()
+    if args.importar:
+        with app.app_context():
+            raise SystemExit(_import_files(args.importar, args.corretora))
     if args.demo or args.refresh:
         with app.app_context():
             if args.demo:
@@ -42,6 +49,37 @@ def main():
         serve(app, host=args.host, port=args.port, threads=4)
     except ImportError:
         app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
+
+
+def _import_files(paths, broker=None):
+    """Importa extratos a partir da linha de comandos (útil no Android, sem o seletor de ficheiros)."""
+    from pathlib import Path
+
+    from .models import Setting
+    from .services import importer
+    status = 0
+    for name in paths:
+        path = Path(name).expanduser()
+        try:
+            content = path.read_bytes()
+        except OSError as exc:
+            print(f"{path}: não foi possível ler o ficheiro ({exc.strerror or exc}).")
+            status = 1
+            continue
+        key = broker or importer.detect_broker(path.name, content)
+        if Setting.get("demo") == "1":  # os dados reais substituem a demonstração, como na página Importar
+            from .api import reset_data
+            reset_data("APAGAR")
+        try:
+            batch = importer.import_file(key, path.name, content)
+        except importer.ImportError_ as exc:
+            print(f"{path.name} ({key}): {exc}")
+            status = 1
+            continue
+        ignored = ", ".join(f"{n}× {k}" for k, n in (getattr(batch, "ignored", {}) or {}).items())
+        print(f"{path.name} ({key}): {batch.imported} novas transações, {batch.skipped} duplicadas ignoradas"
+              + (f" · sem efeito na carteira: {ignored}" if ignored else ""))
+    return status
 
 
 if __name__ == "__main__":

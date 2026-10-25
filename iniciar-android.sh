@@ -5,6 +5,7 @@
 #   bash iniciar-android.sh               arranca e abre o browser
 #   bash iniciar-android.sh --atualizar   descarrega a versão mais recente (git pull) e arranca
 #   PORT=8080 bash iniciar-android.sh     usa outra porta
+#   bash iniciar-android.sh --importar ~/storage/downloads/ficheiro.xlsx   importa um extrato e sai
 #
 # O yfinance (cotações) não é instalado: precisa de pandas/numpy, que no Android raramente compilam.
 # Sem ele a aplicação funciona com as cotações já guardadas; podes atualizá-las no computador e
@@ -43,6 +44,13 @@ if [ "$(cat "$VENV/.pronto" 2>/dev/null)" != "$DEPS" ]; then
   # shellcheck disable=SC2086
   "$VENV/bin/python" -m pip install $DEPS
   printf '%s' "$DEPS" > "$VENV/.pronto"
+fi
+
+# importar sem o seletor de ficheiros do browser (que pode levar o Android a fechar o Termux):
+#   bash iniciar-android.sh --importar ~/storage/downloads/EUR_*.xlsx
+if [ "$1" = "--importar" ]; then
+  [ -d "$HOME/storage" ] || termux-setup-storage  # acesso às Transferências (só na primeira vez)
+  exec "$VENV/bin/python" -m portfolio_investimentos "$@"
 fi
 
 # impede o Android de suspender o Termux enquanto a aplicação está aberta

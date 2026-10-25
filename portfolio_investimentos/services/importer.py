@@ -505,6 +505,19 @@ PARSERS = {"generic": parse_generic, "trading212": parse_trading212, "traderepub
 BINARY_PARSERS = {"xtb": parse_xtb}
 
 
+def detect_broker(filename, data):
+    """Corretora provável de um extrato, pelo conteúdo (para importar sem escolher a corretora)."""
+    if data[:2] == b"PK":  # XLSX
+        return "xtb"
+    lines = data[:4096].decode("utf-8-sig", errors="replace").splitlines() if data else []
+    cols = {c.strip().strip('"').lower() for c in re.split(r"[,;\t]", lines[0])} if lines else set()
+    if {"transaction_id", "asset_class"} <= cols:
+        return "traderepublic"
+    if "action" in cols and ({"time", "time (utc)"} & cols):
+        return "trading212"
+    return "generic"
+
+
 def get_or_create_broker(name, color="#3b82f6"):
     b = Broker.query.filter_by(broker_name=name).first()
     if b is None:

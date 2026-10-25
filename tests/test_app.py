@@ -501,3 +501,22 @@ def test_starts_without_timezone_database(monkeypatch, tmp_path):
     finally:
         monkeypatch.undo()
         importlib.reload(market)
+
+
+def test_detect_broker_and_cli_import(app, tmp_path, monkeypatch, capsys):
+    import sys
+    from portfolio_investimentos import __main__ as cli
+    from portfolio_investimentos.services.importer import detect_broker
+    assert detect_broker("x.xlsx", _xtb_workbook()) == "xtb"
+    assert detect_broker("t.csv", T212_UTC.encode()) == "trading212"
+    assert detect_broker("tr.csv", TR_CSV.encode()) == "traderepublic"
+    assert detect_broker("g.csv", b"date,type,ticker,quantity,price\n") == "generic"
+    (tmp_path / "xtb.xlsx").write_bytes(_xtb_workbook())
+    monkeypatch.setattr(cli, "create_app", lambda: app)
+    monkeypatch.setattr(sys, "argv", ["portfolio_investimentos", "--importar", str(tmp_path / "xtb.xlsx"),
+                                      str(tmp_path / "nao-existe.csv")])
+    with pytest.raises(SystemExit) as exit_:
+        cli.main()
+    out = capsys.readouterr().out
+    assert "xtb.xlsx (xtb): 8 novas transações" in out and "nao-existe.csv: não foi possível ler" in out
+    assert exit_.value.code == 1
