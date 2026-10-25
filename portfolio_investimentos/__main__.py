@@ -100,8 +100,12 @@ def _announce(url):
 
 
 def _port_in_use(host, port):
+    import os
     import socket
     with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET, socket.SOCK_STREAM) as sock:
+        if os.name != "nt":
+            # como o waitress: ligações a fechar (TIME_WAIT) depois de parar a aplicação não ocupam a porta
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.bind((host, port))
         except OSError:

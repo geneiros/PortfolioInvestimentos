@@ -269,6 +269,14 @@ def refresh_market():
 
 
 @action
+def set_offline(enabled):
+    on = str(enabled).lower() in ("1", "true", "on", "sim")
+    Setting.set("offline_enabled", "1" if on else None)
+    return "Disponível offline: a cópia das páginas é guardada neste dispositivo." if on else \
+        "Modo offline desligado: a cópia guardada neste dispositivo foi apagada."
+
+
+@action
 def set_risk_free(rate):
     value = _float(rate)
     if not 0 <= value <= 20:

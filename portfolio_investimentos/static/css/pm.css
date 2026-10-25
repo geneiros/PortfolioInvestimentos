@@ -117,6 +117,10 @@ body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
 .pm-step { width: 26px; height: 26px; border-radius: 50%; background: var(--bs-primary); color: #fff; display: inline-flex; align-items: center;
   justify-content: center; font-weight: 600; font-size: .8rem; flex: 0 0 26px; }
 
+/* modo offline: ações indisponíveis */
+body.pm-offline :is([data-pm-action], [data-pm-refresh], [data-pm-broker], [data-p], #drop, form[data-pm-method] [type=submit]) {
+  opacity: .5; cursor: not-allowed; }
+
 /* privacidade */
 body.pm-private .money { filter: blur(7px); }
 

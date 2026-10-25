@@ -24,7 +24,7 @@
   <script>window.csrf_token = "{{ csrf_token }}";</script>
 </head>
 {% from "macros.html" import broker_badge %}
-<body>
+<body data-offline="{{ 1 if offline_enabled else 0 }}" data-generated="{{ generated_at }}">
 <div class="pm-shell">
   <aside class="pm-sidebar d-flex flex-column p-3 bg-body-tertiary border-end">
     <div class="d-flex align-items-start gap-2 mb-3">

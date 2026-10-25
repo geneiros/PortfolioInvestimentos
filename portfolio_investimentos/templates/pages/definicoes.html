@@ -50,6 +50,24 @@
     </div>
 
     <div class="pm-card mb-3">
+      <div class="pm-label mb-2">Disponível offline {% if offline_enabled %}<span class="badge text-bg-success ms-1">Ligado</span>{% endif %}</div>
+      <p class="small text-body-secondary">Guarda neste dispositivo uma cópia das páginas de consulta (Visão Geral, Carteira,
+        Desempenho, Dividendos, Fiscal, Radar, Notícias e Transações). Com a aplicação parada, a aplicação instalada (PWA)
+        abre essa cópia, só para consulta.</p>
+      {% if offline_enabled %}
+        <p class="small mb-2">Última cópia: <b id="offlineSaved">—</b></p>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-outline-secondary" type="button" id="offlineSave"><i class="bi bi-cloud-download"></i> Guardar cópia agora</button>
+          <button class="btn btn-sm btn-outline-danger" data-pm-action="set_offline" data-args='{"enabled": "0"}'><i class="bi bi-cloud-slash"></i> Desligar e apagar a cópia</button>
+        </div>
+      {% else %}
+        <button class="btn btn-sm btn-primary" data-pm-action="set_offline" data-args='{"enabled": "1"}'><i class="bi bi-cloud-check"></i> Ligar</button>
+      {% endif %}
+      <p class="small text-body-secondary mt-2 mb-0"><i class="bi bi-info-circle"></i> Quem tiver acesso a este dispositivo vê os valores guardados,
+        mesmo com palavra-passe. A cópia mostra a corretora selecionada no momento em que foi guardada, e é apagada ao desligar ou ao sair (Sair).</p>
+    </div>
+
+    <div class="pm-card mb-3">
       <div class="pm-label mb-2">Segurança</div>
       {% if password_env %}
         <p class="small text-body-secondary mb-0"><i class="bi bi-shield-check text-success"></i> A palavra-passe está definida na variável de ambiente <code>PORTFOLIO_PASSWORD</code>. Para a mudares, altera essa variável no servidor.</p>
@@ -108,4 +126,14 @@
     {% else %}<p class="text-body-secondary">Sem ativos.</p>{% endfor %}
   </div></div>
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const out = document.getElementById("offlineSaved"), btn = document.getElementById("offlineSave");
+  if (!out) return;
+  const show = () => { const t = pm.offline.lastSaved(); out.textContent = t ? new Date(t).toLocaleString("pt-PT") : "ainda não"; };
+  show();
+  document.addEventListener("pm:offline-saved", show);
+  btn.addEventListener("click", () => { pm.offline.save(); pm.toast("Cópia offline guardada."); });
+});
+</script>
 {% endblock %}

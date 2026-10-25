@@ -626,3 +626,24 @@ def test_refresh_report_shows_yahoo_error(app, monkeypatch):
         market.refresh_all(start=date(2025, 10, 1))
         report = Setting.get("refresh_report")
     assert "ACME: sem cotações em EUR (ACME.DE: HTTP 429" in report
+
+
+def test_offline_mode_marks_pages(app, client, monkeypatch):
+    token = csrf(client)
+    assert client.get("/ping").status_code == 204
+    assert "X-PM-Offline" not in client.get("/").headers          # desligado por omissão
+    assert post(client, "set_offline", token, enabled="1").status_code == 200
+    page = client.get("/carteira")
+    assert page.headers.get("X-PM-Offline") == "1" and 'data-offline="1"' in page.get_data(as_text=True)
+    assert "X-PM-Offline" not in client.get("/sw.js").headers
+    assert "X-PM-Offline" not in client.get("/static/offline.html").headers
+    assert "X-PM-Offline" not in client.get("/definicoes").headers         # só páginas de consulta
+    # com palavra-passe: o login e os redirecionamentos nunca ficam guardados
+    monkeypatch.setenv("PORTFOLIO_PASSWORD", "segredo123")
+    other = app.test_client()
+    assert "X-PM-Offline" not in other.get("/login", environ_base=REMOTE).headers
+    assert "X-PM-Offline" not in other.get("/", environ_base=REMOTE).headers
+    assert other.get("/ping", environ_base=REMOTE).status_code == 204   # aberto, para a página saber se a app corre
+    monkeypatch.delenv("PORTFOLIO_PASSWORD")
+    assert post(client, "set_offline", token, enabled="0").status_code == 200
+    assert "X-PM-Offline" not in client.get("/").headers

@@ -47,6 +47,11 @@ def _secret_key(folder):
 mimetypes.add_type("application/manifest+json", ".webmanifest")  # manifesto da aplicação instalável
 
 
+# páginas de consulta que o modo "Disponível offline" pode guardar (não Importar nem Definições)
+OFFLINE_PAGES = {"pages.overview", "pages.carteira", "pages.desempenho", "pages.dividendos", "pages.fiscal",
+                 "pages.radar", "pages.noticias", "pages.transacoes"}
+
+
 def create_app(config=None):
     from .engine import formatting
     from .models import db
@@ -99,6 +104,24 @@ def create_app(config=None):
         if "csrf" not in session:
             session["csrf"] = secrets.token_hex(16)
         return {"csrf_token": session["csrf"]}
+
+    @app.context_processor
+    def _offline():
+        from datetime import datetime
+        from .models import Setting
+        return {"offline_enabled": Setting.get("offline_enabled") == "1",
+                "generated_at": datetime.now().isoformat(timespec="minutes")}
+
+    @app.after_request
+    def _mark_offline_pages(resp):
+        # só as páginas de consulta, com o modo offline ligado, podem ficar na cache do service worker
+        # (nunca o login, as páginas de erro nem o que é pedido com o modo desligado)
+        from flask import request
+        from .models import Setting
+        if (resp.status_code == 200 and resp.mimetype == "text/html" and request.endpoint in OFFLINE_PAGES
+                and Setting.get("offline_enabled") == "1"):
+            resp.headers["X-PM-Offline"] = "1"
+        return resp
 
     with app.app_context():
         from .models import migrate

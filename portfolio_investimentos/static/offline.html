@@ -30,12 +30,30 @@
         <li><b>Linux:</b> <code>./iniciar.sh</code></li>
       </ul>
       <button class="btn btn-primary w-100" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i> Tentar de novo</button>
+      <div id="saved" class="mt-3 d-none">
+        <p class="small text-body-secondary mb-2">Páginas guardadas para consulta offline:</p>
+        <div class="list-group list-group-flush small"></div>
+      </div>
     </div>
   </div>
 </main>
 <script>
+  // páginas guardadas pelo modo "Disponível offline" (Definições)
+  const NAMES = { "/": "Visão Geral", "/carteira": "Carteira", "/desempenho": "Desempenho", "/dividendos": "Dividendos",
+                  "/fiscal": "Fiscal", "/radar": "Radar e alertas", "/noticias": "Notícias", "/transacoes": "Transações" };
+  if (window.caches) caches.open("pi-pages").then((c) => c.keys()).then((keys) => {
+    const list = document.querySelector("#saved .list-group");
+    keys.map((k) => new URL(k.url)).filter((u) => u.pathname in NAMES && !u.search).forEach((u) => {
+      const a = document.createElement("a");
+      a.className = "list-group-item list-group-item-action";
+      a.href = u.pathname;
+      a.textContent = NAMES[u.pathname];
+      list.appendChild(a);
+    });
+    if (list.children.length) document.getElementById("saved").classList.remove("d-none");
+  }).catch(() => {});
   // volta sozinha quando a aplicação arrancar
-  setInterval(() => fetch("/", { method: "HEAD", cache: "no-store" }).then((r) => { if (r.ok || r.status === 302) location.reload(); }).catch(() => {}), 3000);
+  setInterval(() => fetch("/ping", { cache: "no-store" }).then((r) => { if (r.ok) location.reload(); }).catch(() => {}), 3000);
 </script>
 </body>
 </html>

@@ -266,3 +266,9 @@ def service_worker():
     resp.headers["Cache-Control"] = "no-cache"
     resp.headers["Content-Type"] = "text/javascript; charset=utf-8"
     return resp
+
+
+@bp.route("/ping")
+def ping():
+    """Resposta vazia: a página usa-a para saber se a aplicação está a correr (modo offline)."""
+    return "", 204, {"Cache-Control": "no-store"}

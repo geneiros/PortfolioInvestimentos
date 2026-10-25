@@ -95,6 +95,7 @@
     if (!el) return;
     e.preventDefault();
     if (el.dataset.confirm && !confirm(el.dataset.confirm)) return;
+    if (el.dataset.pmAction === "logout") pm.offline.clear();  // ao sair, a cópia offline é apagada
     await pm.call(el.dataset.pmAction, JSON.parse(el.dataset.args || "{}"));
     if (el.dataset.reload !== "false") location.reload();
   });
@@ -146,6 +147,64 @@
     try { closed = JSON.parse(pm.store.get("pm-closed-warnings") || "[]"); } catch (err) { /* vazio */ }
     closed = closed.filter((t) => t !== text).concat(text).slice(-50);
     pm.store.set("pm-closed-warnings", JSON.stringify(closed));
+  });
+
+  // ---------------------------------------------------------------- modo offline (PWA)
+  // Com "Disponível offline" ligado (Definições), o service worker guarda as páginas de consulta; se a
+  // aplicação estiver parada, a página vem dessa cópia: mostra-se uma faixa e as ações ficam bloqueadas.
+  const OFFLINE_PAGES = ["/", "/carteira", "/desempenho", "/dividendos", "/fiscal", "/radar", "/noticias", "/transacoes"];
+  const BLOCKED = "[data-pm-action],[data-pm-refresh],[data-pm-broker],[data-p],#fileInput,#drop,form[data-pm-method] [type=submit]";
+  const toSW = (msg) => {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.ready.then((reg) => reg.active && reg.active.postMessage(msg)).catch(() => {});
+  };
+  pm.offline = {
+    clear: () => toSW({ type: "clear" }),
+    save: () => {
+      toSW({ type: "warm", urls: OFFLINE_PAGES });
+      store.set("pm-offline-saved", String(Date.now()));
+      document.dispatchEvent(new CustomEvent("pm:offline-saved"));
+    },
+    lastSaved: () => Number(store.get("pm-offline-saved")) || null,
+  };
+  const enabled = () => document.body.dataset.offline === "1";
+  const enterOffline = () => {
+    if (document.body.classList.contains("pm-offline")) return;
+    document.body.classList.add("pm-offline");
+    const when = document.body.dataset.generated ? new Date(document.body.dataset.generated) : null;
+    const bar = document.createElement("div");
+    bar.className = "alert alert-secondary rounded-0 border-0 border-bottom mb-0 py-2 small d-flex align-items-center gap-2 pm-offline-bar";
+    bar.innerHTML = '<i class="bi bi-cloud-slash"></i><span></span>';
+    bar.querySelector("span").textContent = "Modo offline · dados de " +
+      (when ? when.toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—") +
+      " (só consulta). Inicia a aplicação para atualizar e fazer alterações.";
+    document.querySelector(".pm-main")?.prepend(bar);
+    // volta a tentar e recarrega quando a aplicação responder
+    const retry = setInterval(() => fetch("/ping", { cache: "no-store" })
+      .then((r) => { if (r.ok) { clearInterval(retry); location.reload(); } }).catch(() => {}), 15000);
+  };
+  // em modo offline, as ações ficam bloqueadas com uma explicação (em vez de falharem sem resposta)
+  const blockOffline = (e) => {
+    if (!document.body.classList.contains("pm-offline") || !e.target.closest(BLOCKED)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    pm.toast("Modo offline: só consulta. Inicia a aplicação para fazer alterações.", "secondary");
+  };
+  document.addEventListener("click", blockOffline, true);
+  document.addEventListener("submit", (e) => {
+    if (!document.body.classList.contains("pm-offline") || !e.target.matches("form[data-pm-method]")) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    pm.toast("Modo offline: só consulta. Inicia a aplicação para fazer alterações.", "secondary");
+  }, true);
+  document.addEventListener("DOMContentLoaded", () => {
+    if (!document.querySelector(".pm-main")) return;  // login e páginas sem menu
+    fetch("/ping", { cache: "no-store" }).then((r) => {
+      if (!r.ok) throw new Error("sem resposta");
+      // aplicação a correr: mantém a cópia offline em dia (de 30 em 30 minutos) ou apaga-a se o modo estiver desligado
+      if (!enabled()) pm.offline.clear();
+      else if (!pm.offline.lastSaved() || Date.now() - pm.offline.lastSaved() > 30 * 60 * 1000) pm.offline.save();
+    }).catch(enterOffline);
   });
 
   // ---------------------------------------------------------------- preferências

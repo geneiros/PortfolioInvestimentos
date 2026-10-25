@@ -25,11 +25,20 @@ Para experimentar sem os teus dados, clica em **Ver demonstração**. São carre
 
 No **Chrome** ou no **Edge**, com a aplicação aberta em `http://127.0.0.1:5000`, carrega no ícone de instalar na barra de endereço (ou **Menu → Instalar Portfolio Investimentos**). A aplicação passa a abrir na sua própria janela, com ícone no menu Iniciar, na barra de tarefas ou na Dock, e atalhos para Carteira, Desempenho e Importar.
 
-- A janela instalada é uma porta para a aplicação local, por isso o servidor tem de estar a correr (`iniciar.bat`, `iniciar.command` ou `./iniciar.sh`). Se não estiver, a janela mostra como o iniciar e volta sozinha quando ele arrancar.
+- A janela instalada é uma porta para a aplicação local, por isso o servidor tem de estar a correr (`iniciar.bat`, `iniciar.command` ou `./iniciar.sh`). Se não estiver, a janela mostra como o iniciar e volta sozinha quando ele arrancar (ver também **Disponível offline**, abaixo).
 - Para o servidor não abrir também um separador no browser, arranca com `python -m portfolio_investimentos --no-browser`.
 - Usa sempre a mesma porta: a aplicação instalada fica associada a `127.0.0.1:5000`.
-- Só os ficheiros estáticos (Bootstrap, ícones) ficam em cache. Os teus dados financeiros nunca ficam guardados pelo browser.
+- Por omissão, só os ficheiros estáticos (Bootstrap, ícones) ficam em cache e os teus dados financeiros não ficam guardados pelo browser.
 - Noutros dispositivos da rede (`--host 0.0.0.0`), o browser só permite instalar através de HTTPS.
+
+#### Disponível offline
+
+Para consultar os últimos dados com a aplicação parada (por exemplo, com o Termux ou o computador desligados), liga **Definições → Disponível offline**. A partir daí, as páginas de consulta (Visão Geral, Carteira, Desempenho, Dividendos, Fiscal, Radar, Notícias e Transações) ficam guardadas no browser tal como estavam da última vez que as abriste. A cópia é renovada de 30 em 30 minutos enquanto a aplicação está aberta, ou quando carregas em **Guardar cópia agora**.
+
+- Sem a aplicação a correr, aparece a faixa "Modo offline", com a data dos dados. A página recarrega sozinha quando a aplicação voltar.
+- Funciona só para consulta. Importar, editar, atualizar cotações e mudar de corretora precisam da aplicação a correr.
+- A cópia mostra a corretora que estava selecionada quando foi guardada.
+- Privacidade: quem tiver acesso ao dispositivo pode ver os valores guardados, mesmo com palavra-passe. Desligar a opção ou sair (**Sair**) apaga a cópia.
 
 ### Android (Termux)
 
