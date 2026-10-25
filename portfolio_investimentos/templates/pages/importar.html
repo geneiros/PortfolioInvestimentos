@@ -81,7 +81,19 @@ document.addEventListener("DOMContentLoaded", () => {
   async function upload(files) {
     if (!files.length) return;
     const fd = new FormData();
-    [...files].forEach((f) => fd.append("file", f, f.name));
+    out.textContent = "A ler o ficheiro…";
+    // lê o conteúdo antes de enviar: no Android, um ficheiro da cloud (Drive, OneDrive…) que não está
+    // no telemóvel, ou que mudou depois de escolhido, fazia o envio falhar só com "Failed to fetch"
+    for (const f of [...files]) {
+      try {
+        fd.append("file", new Blob([await f.arrayBuffer()], { type: f.type }), f.name);
+      } catch (err) {
+        out.textContent = `Não foi possível ler "${f.name}". Se estiver no Google Drive ou noutra cloud, descarrega-o primeiro para o telemóvel (pasta Transferências) e escolhe-o de novo.`;
+        input.value = "";
+        return;
+      }
+    }
+    input.value = "";  // permite escolher o mesmo ficheiro outra vez
     fd.append("broker_key", key);
     fd.append("broker_name", document.getElementById("brokerName").value);
     out.textContent = "A importar…";

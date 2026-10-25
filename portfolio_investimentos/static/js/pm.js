@@ -22,10 +22,18 @@
     const body = args instanceof FormData ? args : new URLSearchParams(
       Object.entries(args).filter(([, v]) => v !== undefined && v !== null)
         .map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : v]));
-    const res = await fetch("/api/" + method, {
-      method: "POST", body, credentials: "same-origin",
-      headers: { "X-CSRF-Token": window.csrf_token, Accept: "application/json" },
-    });
+    let res;
+    try {
+      res = await fetch("/api/" + method, {
+        method: "POST", body, credentials: "same-origin",
+        headers: { "X-CSRF-Token": window.csrf_token, Accept: "application/json" },
+      });
+    } catch (err) {
+      // o pedido não teve resposta ("Failed to fetch"): a aplicação parou ou deixou de estar acessível
+      const msg = "Sem ligação à aplicação. Confirma que ela continua a correr (no Android, que o Termux não foi fechado) e tenta de novo.";
+      if (!opts.silent) pm.toast(msg, "danger");
+      throw new Error(msg);
+    }
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) {  // sessão terminada (palavra-passe ativa): volta ao login
       location.href = "/login?next=" + encodeURIComponent(location.pathname + location.search);
