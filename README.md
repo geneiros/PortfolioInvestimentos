@@ -17,6 +17,8 @@ Precisas apenas do **Python 3.10 ou superior** ([python.org/downloads](https://w
    - **Linux:** `./iniciar.sh`
 3. O browser abre em `http://127.0.0.1:5000`. Para terminar, fecha a janela do terminal.
 
+Se instalaste com `git clone`, o `iniciar.bat` verifica a cada arranque se há uma versão nova e pergunta se queres atualizar. Sem resposta em 10 segundos, ou sem internet, arranca a versão atual. Os teus dados não são afetados, porque ficam fora da pasta do projeto.
+
 Na primeira vez, o script cria um ambiente Python (`.venv`) na pasta do projeto e instala as dependências. Isto demora um ou dois minutos. Nas vezes seguintes arranca de imediato.
 
 Para experimentar sem os teus dados, clica em **Ver demonstração**. São carregadas empresas fictícias com preços sintéticos, e depois podes apagá-las em Definições.
