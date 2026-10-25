@@ -86,6 +86,8 @@ def create_app(config=None):
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp)
 
+    from .services.importer import broker_logo
+    app.jinja_env.globals["broker_logo"] = broker_logo
     app.jinja_env.filters.update(
         money=formatting.money, pct=formatting.pct, number=formatting.number, tone=formatting.tone,
         ddmmyyyy=formatting.ddmmyyyy, ddmm=formatting.ddmm, month_label=formatting.month_label,

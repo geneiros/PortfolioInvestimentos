@@ -8,6 +8,7 @@ import hashlib
 import io
 import re
 from datetime import datetime
+from pathlib import Path
 
 from ..models import Broker, FxRate, ImportBatch, Instrument, Price, Transaction, db
 
@@ -35,6 +36,24 @@ BROKERS = [
     {"key": "ibkr", "name": "IBKR", "format": "Extrato CSV", "parser": None, "color": "#dc2626"},
     {"key": "etoro", "name": "eToro", "format": "Extrato PDF", "parser": None, "color": "#22c55e"},
 ]
+
+# logótipos em static/icons/brokers/<chave>.svg|png; a chave é deduzida do nome da corretora,
+# para servir também às corretoras criadas na importação com um nome próprio (ex.: "XTB – conta EUR")
+_LOGO_DIR = Path(__file__).resolve().parent.parent / "static" / "icons" / "brokers"
+_LOGO_NAMES = (("trading212", ("trading 212", "trading212")), ("xtb", ("xtb",)),
+               ("traderepublic", ("trade republic", "traderepublic")))
+
+
+def broker_logo(name_or_key):
+    """Caminho (relativo a /static) do logótipo da corretora, ou None se não houver."""
+    text = (name_or_key or "").strip().lower()
+    for key, names in _LOGO_NAMES:
+        if text == key or any(n in text for n in names):
+            for ext in ("svg", "png"):
+                if (_LOGO_DIR / f"{key}.{ext}").is_file():
+                    return f"icons/brokers/{key}.{ext}"
+    return None
+
 
 INSTRUCTIONS = {
     "generic": [

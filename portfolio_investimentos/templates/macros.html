@@ -2,8 +2,14 @@
 <span class="help" data-bs-toggle="tooltip" title="{{ text }}">?</span>
 {%- endmacro %}
 
-{% macro broker_badge(b) -%}
-<span class="pm-badge-broker" style="background: {{ b.color or '#3b82f6' }}">{{ (b.broker_name or '?')[:1]|upper }}</span>
+{% macro broker_badge(b, size=22) -%}
+{%- set name = b.broker_name or b.name or '?' -%}
+{%- set logo = broker_logo(name) -%}
+{%- if logo -%}
+<img class="pm-broker-logo" src="{{ url_for('static', filename=logo) }}" width="{{ size }}" height="{{ size }}" alt="{{ name }}" title="{{ name }}">
+{%- else -%}
+<span class="pm-badge-broker" style="background: {{ b.color or '#3b82f6' }}; width: {{ size }}px; height: {{ size }}px; flex-basis: {{ size }}px; color: {{ '#0f172a' if b.color in ('#f8fafc', '#e2e8f0') else '#fff' }}">{{ name[:1]|upper }}</span>
+{%- endif -%}
 {%- endmacro %}
 
 {% macro logo(asset) -%}

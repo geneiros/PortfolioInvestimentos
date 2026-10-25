@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}{% autoescape true %}
+{% from "macros.html" import broker_badge %}
 <div class="mx-auto" style="max-width: 940px">
   <h4 class="fw-bold">Importar extrato</h4>
   <p class="text-secondary">Seleciona a tua corretora e carrega o extrato de conta. As transações são extraídas automaticamente e só é importado o que é novo: podes carregar várias vezes sem duplicar.</p>
@@ -35,7 +36,7 @@
     <div class="col-6 col-md-4 col-lg-3">
       <div class="pm-broker-tile {{ 'active' if loop.index == 2 }} {{ 'disabled' if not b.parser }}" data-key="{{ b.key }}" data-name="{{ b.name }}"
            {% if not b.parser %}title="Em breve"{% endif %}>
-        <span class="pm-badge-broker" style="background: {{ b.color }}; width: 32px; height: 32px; flex-basis: 32px; color: {{ '#0f172a' if b.color in ('#f8fafc', '#e2e8f0') else '#fff' }}">{{ b.name[:1] }}</span>
+        {{ broker_badge(b, 32) }}
         <div><b class="small">{{ b.name }}</b><div class="small text-secondary">{{ b.format if b.parser else 'Em breve' }}</div></div>
       </div>
     </div>
