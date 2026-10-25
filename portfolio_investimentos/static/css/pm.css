@@ -83,7 +83,8 @@ body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
   font-weight: 700; color: #fff; }
 .pm-logo { width: 28px; height: 28px; flex: 0 0 28px; font-size: .62rem; }
 .pm-badge-broker { width: 22px; height: 22px; flex: 0 0 22px; font-size: .65rem; }
-.pm-broker-logo { border-radius: var(--bs-border-radius-sm); flex: 0 0 auto; object-fit: contain; }
+.pm-broker-logo { border-radius: var(--bs-border-radius-sm); flex: 0 0 auto; object-fit: contain;
+  box-shadow: 0 0 0 1px var(--bs-border-color-translucent); }  /* contorno: logótipos de fundo branco no modo claro */
 .pm-table { --bs-table-bg: transparent; margin: 0; }
 .pm-table thead th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--bs-secondary-color); white-space: nowrap;
   background: var(--bs-body-bg); cursor: pointer; user-select: none; }
