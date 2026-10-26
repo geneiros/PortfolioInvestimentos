@@ -191,6 +191,62 @@ def _xtb_workbook():
     return buf.getvalue()
 
 
+def _xtb_short_workbook():
+    """Extrato da XTB de poucos dias: só um depósito, mas a folha Open Positions lista todas as posições."""
+    from datetime import datetime as dt
+
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ops = wb.active
+    ops.title = "Cash Operations"
+    for row in (["Account number", "123"], ["Cash Operations", ""], ["Date from (UTC)", dt(2026, 10, 22, 23)],
+                ["Date to (UTC)", dt(2026, 10, 26, 7)],
+                ["Type", "Instrument", "Ticker", "Category", "Time", "Amount", "ID", "Comment", "Product", "Position ID"],
+                ["Deposit", "", "", "", dt(2026, 10, 26, 4), 200.0, "50", "Deposit", "Investment Plans", ""],
+                ["Total", None, None, None, None, 200.0]):
+        ops.append(row)
+    op = wb.create_sheet("Open Positions")
+    for row in (["Account number", "123"], ["Open Positions", ""], ["Data as of report generated", dt(2026, 10, 26, 7)],
+                ["Product", "Instrument/Position", "Ticker", "Category", "Type", "Volume", "Value", "Current price",
+                 "Open price", "Open time (UTC)"],
+                ["My Trades", "Core S&P 500", "SXR8.DE", "ETF", "", 1.0, 530.0, "", 480.0, ""],
+                ["My Trades", "100", "SXR8.DE", "", "BUY", 1.0, 530.0, 530.0, 480.0, dt(2026, 1, 3, 9)],
+                ["Investment Plan", "101", "ERNX.DE", "", "BUY", 10.0, 56.0, 5.60, 5.50, dt(2026, 1, 5, 5)]):
+        op.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def _upload_xtb(client, data, name):
+    resp = client.post("/api/upload_statement", headers={"X-CSRF-Token": csrf(client)},
+                       data={"broker_key": "xtb", "file": (io.BytesIO(data), name)},
+                       content_type="multipart/form-data")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    return resp.get_json()["message"][0]
+
+
+def test_import_xtb_short_period_does_not_duplicate(app, client):
+    """Extrato de poucos dias por cima do histórico: as posições compradas antes não são transferências."""
+    from portfolio_investimentos.services import data
+
+    _upload_xtb(client, _xtb_workbook(), "historico.xlsx")
+    r = _upload_xtb(client, _xtb_short_workbook(), "semana.xlsx")
+    assert r["imported"] == 1  # só o depósito
+    assert r["ignored"] == {"Posições compradas antes do período do extrato (já importadas)": 2}
+    with app.test_request_context():
+        assert Transaction.query.filter_by(type="TRANSFER_IN").count() == 1  # a do histórico
+        assert data.load_portfolio(None).holdings_value == pytest.approx(530.0 + 56.0)
+
+
+def test_import_xtb_short_period_first_import(app, client):
+    """Sem histórico, o extrato curto é a única fonte: as posições abertas entram como transferências."""
+    r = _upload_xtb(client, _xtb_short_workbook(), "semana.xlsx")
+    assert r["imported"] == 3
+    with app.test_request_context():
+        assert Transaction.query.filter_by(type="TRANSFER_IN").count() == 2
+
+
 def test_import_xtb_xlsx(app, client):
     from portfolio_investimentos.models import Instrument, Price
     from portfolio_investimentos.services import data

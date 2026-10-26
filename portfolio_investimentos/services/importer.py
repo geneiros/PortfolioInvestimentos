@@ -457,7 +457,7 @@ def parse_xtb(data):
         else:
             yield {**base, "type": None, "_ignored": op.get("Type")}
 
-    yield from _xtb_transfers_in(wb, ops)
+    yield from _xtb_transfers_in(wb, ops, _xtb_period_start(wb))
 
     # preço atual das posições abertas, na data do relatório
     if "Open Positions" in wb.sheetnames:
@@ -481,8 +481,20 @@ def _pid(v):
     return str(v).strip()
 
 
-def _xtb_transfers_in(wb, ops):
-    """Ações recebidas de outra corretora: posições com venda/abertas mas sem compra em dinheiro."""
+def _xtb_period_start(wb):
+    """Início do período do extrato ("Date from (UTC)" na folha Cash Operations), se existir."""
+    for r in wb["Cash Operations"].iter_rows(max_row=10, values_only=True):
+        if r and r[0] == "Date from (UTC)" and isinstance(r[1], datetime):
+            return r[1]
+    return None
+
+
+def _xtb_transfers_in(wb, ops, start=None):
+    """Ações recebidas de outra corretora: posições com venda/abertas mas sem compra em dinheiro.
+
+    Num extrato de um período curto, as compras anteriores ao início do período não aparecem: essas
+    posições ficam marcadas (`_before_period`) e `import_file` ignora-as se já houver histórico importado.
+    """
     purchased = {_pid(o.get("Position ID")) for o in ops if str(o.get("Type", "")).lower() == "stock purchase"}
     sells = {}
     for o in ops:
@@ -504,10 +516,12 @@ def _xtb_transfers_in(wb, ops):
                              r.get("Open time (UTC)"), pid))
     for ticker, name, cat, vol, price, opened, pid in rows:
         d = _as_date(opened)
+        before = bool(start and isinstance(opened, datetime) and opened < start)
         yield {"date": d, "external_id": f"xtb-in-{pid}-{vol}", "ticker": ticker, "name": name, "isin": None,
                "quantity": vol, "price": price, "amount": 0.0, "fees": 0.0, "tax": 0.0, "currency": "EUR",
                "result": None, "note": "Ações recebidas de outra corretora", "type": "TRANSFER_IN",
-               "_symbol": xtb_yahoo_symbol(ticker), "_kind": "etf" if cat == "ETF" else None, "_price": price}
+               "_symbol": xtb_yahoo_symbol(ticker), "_kind": "etf" if cat == "ETF" else None, "_price": price,
+               "_before_period": before}
 
 
 def _xtb_positions(wb):
@@ -567,6 +581,7 @@ def import_file(broker_key, filename, data, broker_name=None):
     db.session.flush()
 
     existing = {e for (e,) in db.session.query(Transaction.external_id).filter_by(broker=broker)}
+    has_history = bool(existing)
     dates, fx_obs, price_obs = [], {}, {}
     ignored = {}
     for n, item in enumerate(items, start=2):
@@ -576,6 +591,9 @@ def import_file(broker_key, filename, data, broker_name=None):
                                kind=q.get("kind"))
             price_obs[(inst, q["date"])] = (q["price"], q.get("currency", "EUR"))
             continue
+        if item.pop("_before_period", False) and has_history:
+            # comprada antes do período do extrato: a compra já veio numa importação anterior
+            item = {"_ignored": "Posições compradas antes do período do extrato (já importadas)"}
         if item.get("type") is None:
             ignored[item.get("_ignored")] = ignored.get(item.get("_ignored"), 0) + 1
             continue
