@@ -27,8 +27,8 @@ if errorlevel 1 (
 set NOVAS=0
 for /f %%n in ('git rev-list --count HEAD..@{u} 2^>nul') do set NOVAS=%%n
 if "%NOVAS%"=="0" exit /b 0
-REM sem resposta em 10 segundos, arranca sem atualizar
-choice /c SN /t 10 /d N /m "Ha uma versao nova (%NOVAS% alteracoes). Atualizar agora"
+REM sem resposta em 10 segundos, atualiza (so a resposta N salta a atualizacao)
+choice /c SN /t 10 /d S /m "Ha uma versao nova (%NOVAS% alteracoes). Atualizar agora"
 if errorlevel 2 exit /b 0
 git pull --ff-only
 if errorlevel 1 (
