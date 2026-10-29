@@ -547,7 +547,6 @@ def test_merge_instruments_manually(app, client):
 def test_refresh_is_incremental_after_first_run(app, monkeypatch):
     """Depois da primeira atualização, só se pedem os dias novos; posições fechadas já completas não se pedem."""
     import sys
-    from datetime import timedelta
     from portfolio_investimentos.models import Instrument, Price
     from portfolio_investimentos.services import market
 
