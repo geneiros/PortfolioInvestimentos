@@ -136,6 +136,19 @@ def test_reset_data_clears_refresh_state(app, client):
         assert all(Setting.get(k) is None for k in ("last_refresh", "refresh_report", "refresh_missing", "hide_banner"))
 
 
+def test_manual_sell_above_held_quantity_is_rejected(app, client):
+    token = csrf(client)
+    post(client, "add_transaction", token, date="2024-01-03", type="BUY", instrument="ACME", quantity="5", price="10")
+    over = post(client, "add_transaction", token, date="2024-01-04", type="SELL", instrument="ACME", quantity="10",
+                price="20")
+    assert over.status_code == 400 and "Só tens 5 unidades de ACME" in over.get_json()["error"]
+    before = post(client, "add_transaction", token, date="2024-01-02", type="SELL", instrument="ACME", quantity="1",
+                  price="20")
+    assert before.status_code == 400  # ainda não tinha comprado nessa data
+    assert post(client, "add_transaction", token, date="2024-01-04", type="SELL", instrument="ACME", quantity="5",
+                price="20").status_code == 200
+
+
 def test_manual_transfer_and_convert_keep_instrument(app, client):
     """Transferências e conversões manuais têm ativo: antes ficavam sem ele e bloqueavam todas as páginas."""
     token = csrf(client)

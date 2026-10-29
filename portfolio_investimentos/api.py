@@ -111,6 +111,15 @@ def performance(period="MAX", benchmarks=None):
 
 
 # --------------------------------------------------------------- transações
+def _held(ticker, broker, on):
+    """Unidades de um ativo detidas numa data (numa corretora, ou em todas se `broker` for None)."""
+    q = Transaction.query.filter(Transaction.instrument == ticker, Transaction.date <= on)
+    if broker is not None:
+        q = q.filter(Transaction.broker == broker)
+    plus, minus = ("BUY", "TRANSFER_IN", "CONVERT_IN"), ("SELL", "TRANSFER_OUT", "CONVERT_OUT")
+    return sum((t.quantity or 0.0) * (1 if t.type in plus else -1) for t in q if t.type in plus + minus)
+
+
 @action
 def add_transaction(**kw):
     typ = kw.get("type")
@@ -131,6 +140,10 @@ def add_transaction(**kw):
         d = date.fromisoformat(kw.get("date") or "")
     except ValueError as exc:
         raise ApiError("Data inválida.") from exc
+    if typ in ("SELL", "TRANSFER_OUT", "CONVERT_OUT"):
+        held = _held(instrument, int(broker) if broker else None, d)
+        if qty > held + 1e-6:
+            raise ApiError(f"Só tens {held:g} unidades de {instrument} em {d:%d/%m/%Y}.")
     t = Transaction(broker=int(broker) if broker else None, instrument=instrument, date=d, type=typ,
                     quantity=qty, price=_float(kw.get("price")), amount=amount, fees=_float(kw.get("fees")),
                     tax=_float(kw.get("tax")), currency=(kw.get("currency") or "EUR").upper()[:3],
