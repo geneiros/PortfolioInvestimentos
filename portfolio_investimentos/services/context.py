@@ -29,6 +29,19 @@ def js_json(obj):
     return json.dumps(obj, default=str).replace("<", "\\u003c").replace(">", "\\u003e")
 
 
+def _regions(p):
+    """Bolsas onde há posições abertas: EUA (sufixo .US, sem sufixo ou em USD) e/ou Europa (os restantes)."""
+    found = set()
+    for pos in p.open_positions:
+        a = pos.asset
+        if a.kind == "index":
+            continue
+        t = a.ticker.upper()
+        isin_like = len(t) == 12 and t[:2].isalpha() and t[2:].isalnum()
+        found.add("US" if a.currency == "USD" or t.endswith(".US") or ("." not in t and not isin_like) else "EU")
+    return found or {"EU"}
+
+
 def build(active, title, **extra):
     broker = data.selected_broker()
     brokers = data.brokers()
@@ -37,7 +50,7 @@ def build(active, title, **extra):
         active=active, title=title, nav=NAV, nav_bottom=NAV_BOTTOM, feedback_url=FEEDBACK_URL,
         brokers=brokers, broker=broker, broker_doc=next((b for b in brokers if b.name == broker), None),
         total_positions=sum(b.positions for b in brokers), p=p, day_change=p.day_change(),
-        market=market_status(), eurusd=p.book.latest_fx("USD"),
+        market=market_status(regions=_regions(p)), eurusd=p.book.latest_fx("USD"),
         hide_banner=Setting.get("hide_banner") == "1", is_demo=Setting.get("demo") == "1",
         has_data=bool(p.transactions), auth_enabled=auth.password_enabled(), MONTHS=MONTHS, js_json=js_json, warnings=list(p.warnings),
     )

@@ -537,6 +537,52 @@ def test_settings_assets_show_attention_rows_and_quote_status(app, client):
     assert "sem cotações" in html and "11,00 EUR · 06/02/2026" in html
 
 
+def test_market_status_holidays_and_us_hours():
+    from datetime import datetime
+    from portfolio_investimentos.services import market
+
+    L = market.LISBON
+    at = lambda *a: datetime(*a, tzinfo=L)  # noqa: E731
+    # Páscoa 2026: 5 de abril; Sexta-feira Santa (3) e Segunda-feira de Páscoa (6) fecham a Euronext
+    assert market._easter(2026) == date(2026, 4, 5) and market._easter(2027) == date(2027, 3, 28)
+    s = market.market_status(at(2026, 4, 3, 10, 0))
+    assert (s["open"], s["detail"]) == (False, "Abre terça-feira às 08:00")
+    assert market.market_status(at(2026, 12, 25, 10, 0))["open"] is False  # Natal
+    assert market.market_status(at(2026, 10, 29, 10, 0))["open"] is True  # dia normal
+    # 4 de julho de 2026 é sábado: a NYSE fecha na sexta, dia 3
+    assert market._session("US", date(2026, 7, 3)) is None and market._session("US", date(2026, 7, 2))
+    assert date(2026, 11, 26) in market.us_holidays(2026)  # Ação de Graças
+    # Europa fechada, EUA abertos (18:00 em Lisboa em fevereiro; Nova Iorque fecha às 21:00)
+    both = market.market_status(at(2026, 2, 3, 18, 0), ("EU", "US"))
+    assert both["open"] is True and both["label"] == "Europa: fechado · EUA: aberto até às 21:00"
+    # Nova Iorque ainda em hora de verão, Lisboa já não: a sessão acaba às 20:00 em Lisboa
+    assert "EUA: aberto até às 20:00" in market.market_status(at(2026, 10, 29, 18, 0), ("EU", "US"))["label"]
+    # tudo fechado: diz quando abre a primeira bolsa
+    shut = market.market_status(at(2026, 12, 25, 12, 0), ("EU", "US"))
+    assert shut["open"] is False and shut["detail"] == "Abre segunda-feira às 08:00 (Europa)"
+
+
+def test_market_regions_from_positions(app, client):
+    from portfolio_investimentos.models import Instrument
+    from portfolio_investimentos.services import context, data
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="VWCE.DE", currency="EUR"), Instrument(ticker="AAPL", currency="USD"),
+            Instrument(ticker="IE00B4L5Y983", currency="EUR"),
+            Transaction(date=date(2026, 1, 6), type="BUY", instrument="VWCE.DE", quantity=1, price=10.0, currency="EUR"),
+            Transaction(date=date(2026, 1, 6), type="BUY", instrument="IE00B4L5Y983", quantity=1, price=10.0, currency="EUR"),
+        ])
+        db.session.commit()
+    with app.test_request_context():
+        assert context._regions(data.load_portfolio(None)) == {"EU"}  # o ISIN não conta como ação dos EUA
+    with app.app_context():
+        db.session.add(Transaction(date=date(2026, 1, 7), type="BUY", instrument="AAPL", quantity=1, price=10.0,
+                                   currency="USD"))
+        db.session.commit()
+    with app.test_request_context():
+        assert context._regions(data.load_portfolio(None)) == {"EU", "US"}
+
+
 def test_merge_instruments_manually(app, client):
     from portfolio_investimentos.models import Instrument, Price
     with app.app_context():

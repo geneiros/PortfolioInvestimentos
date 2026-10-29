@@ -67,18 +67,109 @@ DEFAULT_BENCHMARKS = [
 ]
 
 
-def market_status(now=None):
+def _easter(year):
+    """Domingo de Páscoa (algoritmo gregoriano anónimo)."""
+    a, b, c = year % 19, year // 100, year % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    el = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * el) // 451
+    month, day = divmod(h + el - 7 * m + 114, 31)
+    return date(year, month, day + 1)
+
+
+def _nth_weekday(year, month, weekday, n):
+    """n-ésimo dia da semana do mês (n = -1: o último)."""
+    if n > 0:
+        first = date(year, month, 1)
+        return first + timedelta(days=(weekday - first.weekday()) % 7 + 7 * (n - 1))
+    last = date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1)
+    return last - timedelta(days=(last.weekday() - weekday) % 7)
+
+
+def _observed(d):
+    """Feriado que calha ao fim de semana: sábado passa para sexta, domingo para segunda (regra da NYSE)."""
+    return d - timedelta(days=1) if d.weekday() == 5 else d + timedelta(days=1) if d.weekday() == 6 else d
+
+
+def eu_holidays(year):
+    """Feriados em que a Euronext (e a Xetra) está fechada."""
+    easter = _easter(year)
+    return {date(year, 1, 1), easter - timedelta(days=2), easter + timedelta(days=1), date(year, 5, 1),
+            date(year, 12, 25), date(year, 12, 26)}
+
+
+def us_holidays(year):
+    """Feriados da NYSE e da Nasdaq."""
+    days = {_nth_weekday(year, 1, 0, 3), _nth_weekday(year, 2, 0, 3), _easter(year) - timedelta(days=2),
+            _nth_weekday(year, 5, 0, -1), _observed(date(year, 6, 19)), _observed(date(year, 7, 4)),
+            _nth_weekday(year, 9, 0, 1), _nth_weekday(year, 11, 3, 4), _observed(date(year, 12, 25))}
+    if date(year, 1, 1).weekday() != 5:  # 1 de janeiro ao sábado: a bolsa abre na sexta, 31 de dezembro
+        days.add(_observed(date(year, 1, 1)))
+    return days
+
+
+def _new_york():
+    try:
+        return ZoneInfo("America/New_York")
+    except ZoneInfoNotFoundError:
+        return None
+
+
+REGIONS = {"EU": "Europa", "US": "EUA"}
+
+
+def _session(region, day):
+    """Abertura e fecho (hora de Lisboa) da sessão de um dia, ou None se a bolsa está fechada."""
+    if day.weekday() >= 5:
+        return None
+    if region == "EU":
+        if day in eu_holidays(day.year):
+            return None
+        return datetime.combine(day, OPEN, LISBON), datetime.combine(day, CLOSE, LISBON)
+    if day in us_holidays(day.year):
+        return None
+    ny = _new_york()
+    if ny is None:  # sem base de fusos: horário habitual em Lisboa
+        return datetime.combine(day, time(14, 30), LISBON), datetime.combine(day, time(21, 0), LISBON)
+    # sessão de 9:30 às 16:00 em Nova Iorque (13:00 na sexta a seguir ao Dia de Ação de Graças e a 24 de dezembro)
+    early = day == _nth_weekday(day.year, 11, 3, 4) + timedelta(days=1) or day == date(day.year, 12, 24)
+    return (datetime.combine(day, time(9, 30), ny).astimezone(LISBON),
+            datetime.combine(day, time(13, 0) if early else time(16, 0), ny).astimezone(LISBON))
+
+
+def _region_status(region, now):
+    """(aberta, detalhe, versão curta, próxima abertura) de uma região num instante."""
+    today = now.date()
+    sess = _session(region, today)
+    if sess and sess[0] <= now < sess[1]:
+        return True, f"fecha às {sess[1]:%H:%M}", f"aberto até às {sess[1]:%H:%M}", None
+    for ahead in range(0, 12):
+        day = today + timedelta(days=ahead)
+        sess = _session(region, day)
+        if sess and sess[0] > now:
+            when = "hoje" if ahead == 0 else ("amanhã" if ahead == 1 else WEEKDAYS[day.weekday()])
+            return False, f"Abre {when} às {sess[0]:%H:%M}", "fechado", sess[0]
+    return False, "", "fechado", None
+
+
+def market_status(now=None, regions=("EU",)):
+    """Estado das bolsas onde há posições: Europa (Euronext) e/ou EUA, com os feriados de cada uma."""
     now = (now or datetime.now(LISBON)).astimezone(LISBON)
-    if now.weekday() < 5 and OPEN <= now.time() < CLOSE:
-        return {"open": True, "label": "Aberto", "detail": f"Fecha às {CLOSE:%H:%M}"}
-    nxt = now.date()
-    if now.weekday() >= 5 or now.time() >= CLOSE:
-        nxt += timedelta(days=1)
-    while nxt.weekday() >= 5:
-        nxt += timedelta(days=1)
-    when = "hoje" if nxt == now.date() else ("amanhã" if nxt == now.date() + timedelta(days=1)
-                                             else WEEKDAYS[nxt.weekday()])
-    return {"open": False, "label": "Fechado", "detail": f"Abre {when} às {OPEN:%H:%M}"}
+    regions = [r for r in REGIONS if r in regions] or ["EU"]
+    states = [(r, *_region_status(r, now)) for r in regions]
+    if len(states) == 1:
+        _, is_open, detail, _, _ = states[0]
+        return {"open": is_open, "label": "Aberto" if is_open else "Fechado", "detail": detail}
+    is_open = any(s[1] for s in states)
+    label = " · ".join(f"{REGIONS[r]}: {short}" for r, _, _, short, _ in states)
+    # fechadas todas: diz quando abre a primeira
+    soonest = min((s_ for s_ in states if s_[4]), key=lambda s_: s_[4], default=None)
+    detail = "" if is_open or soonest is None else f"{soonest[2]} ({REGIONS[soonest[0]]})"
+    return {"open": is_open, "label": label, "detail": detail}
 
 
 def ensure_benchmarks():

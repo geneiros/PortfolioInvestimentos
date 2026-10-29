@@ -98,7 +98,7 @@
         <span class="badge rounded-pill {{ 'text-bg-success' if dc[0] > 0 else ('text-bg-danger' if dc[0] < 0 else 'text-bg-secondary') }} fs-6 fw-normal">
           <span class="money">{{ dc[0]|money(2, sign=True) }}</span> ({{ dc[1]|pct(2) }}) · {{ p.as_of|ddmm }}</span>
         {% endif %}
-        <span class="badge rounded-pill {{ 'text-bg-success' if market.open else 'bg-body-secondary text-body border' }} fs-6 fw-normal">{{ market.label }} · {{ market.detail }}</span>
+        <span class="badge rounded-pill {{ 'text-bg-success' if market.open else 'bg-body-secondary text-body border' }} fs-6 fw-normal">{{ market.label }}{% if market.detail %} · {{ market.detail }}{% endif %}</span>
       </div>
       <span class="small text-body-secondary d-none d-xl-inline">{% if eurusd %}EUR/USD {{ eurusd|number(4) }}{% endif %}</span>
     </nav>
