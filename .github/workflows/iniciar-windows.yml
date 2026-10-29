@@ -10,6 +10,7 @@ on:
 jobs:
   atualizar:
     runs-on: windows-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,13 +34,13 @@ jobs:
           git commit -m "versao 2 (muda o iniciar.bat)"
           git push origin main
       - name: Atualizar e arrancar (PORTFOLIO_ATUALIZAR=S)
-        shell: cmd
+        shell: pwsh
+        timeout-minutes: 10
         env:
           PORTFOLIO_ATUALIZAR: S
         run: |
-          cd /d "%RUNNER_TEMP%\app"
-          call iniciar.bat --help < nul > saida.txt 2>&1
-          type saida.txt
+          Set-Location "$env:RUNNER_TEMP\app"
+          cmd /c "call iniciar.bat --help < nul 2>&1" | Tee-Object saida.txt
       - name: Confirmar
         shell: pwsh
         run: |
@@ -51,18 +52,18 @@ jobs:
           if ($n -ne 1) { throw "a aplicacao arrancou $n vezes (esperado: 1)" }
           if ($out -match "n.o \S+ reconhecido|is not recognized|nao e reconhecido") { throw "o cmd executou lixo depois da atualizacao" }
       - name: Nova versão, mas PORTFOLIO_ATUALIZAR=N não atualiza
-        shell: cmd
+        shell: pwsh
+        timeout-minutes: 10
         env:
           PORTFOLIO_ATUALIZAR: N
         run: |
-          cd /d "%RUNNER_TEMP%\dev"
+          Set-Location "$env:RUNNER_TEMP\dev"
           git pull
-          echo nova> VERSAO-3.txt
+          "nova" | Set-Content VERSAO-3.txt
           git add -A
           git commit -m "versao 3"
           git push origin main
-          cd /d "%RUNNER_TEMP%\app"
-          call iniciar.bat --help < nul > saida2.txt 2>&1
-          type saida2.txt
-          if exist VERSAO-3.txt exit /b 1
-          findstr /c:"usage:" saida2.txt || exit /b 1
+          Set-Location "$env:RUNNER_TEMP\app"
+          cmd /c "call iniciar.bat --help < nul 2>&1" | Tee-Object saida2.txt
+          if (Test-Path VERSAO-3.txt) { throw "atualizou apesar de PORTFOLIO_ATUALIZAR=N" }
+          if ((Get-Content saida2.txt -Raw) -notmatch "usage:") { throw "nao arrancou" }
