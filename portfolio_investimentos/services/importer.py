@@ -132,6 +132,21 @@ def _rename_instrument(old, new):
     db.session.flush()
 
 
+def merge_instruments(old, new):
+    """Junta o ativo `old` no ativo `new` (o mesmo título com dois tickers): transações e alertas passam para `new`.
+
+    As cotações, eventos e notícias de `old` descartam-se (`new` tem as suas, únicas por data/endereço) e voltam
+    a obter-se na próxima atualização.
+    """
+    from ..models import Event, News, WatchItem
+    for model in (Price, Event, News, WatchItem):
+        model.query.filter(model.instrument == old.ticker).delete(synchronize_session=False)
+    new.isin = new.isin or old.isin
+    if old.sector and not new.sector:
+        new.sector = old.sector
+    _rename_instrument(old, new)
+
+
 def _instrument(ticker, name=None, currency="EUR", isin=None, symbol=None, kind=None):
     """Devolve o ticker do ativo, criando-o se necessário.
 

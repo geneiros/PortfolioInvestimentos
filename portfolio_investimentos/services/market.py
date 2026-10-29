@@ -177,7 +177,10 @@ def refresh_all(start=None):
         held = {pos.asset.ticker for pos in load_portfolio(None).open_positions}
         # os ativos de demonstração são fictícios: não existem no Yahoo Finance
         insts = [i for i in Instrument.query.all() if not i.ticker.startswith("DEMO-")]
+        gone = []  # ativos juntados com outro durante a atualização
         for inst in insts:
+            if inst in gone:
+                continue
             problems = []
             try:
                 found = _resolve_symbol(yf, inst, start, problems)
@@ -191,6 +194,15 @@ def refresh_all(start=None):
                 report.append(f"{inst.ticker}: sem cotações em {inst.currency} ({why[:300]})")
                 continue
             symbol, hist, scale = found
+            twin = _twin(inst, symbol, insts)
+            if twin:  # o mesmo título já existe com o ticker da bolsa (ex.: comprado também na XTB)
+                from .importer import merge_instruments
+                report.append(f"{inst.ticker}: é o mesmo título que {twin.ticker}; ativos juntados")
+                held.add(twin.ticker)
+                gone.append(inst)
+                merge_instruments(inst, twin)
+                db.session.commit()
+                continue
             if symbol != inst.data_symbol:
                 # cotações guardadas com outro símbolo podem estar noutra moeda
                 Price.query.filter_by(instrument=inst.ticker).delete()
@@ -217,7 +229,7 @@ def refresh_all(start=None):
         for inst in insts:
             # notícias, eventos e setor só interessam para as posições abertas; os ativos vendidos
             # podem já nem existir em bolsa (ex.: empresas compradas ou fundidas)
-            if inst.kind == "index" or inst.ticker not in held:
+            if inst in gone or inst.kind == "index" or inst.ticker not in held:
                 continue
             t = yf.Ticker(inst.data_symbol or inst.ticker)
             if not inst.sector and inst.kind == "etf":
@@ -279,6 +291,16 @@ def _reference_price(inst):
                                   Transaction.currency == inst.currency)
          .order_by(Transaction.date.desc()).first())
     return (t.date, t.price) if t else None
+
+
+def _twin(inst, symbol, insts):
+    """Outro ativo que é o mesmo título: `inst` só tem o ISIN como ticker e o símbolo encontrado é o do outro."""
+    from .importer import _ISIN
+    if not (inst.isin and _ISIN.match(inst.ticker)):
+        return None
+    return next((o for o in insts if o is not inst and o.kind != "index" and not _ISIN.match(o.ticker)
+                 and o.currency == inst.currency and o.isin in (None, inst.isin)
+                 and symbol in (o.data_symbol, o.ticker)), None)
 
 
 def _resolve_symbol(yf, inst, start, problems=None):

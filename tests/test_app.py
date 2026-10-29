@@ -492,6 +492,58 @@ def test_refresh_picks_symbol_in_instrument_currency(app, client, monkeypatch):
     assert (st["running"], st["error"], st["missing"], st["updated"]) == (False, None, ["XYZ"], 3)
 
 
+def test_refresh_merges_isin_placeholder_into_exchange_ticker(app, monkeypatch):
+    """O mesmo ETF na XTB (ticker da bolsa) e na Trade Republic (ISIN) passa a ser um só ativo."""
+    import sys
+    from portfolio_investimentos.models import Instrument, Price
+    from portfolio_investimentos.services import market
+    monkeypatch.setitem(sys.modules, "yfinance", _FakeYf)
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="ADB.DE", currency="EUR", kind="etf", data_symbol="ADB.DE"),
+            Instrument(ticker="US00724F1012", currency="EUR", isin="US00724F1012"),
+            Transaction(date=date(2026, 8, 27), type="BUY", instrument="ADB.DE", quantity=1, price=240.4, currency="EUR"),
+            Transaction(date=date(2026, 9, 14), type="BUY", instrument="US00724F1012", quantity=2, price=230.0,
+                        currency="EUR"),
+            Price(instrument="US00724F1012", date=date(2026, 10, 22), close=1.0),  # data que o outro também tem
+        ])
+        db.session.commit()
+        report = market.refresh_all(start=date(2026, 10, 1))
+        assert "ativos juntados" in report
+        assert db.session.get(Instrument, "US00724F1012") is None
+        merged = db.session.get(Instrument, "ADB.DE")
+        assert merged.isin == "US00724F1012"
+        assert sorted(t.instrument for t in Transaction.query) == ["ADB.DE", "ADB.DE"]
+        assert [p.close for p in Price.query.filter_by(instrument="ADB.DE")] == [227.10, 227.10]
+        # uma nova importação da Trade Republic (ISIN como ticker) já cai no ativo unificado
+        from portfolio_investimentos.services import importer
+        assert importer._instrument("US00724F1012", isin="US00724F1012") == "ADB.DE"
+
+
+def test_merge_instruments_manually(app, client):
+    from portfolio_investimentos.models import Instrument, Price
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="AAA.DE", currency="EUR"), Instrument(ticker="AAA", currency="EUR", sector="Tec"),
+            Instrument(ticker="USD1", currency="USD"),
+            Transaction(date=date(2026, 1, 5), type="BUY", instrument="AAA", quantity=1, price=10.0, currency="EUR"),
+            Price(instrument="AAA", date=date(2026, 1, 6), close=11.0),
+            Price(instrument="AAA.DE", date=date(2026, 1, 6), close=11.5),
+        ])
+        db.session.commit()
+    token = csrf(client)
+    assert post(client, "merge_instruments", token, source="AAA", target="AAA").status_code == 400
+    assert post(client, "merge_instruments", token, source="AAA", target="USD1").status_code == 400  # moedas diferentes
+    assert post(client, "merge_instruments", token, source="AAA", target="NAO").status_code == 400
+    assert post(client, "merge_instruments", token, source="AAA", target="AAA.DE").status_code == 200
+    with app.app_context():
+        assert db.session.get(Instrument, "AAA") is None
+        assert db.session.get(Instrument, "AAA.DE").sector == "Tec"
+        assert Transaction.query.filter_by(instrument="AAA.DE").count() == 1
+        assert [p.close for p in Price.query.filter_by(instrument="AAA.DE")] == [11.5]
+    assert client.get("/definicoes").status_code == 200 and client.get("/carteira").status_code == 200
+
+
 def test_refresh_state(app):
     from datetime import datetime, timedelta
     from portfolio_investimentos.models import Setting

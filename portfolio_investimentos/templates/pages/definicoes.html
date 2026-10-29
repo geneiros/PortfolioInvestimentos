@@ -113,6 +113,15 @@
   <div class="col-xl-7"><div class="pm-card">
     <div class="pm-label mb-1">Ativos</div>
     <p class="small text-body-secondary">O <b>símbolo de dados</b> é o código no Yahoo Finance (ex.: <code>VWCE.DE</code>, <code>IWDA.AS</code>, <code>AAPL</code>). O setor define os filtros da página Carteira.</p>
+    {% if instruments|length > 1 %}
+    <form class="d-flex flex-wrap gap-2 align-items-center small mb-3" data-pm-method="merge_instruments" data-pm-success="Ativos juntados.">
+      <span>O mesmo título com dois tickers? Juntar</span>
+      <select name="source" class="form-select form-select-sm" style="width: 150px">{% for i in instruments %}<option>{{ i.ticker }}</option>{% endfor %}</select>
+      <span>em</span>
+      <select name="target" class="form-select form-select-sm" style="width: 150px">{% for i in instruments %}<option>{{ i.ticker }}</option>{% endfor %}</select>
+      <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-intersect"></i> Juntar</button>
+    </form>
+    {% endif %}
     {% for i in instruments %}
       <form class="d-flex gap-2 align-items-center py-2 border-bottom" data-pm-method="update_instrument" data-pm-success="Ativo atualizado." data-pm-reload="false">
         <input type="hidden" name="ticker" value="{{ i.ticker }}"><b style="min-width: 110px" class="small">{{ i.ticker }}</b>

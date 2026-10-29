@@ -218,6 +218,23 @@ def save_broker(broker_name, color=None, name=None):
 
 
 @action
+def merge_instruments(source, target):
+    """Junta dois tickers do mesmo título num só (o ativo `source` desaparece)."""
+    old, new = db.session.get(Instrument, source or ""), db.session.get(Instrument, target or "")
+    if old is None or new is None:
+        raise ApiError("Ativo não encontrado.")
+    if old is new:
+        raise ApiError("Escolhe dois ativos diferentes.")
+    if "index" in (old.kind, new.kind):
+        raise ApiError("Os índices de comparação não se juntam.")
+    if old.currency != new.currency:
+        raise ApiError(f"Moedas diferentes ({old.currency} e {new.currency}): não é o mesmo ativo.")
+    importer.merge_instruments(old, new)
+    db.session.commit()
+    return f"{old.ticker} juntado em {new.ticker}."
+
+
+@action
 def delete_broker(name):
     b = _get(Broker, name)
     if Transaction.query.filter_by(broker=b.id).first():
