@@ -718,7 +718,7 @@ class Portfolio:
     # ---------------------------------------------------------------- fiscal
     def fiscal_years(self):
         years = defaultdict(lambda: {"sales": [], "gains": 0.0, "losses": 0.0,
-                                     "div_gross": 0.0, "div_tax": 0.0, "interest": 0.0})
+                                     "div_gross": 0.0, "div_tax": 0.0, "tax_dividends": 0.0, "interest": 0.0})
         for s in self.sales:
             y = years[s.date.year]
             y["sales"].append(s)
@@ -729,6 +729,9 @@ class Portfolio:
         for d in self.dividends:
             years[d.date.year]["div_gross"] += d.gross_eur
             years[d.date.year]["div_tax"] += d.tax_eur
+            # crédito por dupla tributação limitado ao imposto português sobre ESTE dividendo:
+            # a retenção a mais num dividendo não abate o imposto de outro
+            years[d.date.year]["tax_dividends"] += max(d.gross_eur * TAX_RATE - d.tax_eur, 0.0)
         for t in self.transactions:
             if t.type == "INTEREST":
                 years[t.date.year]["interest"] += self.book.to_eur(t.amount, t.currency, t.date)
@@ -737,8 +740,6 @@ class Portfolio:
             balance = y["gains"] + y["losses"]
             y["balance"] = balance
             y["tax_gains"] = max(balance, 0.0) * TAX_RATE
-            # crédito por dupla tributação limitado ao imposto português sobre o dividendo
-            y["tax_dividends"] = max(y["div_gross"] * TAX_RATE - y["div_tax"], 0.0)
             y["tax_interest"] = y["interest"] * TAX_RATE
             out[year] = y
         return out

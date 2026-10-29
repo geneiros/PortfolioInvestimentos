@@ -105,6 +105,17 @@ def test_dividends_and_fiscal():
     assert fiscal[2024]["interest"] == pytest.approx(10)
 
 
+def test_fiscal_dividend_credit_is_limited_per_dividend():
+    """A retenção a mais num dividendo (30% nos EUA) não abate o imposto de outro dividendo do mesmo ano."""
+    d0 = date(2024, 1, 2)
+    prices = book_linear("ACME", d0, date(2024, 12, 31), 10, 10)
+    txs = [Tx(d0, "BUY", ACME, quantity=100, price=10),
+           Tx(date(2024, 3, 15), "DIVIDEND", ACME, quantity=100, amount=100, tax=30),
+           Tx(date(2024, 9, 15), "DIVIDEND", ACME, quantity=100, amount=100, tax=0)]
+    p = Portfolio(txs, PriceBook(prices), as_of=date(2024, 12, 31))
+    assert p.fiscal_years()[2024]["tax_dividends"] == pytest.approx(28.0)  # e não 26
+
+
 def test_benchmark_merit_and_risk():
     d0, d1 = date(2022, 1, 3), date(2024, 12, 31)
     prices = book_linear("ACME", d0, d1, 100, 150)
