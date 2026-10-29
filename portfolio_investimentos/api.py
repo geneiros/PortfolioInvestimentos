@@ -80,9 +80,10 @@ def call(name):
     if not any(p.kind == p.VAR_KEYWORD for p in params.values()):
         args = {k: v for k, v in args.items() if k in params}
     try:
-        return jsonify(message=fn(**args))
-    except TypeError as exc:
+        inspect.signature(fn).bind(**args)
+    except TypeError as exc:  # só a falta de argumentos; erros dentro da ação não se escondem aqui
         raise ApiError("Faltam dados no pedido.") from exc
+    return jsonify(message=fn(**args))
 
 
 # ------------------------------------------------------------------ navegação
@@ -102,7 +103,10 @@ def hide_banner():
 def performance(period="MAX", benchmarks=None):
     from .views import perf_payload
     if isinstance(benchmarks, str):
-        benchmarks = json.loads(benchmarks)
+        try:
+            benchmarks = json.loads(benchmarks)
+        except ValueError as exc:
+            raise ApiError("Índices de comparação inválidos.") from exc
     return perf_payload(data.load_portfolio(data.selected_broker()), (period or "MAX").upper(), benchmarks)
 
 
@@ -186,6 +190,8 @@ def save_broker(broker_name, color=None, name=None):
         raise ApiError("Indica o nome da corretora.")
     if name:
         b = _get(Broker, name)
+        if Broker.query.filter(Broker.broker_name == broker_name, Broker.id != b.id).first():
+            raise ApiError("Já existe uma corretora com esse nome.")
         b.broker_name, b.color = broker_name, color or b.color
         db.session.commit()
         return b.id

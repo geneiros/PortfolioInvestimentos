@@ -112,6 +112,18 @@ def test_generic_csv_keeps_identical_rows_same_day(app, client):
         assert sum(t.quantity for t in Transaction.query.filter_by(type="BUY")) == 20
 
 
+def test_api_invalid_input_returns_message_not_500(app, client):
+    token = csrf(client)
+    first = post(client, "save_broker", token, broker_name="Alfa").get_json()["message"]
+    post(client, "save_broker", token, broker_name="Beta")
+    dup = post(client, "save_broker", token, broker_name="Beta", name=str(first))
+    assert dup.status_code == 400 and "Já existe" in dup.get_json()["error"]
+    assert post(client, "save_broker", token, broker_name="Alfa", name=str(first)).status_code == 200  # o próprio nome
+    bad = post(client, "performance", token, period="1A", benchmarks="{x")
+    assert bad.status_code == 400 and "inválidos" in bad.get_json()["error"]
+    assert post(client, "delete_transaction", token).status_code == 400  # falta o argumento
+
+
 def test_manual_transfer_and_convert_keep_instrument(app, client):
     """Transferências e conversões manuais têm ativo: antes ficavam sem ele e bloqueavam todas as páginas."""
     token = csrf(client)
