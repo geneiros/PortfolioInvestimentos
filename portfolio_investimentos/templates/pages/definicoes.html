@@ -116,15 +116,31 @@
     {% if instruments|length > 1 %}
     <form class="d-flex flex-wrap gap-2 align-items-center small mb-3" data-pm-method="merge_instruments" data-pm-success="Ativos juntados.">
       <span>O mesmo título com dois tickers? Juntar</span>
-      <select name="source" class="form-select form-select-sm" style="width: 150px">{% for i in instruments %}<option>{{ i.ticker }}</option>{% endfor %}</select>
+      <select name="source" class="form-select form-select-sm" style="width: 150px">{% for r in instruments %}<option>{{ r.ticker }}</option>{% endfor %}</select>
       <span>em</span>
-      <select name="target" class="form-select form-select-sm" style="width: 150px">{% for i in instruments %}<option>{{ i.ticker }}</option>{% endfor %}</select>
+      <select name="target" class="form-select form-select-sm" style="width: 150px">{% for r in instruments %}<option>{{ r.ticker }}</option>{% endfor %}</select>
       <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-intersect"></i> Juntar</button>
     </form>
     {% endif %}
-    {% for i in instruments %}
-      <form class="d-flex gap-2 align-items-center py-2 border-bottom" data-pm-method="update_instrument" data-pm-success="Ativo atualizado." data-pm-reload="false">
-        <input type="hidden" name="ticker" value="{{ i.ticker }}"><b style="min-width: 110px" class="small">{{ i.ticker }}</b>
+    {% set n_attention = instruments|selectattr('attention')|list|length %}
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2" id="assetFilter">
+      <input type="search" id="assetSearch" class="form-control form-control-sm" style="max-width: 270px" placeholder="Pesquisar ticker, nome ou ISIN">
+      <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-outline-secondary active" data-asset-group="attention">Posições abertas e sem cotações ({{ n_attention }})</button>
+        <button type="button" class="btn btn-outline-secondary" data-asset-group="all">Todos ({{ instruments|length }})</button>
+      </div>
+    </div>
+    <p class="small text-body-secondary d-none" id="assetNone">Nenhum ativo corresponde.</p>
+    {% for r in instruments %}{% set i = r.i %}
+      <form class="{{ 'd-flex' if r.attention else 'd-none' }} gap-2 align-items-center py-2 border-bottom" data-pm-method="update_instrument" data-pm-success="Ativo atualizado." data-pm-reload="false"
+            data-asset-row data-attention="{{ 1 if r.attention else 0 }}" data-ticker="{{ i.ticker }}"
+            data-search="{{ (i.ticker ~ ' ' ~ (i.instrument_name or '') ~ ' ' ~ (i.isin or ''))|lower }}">
+        <input type="hidden" name="ticker" value="{{ i.ticker }}">
+        <div style="min-width: 130px"><b class="small">{{ i.ticker }}</b>
+          <div class="text-body-secondary" style="font-size: .7rem">
+            {% if r.no_quotes %}<span class="text-warning-emphasis"><i class="bi bi-exclamation-triangle"></i> sem cotações</span>
+            {% else %}{{ r.last_close|number }} {{ i.currency }} · {{ r.last_date|ddmmyyyy }}{% endif %}
+          </div></div>
         <input name="instrument_name" value="{{ i.instrument_name or '' }}" class="form-control form-control-sm" placeholder="Nome">
         <select name="kind" class="form-select form-select-sm" style="width: 90px"><option value="stock" {{ 'selected' if i.kind == 'stock' }}>Ação</option><option value="etf" {{ 'selected' if i.kind == 'etf' }}>ETF</option></select>
         <input name="sector" value="{{ i.sector or '' }}" class="form-control form-control-sm" placeholder="Setor">
@@ -137,6 +153,29 @@
 </div>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+  // ativos: por omissão só os que precisam de atenção; a pesquisa procura em todos (?ativo=XXX abre a pesquisa)
+  const rows = [...document.querySelectorAll("[data-asset-row]")], box = document.getElementById("assetSearch");
+  const pills = [...document.querySelectorAll("[data-asset-group]")], none = document.getElementById("assetNone");
+  if (box) {
+    let group = "attention";
+    const apply = () => {
+      const q = box.value.trim().toLowerCase();
+      let shown = 0;
+      rows.forEach((r) => {
+        const ok = q ? r.dataset.search.includes(q) : (group === "all" || r.dataset.attention === "1");
+        r.classList.toggle("d-none", !ok);
+        r.classList.toggle("d-flex", ok);
+        shown += ok;
+      });
+      pills.forEach((b) => b.classList.toggle("active", !q && b.dataset.assetGroup === group));
+      none.classList.toggle("d-none", shown > 0);
+    };
+    pills.forEach((b) => b.addEventListener("click", () => { group = b.dataset.assetGroup; box.value = ""; apply(); }));
+    box.addEventListener("input", apply);
+    const wanted = new URLSearchParams(location.search).get("ativo");
+    if (wanted) box.value = wanted;
+    apply();
+  }
   const out = document.getElementById("offlineSaved"), btn = document.getElementById("offlineSave");
   if (!out) return;
   const show = () => { const t = pm.offline.lastSaved(); out.textContent = t ? new Date(t).toLocaleString("pt-PT") : "ainda não"; };

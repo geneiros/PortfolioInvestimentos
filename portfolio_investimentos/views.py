@@ -10,7 +10,7 @@ from . import auth
 from .services import context as ctx
 from .services import data
 from .services.importer import BROKERS, INSTRUCTIONS
-from .services.market import check_alerts, upcoming_events, yfinance_available
+from .services.market import check_alerts, refresh_state, upcoming_events, yfinance_available
 
 bp = Blueprint("pages", __name__)
 
@@ -251,12 +251,30 @@ def definicoes():
     from flask import current_app
     c = ctx.build("definicoes", "Definições")
     tickers = sorted({t.asset.ticker for t in c["p"].transactions if t.asset})
-    c.update(instruments=Instrument.query.filter(Instrument.ticker.in_(tickers or [""])).order_by(Instrument.ticker).all(),
+    c.update(instruments=_asset_rows(c["p"], tickers),
              last_price=db.session.query(db.func.max(Price.date)).scalar(),
              db_path=current_app.config["DB_PATH"], yfinance=yfinance_available(),
              risk_free_pct=round(data.risk_free() * 100, 2), last_refresh=Setting.get("last_refresh"), refresh_report=Setting.get("refresh_report"),
              password_env=bool(auth.env_password()))
     return render_template("pages/definicoes.html", **c)
+
+
+def _asset_rows(p, tickers):
+    """Ativos das Definições com o estado das cotações; por omissão só se mostram os que precisam de atenção."""
+    insts = Instrument.query.filter(Instrument.ticker.in_(tickers or [""])).order_by(Instrument.ticker).all()
+    latest = db.session.query(Price.instrument, db.func.max(Price.date).label("d")).group_by(Price.instrument).subquery()
+    last = {r.instrument: (r.date, r.close) for r in db.session.query(Price).join(
+        latest, db.and_(Price.instrument == latest.c.instrument, Price.date == latest.c.d))}
+    held = {pos.asset.ticker for pos in p.open_positions}
+    missing = set(refresh_state()[2])
+    rows = []
+    for i in insts:
+        date_, close = last.get(i.ticker, (None, None))
+        no_quotes = i.ticker in missing or date_ is None
+        rows.append(SimpleNamespace(i=i, ticker=i.ticker, held=i.ticker in held, no_quotes=no_quotes,
+                                    last_date=date_, last_close=close,
+                                    attention=i.ticker in held or no_quotes))
+    return rows
 
 
 @bp.route("/sw.js")

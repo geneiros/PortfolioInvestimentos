@@ -520,6 +520,23 @@ def test_refresh_merges_isin_placeholder_into_exchange_ticker(app, monkeypatch):
         assert importer._instrument("US00724F1012", isin="US00724F1012") == "ADB.DE"
 
 
+def test_settings_assets_show_attention_rows_and_quote_status(app, client):
+    from portfolio_investimentos.models import Instrument, Price
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="OPEN", currency="EUR"), Instrument(ticker="SHUT", currency="EUR"),
+            Transaction(date=date(2026, 1, 6), type="BUY", instrument="OPEN", quantity=2, price=10.0, currency="EUR"),
+            Transaction(date=date(2026, 1, 6), type="BUY", instrument="SHUT", quantity=1, price=10.0, currency="EUR"),
+            Transaction(date=date(2026, 2, 6), type="SELL", instrument="SHUT", quantity=1, price=11.0, currency="EUR"),
+            Price(instrument="SHUT", date=date(2026, 2, 6), close=11.0),
+        ])
+        db.session.commit()
+    html = client.get("/definicoes").get_data(as_text=True)
+    rows = re.findall(r'data-asset-row data-attention="(\d)" data-ticker="(\w+)"', html)
+    assert rows == [("1", "OPEN"), ("0", "SHUT")]  # aberta sem cotações precisa de atenção; a fechada, com cotações, não
+    assert "sem cotações" in html and "11,00 EUR · 06/02/2026" in html
+
+
 def test_merge_instruments_manually(app, client):
     from portfolio_investimentos.models import Instrument, Price
     with app.app_context():
