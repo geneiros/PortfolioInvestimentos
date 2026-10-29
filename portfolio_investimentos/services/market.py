@@ -418,7 +418,7 @@ def _store_news(ticker, items):
             continue
         published = content.get("pubDate") or content.get("providerPublishTime")
         if isinstance(published, (int, float)):
-            published = datetime.utcfromtimestamp(published)
+            published = datetime.fromtimestamp(published, timezone.utc).replace(tzinfo=None)
         elif isinstance(published, str):
             published = datetime.fromisoformat(published.replace("Z", "+00:00")).replace(tzinfo=None)
         source = (content.get("provider") or {}).get("displayName") or content.get("publisher")

@@ -1,5 +1,5 @@
 """Filtros Jinja para números no formato português (€1 234,56 · +3,42%)."""
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from markupsafe import Markup
 
@@ -56,7 +56,7 @@ def month_label(d):
 def ago(dt):
     if not dt:
         return ""
-    delta = datetime.utcnow() - dt
+    delta = datetime.now(timezone.utc).replace(tzinfo=None) - dt
     if delta.days >= 30:
         n = delta.days // 30
         return f"há {n} {'mês' if n == 1 else 'meses'}"

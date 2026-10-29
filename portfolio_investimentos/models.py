@@ -1,7 +1,13 @@
 """Modelos de dados (SQLite local). Aplicação pessoal: não há utilizadores."""
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
+
+
+def utcnow():
+    """Data e hora UTC sem fuso (como ficam gravadas no SQLite)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 db = SQLAlchemy()
 
@@ -88,7 +94,7 @@ class Transaction(NameMixin, db.Model):
     note = db.Column(db.String(255))
     external_id = db.Column(db.String(64), index=True)
     import_batch = db.Column(db.Integer, db.ForeignKey("import_batch.id"))
-    creation = db.Column(db.DateTime, default=datetime.utcnow)
+    creation = db.Column(db.DateTime, default=utcnow)
 
 
 class ImportBatch(NameMixin, db.Model):
@@ -100,7 +106,7 @@ class ImportBatch(NameMixin, db.Model):
     last_date = db.Column(db.Date)
     imported = db.Column(db.Integer, default=0)
     skipped = db.Column(db.Integer, default=0)
-    creation = db.Column(db.DateTime, default=datetime.utcnow)
+    creation = db.Column(db.DateTime, default=utcnow)
 
 
 class WatchItem(NameMixin, db.Model):
@@ -108,7 +114,7 @@ class WatchItem(NameMixin, db.Model):
     instrument = db.Column(db.String(32), db.ForeignKey("instrument.ticker"), nullable=False)
     target_price = db.Column(db.Float)
     note = db.Column(db.String(255))
-    creation = db.Column(db.DateTime, default=datetime.utcnow)
+    creation = db.Column(db.DateTime, default=utcnow)
 
 
 class Alert(NameMixin, db.Model):
@@ -120,7 +126,7 @@ class Alert(NameMixin, db.Model):
     threshold = db.Column(db.Float, nullable=False)
     active = db.Column(db.Boolean, default=True)
     triggered_on = db.Column(db.DateTime)
-    creation = db.Column(db.DateTime, default=datetime.utcnow)
+    creation = db.Column(db.DateTime, default=utcnow)
 
 
 class Event(db.Model):
