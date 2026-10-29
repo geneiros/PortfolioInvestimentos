@@ -314,7 +314,9 @@ def reset_data(confirm=""):
         model.query.delete()
     Broker.query.delete()
     Instrument.query.filter(Instrument.kind != "index").delete()
-    for key in ("broker", "demo"):
+    # também o estado da atualização de cotações (senão o aviso "ainda não atualizaste" deixava de aparecer)
+    for key in ("broker", "demo", "last_refresh", "refresh_missing", "refresh_updated", "refresh_report",
+                "refresh_status", "hide_banner"):
         Setting.set(key, None)
     db.session.commit()
     return "Todos os dados foram apagados."

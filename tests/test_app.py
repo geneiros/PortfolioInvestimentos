@@ -124,6 +124,18 @@ def test_api_invalid_input_returns_message_not_500(app, client):
     assert post(client, "delete_transaction", token).status_code == 400  # falta o argumento
 
 
+def test_reset_data_clears_refresh_state(app, client):
+    from portfolio_investimentos.models import Setting
+
+    with app.app_context():
+        for key in ("last_refresh", "refresh_report", "refresh_missing", "hide_banner"):
+            Setting.set(key, "1")
+        db.session.commit()
+    assert post(client, "reset_data", csrf(client), confirm="APAGAR").status_code == 200
+    with app.app_context():
+        assert all(Setting.get(k) is None for k in ("last_refresh", "refresh_report", "refresh_missing", "hide_banner"))
+
+
 def test_manual_transfer_and_convert_keep_instrument(app, client):
     """Transferências e conversões manuais têm ativo: antes ficavam sem ele e bloqueavam todas as páginas."""
     token = csrf(client)
