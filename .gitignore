@@ -6,3 +6,4 @@ instance/
 *.db
 .pytest_cache/
 dump.rdb
+uv.lock
