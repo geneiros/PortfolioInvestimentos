@@ -136,7 +136,7 @@ class Position:
 
     @property
     def qty(self):
-        return sum(l.qty for l in self.lots)
+        return sum(lot.qty for lot in self.lots)
 
     @property
     def is_open(self):
@@ -144,12 +144,12 @@ class Position:
 
     @property
     def invested_eur(self):
-        return sum(l.cost_eur for l in self.lots)
+        return sum(lot.cost_eur for lot in self.lots)
 
     @property
     def avg_price(self):
         q = self.qty
-        return sum(l.cost_local for l in self.lots) / q if q > EPS else 0.0
+        return sum(lot.cost_local for lot in self.lots) / q if q > EPS else 0.0
 
     @property
     def unrealized_eur(self):
@@ -481,7 +481,7 @@ class Portfolio:
                 pos.day_change_pct = p / prev - 1
                 pos.day_change_eur = pos.value_eur - q * prev / self.book.fx(cur, prev_day)
             # efeito cambial = valor atual - valor atual convertido às taxas de compra
-            at_buy_fx = sum(l.qty * p / l.fx for l in pos.lots)
+            at_buy_fx = sum(lot.qty * p / lot.fx for lot in pos.lots)
             pos.fx_effect_eur = pos.value_eur - at_buy_fx
 
     # ------------------------------------------------------------- resumos

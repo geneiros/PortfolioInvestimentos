@@ -221,7 +221,7 @@ Interest on cash,2026-01-13 02:00:00+00:00,,,,Interest on cash,I1,,,,,,,0.18,EUR
 
 
 def test_import_trading212_full_export(app, client):
-    from portfolio_investimentos.models import FxRate, Instrument, Price
+    from portfolio_investimentos.models import FxRate, Instrument
     from portfolio_investimentos.services import data
 
     token = csrf(client)

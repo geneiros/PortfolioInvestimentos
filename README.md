@@ -1,5 +1,7 @@
 # Portfolio Investimentos
 
+[![Testes](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml/badge.svg)](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml)
+
 Gestor de carteira de investimentos local: desempenho, dividendos, fiscalidade (PT) e importação de extratos da Trading 212, XTB e Trade Republic. **Corre no teu computador**, com alertas de preço e lista de observação.
 
 - **Sem servidor e sem base de dados para instalar.** Os dados ficam num único ficheiro SQLite no teu computador.
