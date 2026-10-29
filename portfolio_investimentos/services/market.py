@@ -169,6 +169,7 @@ def refresh_all(start=None):
     try:
         ensure_benchmarks()
         first_tx = db.session.query(db.func.min(Transaction.date)).scalar()
+        full = start is not None  # com data de início explícita pede-se o histórico todo
         start = start or (first_tx - timedelta(days=7) if first_tx else date.today() - timedelta(days=365))
         report, missing, updated = [], [], 0
         # os erros do yfinance (ex.: "No fundamentals data found") já ficam no resumo por ativo
@@ -178,21 +179,34 @@ def refresh_all(start=None):
         # os ativos de demonstração são fictícios: não existem no Yahoo Finance
         insts = [i for i in Instrument.query.all() if not i.ticker.startswith("DEMO-")]
         gone = []  # ativos juntados com outro durante a atualização
+        tx_span = {t: (lo, hi) for t, lo, hi in db.session.query(
+            Transaction.instrument, db.func.min(Transaction.date), db.func.max(Transaction.date)
+        ).group_by(Transaction.instrument)}
+        price_min = dict(db.session.query(Price.instrument, db.func.min(Price.date)).group_by(Price.instrument))
+        quick = skipped = 0
         for inst in insts:
             if inst in gone:
                 continue
             problems = []
-            try:
-                found = _resolve_symbol(yf, inst, start, problems)
-            except Exception as exc:  # um símbolo inválido não deve parar o resto
-                missing.append(inst.ticker)
-                report.append(f"{inst.ticker}: erro ({exc})")
+            mode = _plan(inst, held, tx_span, price_min, full)
+            if mode == "skip":  # posição fechada com as cotações já completas
+                skipped += 1
                 continue
-            if found is None:
-                missing.append(inst.ticker)
-                why = "; ".join(dict.fromkeys(problems)) if problems else "nenhum símbolo encontrado"
-                report.append(f"{inst.ticker}: sem cotações em {inst.currency} ({why[:300]})")
-                continue
+            found = _incremental(yf, inst, inst.last_quote - timedelta(days=5)) if mode == "incremental" else None
+            if found is not None:
+                quick += 1
+            else:
+                try:
+                    found = _resolve_symbol(yf, inst, start, problems)
+                except Exception as exc:  # um símbolo inválido não deve parar o resto
+                    missing.append(inst.ticker)
+                    report.append(f"{inst.ticker}: erro ({exc})")
+                    continue
+                if found is None:
+                    missing.append(inst.ticker)
+                    why = "; ".join(dict.fromkeys(problems)) if problems else "nenhum símbolo encontrado"
+                    report.append(f"{inst.ticker}: sem cotações em {inst.currency} ({why[:300]})")
+                    continue
             symbol, hist, scale = found
             twin = _twin(inst, symbol, insts)
             if twin:  # o mesmo título já existe com o ticker da bolsa (ex.: comprado também na XTB)
@@ -209,6 +223,9 @@ def refresh_all(start=None):
                 inst.data_symbol = symbol
             try:
                 n = _upsert(Price, "instrument", inst.ticker, "close", hist, scale)
+                closes = _closes(hist, scale)
+                if closes:
+                    inst.last_quote = closes[-1][0]
             except Exception as exc:  # um ativo com dados inválidos não deve parar o resto
                 db.session.rollback()
                 missing.append(inst.ticker)
@@ -219,8 +236,14 @@ def refresh_all(start=None):
 
         currencies = {i.currency for i in insts} | {c for (c,) in db.session.query(Transaction.currency).distinct()}
         for cur in sorted(c for c in currencies if c and c != "EUR"):
+            fx_start = start
+            if not full:  # só os dias novos, se o histórico guardado já cobre o início
+                lo, hi = db.session.query(db.func.min(FxRate.date), db.func.max(FxRate.date)).filter(
+                    FxRate.currency == cur).one()
+                if hi and lo <= start + timedelta(days=7):
+                    fx_start = max(start, hi - timedelta(days=5))
             try:
-                n = _upsert(FxRate, "currency", cur, "rate", yf.Ticker(f"EUR{cur}=X").history(start=start))
+                n = _upsert(FxRate, "currency", cur, "rate", yf.Ticker(f"EUR{cur}=X").history(start=fx_start))
                 report.append(f"EUR/{cur}: {n} taxas")
             except Exception as exc:
                 db.session.rollback()
@@ -248,6 +271,9 @@ def refresh_all(start=None):
                 _store_calendar(inst.ticker, t.calendar or {})
             except Exception as exc:
                 report.append(f"{inst.ticker} calendário: erro ({exc})")
+        if quick or skipped:
+            report.append(f"Atualização incremental: {quick} ativos só com os últimos dias; "
+                          f"{skipped} posições fechadas sem pedidos.")
         db.session.commit()
         Setting.set("refresh_missing", ",".join(missing))
         Setting.set("refresh_updated", updated)
@@ -291,6 +317,45 @@ def _reference_price(inst):
                                   Transaction.currency == inst.currency)
          .order_by(Transaction.date.desc()).first())
     return (t.date, t.price) if t else None
+
+
+def _plan(inst, held, tx_span, price_min, full):
+    """"full" (símbolo e histórico todos), "incremental" (só os dias novos) ou "skip" (nada a pedir)."""
+    if full or not inst.data_symbol or not inst.last_quote:
+        return "full"  # símbolo ainda por validar
+    first, last = tx_span.get(inst.ticker, (None, None))
+    lowest = price_min.get(inst.ticker)
+    if first and (lowest is None or lowest > first + timedelta(days=7)):
+        return "full"  # transações mais antigas do que as cotações guardadas
+    if inst.kind != "index" and inst.ticker not in held and last and inst.last_quote >= last:
+        return "skip"  # posição fechada: o histórico já cobre todas as transações
+    return "incremental"
+
+
+def _incremental(yf, inst, since):
+    """Cotações desde `since` com o símbolo já validado; None se for preciso o histórico todo."""
+    try:
+        t = yf.Ticker(inst.data_symbol)
+        hist = t.history(start=since, auto_adjust=False)
+        if hist is None or hist.empty:
+            return None
+        cur = (getattr(t, "history_metadata", None) or {}).get("currency")
+        cur, scale = SUBUNITS.get(cur, (cur, 1.0))
+        if cur and cur != inst.currency:
+            return None
+        if any(split for _, row in hist.iterrows() for split in [_split(row)]):
+            return None  # desdobramento recente: as cotações antigas têm de ser ajustadas outra vez
+        return inst.data_symbol, hist, scale
+    except Exception:
+        return None
+
+
+def _split(row):
+    try:
+        v = float(row.get("Stock Splits", 0) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    return v if math.isfinite(v) else 0.0
 
 
 def _twin(inst, symbol, insts):

@@ -51,6 +51,7 @@ class Instrument(db.Model):
     exchange = db.Column(db.String(40))
     isin = db.Column(db.String(12))
     data_symbol = db.Column(db.String(32))  # símbolo no Yahoo Finance
+    last_quote = db.Column(db.Date)  # último fecho obtido do Yahoo com o data_symbol (atualização incremental)
     color = db.Column(db.String(9), default="#64748b")
 
     @property
@@ -153,7 +154,7 @@ class News(db.Model):
 
 def migrate():
     """Acrescenta colunas novas a bases de dados criadas por versões anteriores (SQLite)."""
-    added = {"transaction": {"result": "FLOAT"}}
+    added = {"transaction": {"result": "FLOAT"}, "instrument": {"last_quote": "DATE"}}
     with db.engine.begin() as conn:
         for table, cols in added.items():
             existing = {r[1] for r in conn.exec_driver_sql(f'PRAGMA table_info("{table}")')}

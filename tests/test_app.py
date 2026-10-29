@@ -544,6 +544,51 @@ def test_merge_instruments_manually(app, client):
     assert client.get("/definicoes").status_code == 200 and client.get("/carteira").status_code == 200
 
 
+def test_refresh_is_incremental_after_first_run(app, monkeypatch):
+    """Depois da primeira atualização, só se pedem os dias novos; posições fechadas já completas não se pedem."""
+    import sys
+    from datetime import timedelta
+    from portfolio_investimentos.models import Instrument, Price
+    from portfolio_investimentos.services import market
+
+    calls = []
+
+    class Yf(_FakeYf):
+        class Ticker(_FakeYf.Ticker):
+            def history(self, start=None, **kw):
+                calls.append((self.symbol, start))
+                return super().history(start=start, **kw)
+
+    monkeypatch.setitem(sys.modules, "yfinance", Yf)
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="ADB", currency="EUR", isin="US00724F1012", data_symbol="ADB.DE"),
+            Instrument(ticker="NOV", currency="EUR", isin="DK0062498333", data_symbol="NOV.DE"),
+            Transaction(date=date(2026, 8, 27), type="BUY", instrument="ADB", quantity=1, price=240.4, currency="EUR"),
+            Transaction(date=date(2026, 9, 14), type="BUY", instrument="NOV", quantity=1, price=37.5, currency="EUR"),
+            Transaction(date=date(2026, 9, 20), type="SELL", instrument="NOV", quantity=1, price=38.0, currency="EUR"),
+        ])
+        db.session.commit()
+        market.refresh_all(start=date(2026, 8, 1))  # primeira vez: histórico todo
+        # o Yahoo simulado só devolve 3 dias; juntam-se cotações antigas, como as de um histórico real
+        db.session.add_all([Price(instrument="ADB", date=date(2026, 8, 27), close=240.0),
+                            Price(instrument="NOV", date=date(2026, 9, 14), close=37.5)])
+        db.session.commit()
+        assert db.session.get(Instrument, "ADB").last_quote == date(2026, 10, 23)
+        calls.clear()
+        report = market.refresh_all()  # seguinte: incremental
+        asset_calls = [c for c in calls if c[0] in ("ADB.DE", "NOV.DE")]
+        # NOV está vendida e as cotações já passam da última transação: nada a pedir; ADB só desde 18/10
+        assert asset_calls == [("ADB.DE", date(2026, 10, 18))]
+        assert "1 ativos só com os últimos dias" in report and "1 posições fechadas" in report
+        # símbolo alterado à mão: volta a pedir o histórico todo
+        calls.clear()
+        db.session.get(Instrument, "ADB").last_quote = None
+        db.session.commit()
+        market.refresh_all()
+        assert [c for c in calls if c[0] == "ADB.DE"][0][1] == date(2026, 8, 20)
+
+
 def test_refresh_state(app):
     from datetime import datetime, timedelta
     from portfolio_investimentos.models import Setting

@@ -250,10 +250,13 @@ def update_instrument(ticker, instrument_name=None, sector=None, data_symbol=Non
     inst = db.session.get(Instrument, ticker)
     if inst is None:
         raise ApiError("Ativo desconhecido.")
+    old_symbol = inst.data_symbol
     for k, v in {"instrument_name": instrument_name, "sector": sector, "data_symbol": data_symbol,
                  "color": color}.items():
         if v is not None:
             setattr(inst, k, v.strip() or None)
+    if data_symbol is not None and inst.data_symbol != old_symbol:
+        inst.last_quote = None  # outro símbolo: a próxima atualização volta a pedir o histórico todo
     if kind in ("stock", "etf"):
         inst.kind = kind
     db.session.commit()
