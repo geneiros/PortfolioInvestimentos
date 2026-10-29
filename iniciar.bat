@@ -4,12 +4,11 @@ REM Com git clone, verifica antes se ha uma versao nova e pergunta se deve atual
 cd /d "%~dp0"
 where py >nul 2>nul && (set PY=py -3) || (set PY=python)
 call :atualizacoes
-if not exist .venv (
+if not exist .venv\Scripts\python.exe (
   echo A preparar o ambiente - so na primeira vez...
   %PY% -m venv .venv || (echo Python 3.10+ nao encontrado. Instala-o em https://www.python.org/downloads/ & pause & exit /b 1)
-  .venv\Scripts\python -m pip install --upgrade pip
-  .venv\Scripts\python -m pip install -r requirements.txt || .venv\Scripts\python -m pip install Flask Flask-SQLAlchemy waitress openpyxl tzdata
 )
+call :dependencias || (echo Nao foi possivel instalar as dependencias. Verifica a ligacao a internet e volta a abrir. & pause & exit /b 1)
 .venv\Scripts\python -m portfolio_investimentos %*
 pause
 exit /b
@@ -35,6 +34,14 @@ if errorlevel 1 (
   echo Nao foi possivel atualizar - ha ficheiros alterados nesta pasta? A arrancar a versao atual.
   exit /b 0
 )
-REM as dependencias podem ter mudado na versao nova
-if exist .venv\Scripts\python.exe .venv\Scripts\python -m pip install -r requirements.txt
+exit /b 0
+
+:dependencias
+REM o marcador e uma copia de requirements.txt, criada so depois de a instalacao terminar:
+REM reinstala se a instalacao anterior foi interrompida ou se a lista de dependencias mudou
+fc /b requirements.txt .venv\.pronto >nul 2>nul && exit /b 0
+echo A instalar as dependencias...
+.venv\Scripts\python -m pip install --upgrade pip
+.venv\Scripts\python -m pip install -r requirements.txt || .venv\Scripts\python -m pip install Flask Flask-SQLAlchemy waitress openpyxl tzdata || exit /b 1
+copy /y requirements.txt .venv\.pronto >nul
 exit /b 0
