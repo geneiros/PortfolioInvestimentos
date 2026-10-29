@@ -75,6 +75,28 @@ def test_import_deduplicates(app, client):
         assert (div.currency, div.tax) == ("USD", pytest.approx(0.07))
 
 
+def test_generic_csv_keeps_identical_rows_same_day(app, client):
+    """Duas ordens iguais no mesmo dia são duas transações; reimportar o ficheiro continua a ser duplicado."""
+    csv = (b"date,type,ticker,quantity,price,amount,fees,tax,currency,name\n"
+           b"2024-01-02,DEPOSIT,,,,2000,,,EUR,\n"
+           b"2024-01-03,BUY,ACME,10,50,,,,EUR,Acme\n"
+           b"2024-01-03,BUY,ACME,10,50,,,,EUR,Acme\n")
+    token = csrf(client)
+
+    def upload():
+        resp = client.post("/api/upload_statement", headers={"X-CSRF-Token": token},
+                           data={"broker_key": "generic", "file": (io.BytesIO(csv), "a.csv")},
+                           content_type="multipart/form-data")
+        return resp.get_json()["message"][0]
+
+    first = upload()
+    assert (first["imported"], first["skipped"]) == (3, 0)
+    again = upload()
+    assert (again["imported"], again["skipped"]) == (0, 3)
+    with app.app_context():
+        assert sum(t.quantity for t in Transaction.query.filter_by(type="BUY")) == 20
+
+
 def test_manual_transfer_and_convert_keep_instrument(app, client):
     """Transferências e conversões manuais têm ativo: antes ficavam sem ele e bloqueavam todas as páginas."""
     token = csrf(client)

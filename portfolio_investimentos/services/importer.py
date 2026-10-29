@@ -583,7 +583,7 @@ def import_file(broker_key, filename, data, broker_name=None):
     existing = {e for (e,) in db.session.query(Transaction.external_id).filter_by(broker=broker)}
     has_history = bool(existing)
     dates, fx_obs, price_obs = [], {}, {}
-    ignored = {}
+    ignored, repeats = {}, {}
     for n, item in enumerate(items, start=2):
         if item.get("_quote"):  # cotação observada no extrato (ex.: preço atual da posição)
             q = item["_quote"]
@@ -600,9 +600,15 @@ def import_file(broker_key, filename, data, broker_name=None):
         fx = item.pop("_fx", None)
         item.pop("_price", None)  # os preços das transações são usados ao carregar a carteira
         symbol, kind = item.pop("_symbol", None), item.pop("_kind", None)
-        fp = item.pop("external_id") or _fingerprint(
-            item["date"], item["type"], item["ticker"], round(item["quantity"], 6),
-            round(item["price"], 6), round(item["amount"], 2))
+        fp = item.pop("external_id")
+        if not fp:
+            fp = _fingerprint(item["date"], item["type"], item["ticker"], round(item["quantity"], 6),
+                              round(item["price"], 6), round(item["amount"], 2))
+            # linhas iguais no mesmo ficheiro (ordens repetidas no mesmo dia) são transações distintas:
+            # a primeira mantém a impressão digital de sempre, as seguintes juntam o nº de ordem
+            repeats[fp] = repeats.get(fp, 0) + 1
+            if repeats[fp] > 1:
+                fp = _fingerprint(fp, repeats[fp])
         dates.append(item["date"])
         ticker, name_, isin = item.pop("ticker"), item.pop("name"), item.pop("isin", None)
         if fx:
