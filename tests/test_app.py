@@ -192,6 +192,13 @@ def test_backup_and_reset(app, client):
     post(client, "load_demo", token)
     backup = client.get("/api/backup")
     assert backup.status_code == 200 and backup.data[:15] == b"SQLite format 3"
+    import sqlite3 as _sq
+    import tempfile as _tf
+    with _tf.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        f.write(backup.data)
+    check = _sq.connect(f.name)
+    assert check.execute("PRAGMA integrity_check").fetchone() == ("ok",)  # cópia consistente e abrível
+    check.close()
     assert post(client, "reset_data", token, confirm="não").status_code == 400
     assert post(client, "reset_data", token, confirm="APAGAR").status_code == 200
     with app.app_context():

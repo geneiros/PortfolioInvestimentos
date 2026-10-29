@@ -1,6 +1,10 @@
 """Ações chamadas pelas páginas (POST /api/<ação>, protegido com token CSRF)."""
 import inspect
+import io
 import json
+import os
+import sqlite3
+import tempfile
 from datetime import date
 
 from flask import Blueprint, Response, abort, current_app, jsonify, request, send_file, session
@@ -337,9 +341,22 @@ def reset_data(confirm=""):
 
 @bp.route("/backup")
 def backup():
-    """Descarrega uma cópia do ficheiro da base de dados."""
+    """Descarrega uma cópia consistente da base de dados (API de backup do SQLite, mesmo com escritas em curso)."""
     db.session.commit()
-    return send_file(current_app.config["DB_PATH"], as_attachment=True,
+    fd, tmp = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        src, dst = sqlite3.connect(current_app.config["DB_PATH"]), sqlite3.connect(tmp)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+        with open(tmp, "rb") as f:
+            blob = io.BytesIO(f.read())
+    finally:
+        os.remove(tmp)
+    return send_file(blob, as_attachment=True, mimetype="application/octet-stream",
                      download_name=f"portfolio-{date.today().isoformat()}.db")
 
 
