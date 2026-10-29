@@ -80,6 +80,10 @@ O script abre a aplicação no browser do telemóvel. No Chrome, **menu ⋮ → 
 
 Podes escolher outra pasta com a variável `PORTFOLIO_DATA_DIR` (por exemplo, uma pasta sincronizada com a cloud). Em **Definições** há botões para descarregar uma cópia de segurança (`.db`), exportar as transações em CSV e apagar todos os dados.
 
+**Cópias automáticas.** Antes de importar um extrato, apagar dados, carregar a demonstração, apagar uma importação ou atualizar a estrutura da base de dados (numa versão nova), a aplicação guarda uma cópia na pasta `copias`, ao lado da base de dados, e mantém as últimas 10. Em **Definições → Os teus dados → Cópias automáticas** vês a lista e podes **Restaurar** uma delas (antes de restaurar fica também uma cópia do estado atual) ou criar uma cópia à hora. Não se fazem cópias quando só há dados de demonstração.
+
+**Versão da estrutura da base de dados.** A base de dados guarda a versão da sua estrutura (`PRAGMA user_version`). Ao abrir uma versão nova da aplicação, os passos de migração pendentes (`portfolio_investimentos/migrations.py`) correm um a um, cada um numa transação; se um falhar, a base fica como estava e a mensagem diz onde está a cópia. Uma base de uma versão mais recente do que a aplicação não é aberta.
+
 A aplicação só aceita ligações do próprio computador (`127.0.0.1`), e as ações estão protegidas contra pedidos de outros sites abertos no browser.
 
 ### Palavra-passe e acesso a partir de outros dispositivos

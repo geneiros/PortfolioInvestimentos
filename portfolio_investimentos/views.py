@@ -8,7 +8,7 @@ from .engine.portfolio import MERIT_BENCHMARK
 from .models import Alert, Broker, ImportBatch, Instrument, News, Price, Setting, Transaction, WatchItem, db
 from . import auth
 from .services import context as ctx
-from .services import data
+from .services import backups, data
 from .services.importer import BROKERS, INSTRUCTIONS
 from .services.market import check_alerts, refresh_state, upcoming_events, yfinance_available
 
@@ -253,7 +253,8 @@ def definicoes():
     tickers = sorted({t.asset.ticker for t in c["p"].transactions if t.asset})
     c.update(instruments=_asset_rows(c["p"], tickers),
              last_price=db.session.query(db.func.max(Price.date)).scalar(),
-             db_path=current_app.config["DB_PATH"], yfinance=yfinance_available(),
+             db_path=current_app.config["DB_PATH"], backups=backups.list_backups(current_app.config["DB_PATH"]),
+             yfinance=yfinance_available(),
              risk_free_pct=round(data.risk_free() * 100, 2), last_refresh=Setting.get("last_refresh"), refresh_report=Setting.get("refresh_report"),
              password_env=bool(auth.env_password()))
     return render_template("pages/definicoes.html", **c)

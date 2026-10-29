@@ -150,14 +150,3 @@ class News(db.Model):
     url = db.Column(db.String(1000), unique=True)
     source = db.Column(db.String(120))
     published_on = db.Column(db.DateTime, index=True)
-
-
-def migrate():
-    """Acrescenta colunas novas a bases de dados criadas por versões anteriores (SQLite)."""
-    added = {"transaction": {"result": "FLOAT"}, "instrument": {"last_quote": "DATE"}}
-    with db.engine.begin() as conn:
-        for table, cols in added.items():
-            existing = {r[1] for r in conn.exec_driver_sql(f'PRAGMA table_info("{table}")')}
-            for col, typ in cols.items():
-                if existing and col not in existing:
-                    conn.exec_driver_sql(f'ALTER TABLE "{table}" ADD COLUMN {col} {typ}')

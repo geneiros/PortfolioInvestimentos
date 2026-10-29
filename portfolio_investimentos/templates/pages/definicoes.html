@@ -102,6 +102,16 @@
         <button class="btn btn-sm btn-outline-secondary" data-pm-action="load_demo" data-confirm="Isto substitui as transações atuais por dados de demonstração. Continuar?"><i class="bi bi-magic"></i> Carregar demonstração</button>
       </div>
       <hr>
+      <div class="pm-label mb-1">Cópias automáticas</div>
+      <p class="small text-body-secondary mb-2">Antes de importar, apagar dados, carregar a demonstração ou atualizar a base de dados, a aplicação guarda uma cópia (as últimas 10) na pasta <code>copias</code>, ao lado da base de dados.</p>
+      {% for b in backups %}
+        <div class="d-flex align-items-center gap-2 small py-1 border-bottom">
+          <span class="flex-grow-1"><b>{{ b.when.strftime('%d/%m/%Y %H:%M') }}</b> · {{ b.label }} <span class="text-body-secondary">({{ (b.size / 1024)|round|int }} KB)</span></span>
+          <button class="btn btn-sm btn-outline-secondary" data-pm-action="restore_backup" data-args='{"name": "{{ b.name }}"}' data-confirm="Restaurar a cópia de {{ b.when.strftime('%d/%m/%Y %H:%M') }}? Os dados atuais são substituídos (fica antes uma cópia do estado atual)."><i class="bi bi-arrow-counterclockwise"></i> Restaurar</button>
+        </div>
+      {% else %}<p class="small text-body-secondary mb-2">Ainda não há cópias automáticas.</p>{% endfor %}
+      <button class="btn btn-sm btn-outline-secondary mt-2" data-pm-action="create_backup"><i class="bi bi-safe"></i> Criar cópia agora</button>
+      <hr>
       <form class="d-flex gap-2" data-pm-method="reset_data" data-pm-success="Dados apagados.">
         <input name="confirm" class="form-control form-control-sm" placeholder='Escreve APAGAR para confirmar'>
         <button class="btn btn-sm btn-danger text-nowrap" type="submit"><i class="bi bi-trash"></i> Apagar tudo</button>

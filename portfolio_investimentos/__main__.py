@@ -25,14 +25,22 @@ def main():
 
     if args.testar_yahoo:
         raise SystemExit(_test_yahoo())
-    app = create_app()
+    from .migrations import MigrationError
+    try:
+        app = create_app()
+    except MigrationError as exc:
+        raise SystemExit(str(exc)) from exc
     if args.importar:
         with app.app_context():
+            from .services.backups import auto_backup
+            auto_backup("importar")
             raise SystemExit(_import_files(args.importar, args.corretora))
     if args.demo or args.refresh:
         with app.app_context():
             if args.demo:
+                from .services.backups import auto_backup
                 from .services.demo import create_demo
+                auto_backup("demonstracao")
                 print(create_demo())
             if args.refresh:
                 from .services.market import refresh_all

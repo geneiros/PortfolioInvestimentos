@@ -1,6 +1,7 @@
 """Testes da aplicação Flask (base de dados SQLite temporária)."""
 import io
 import re
+from pathlib import Path
 from datetime import date
 
 import pytest
@@ -969,3 +970,118 @@ def test_offline_mode_marks_pages(app, client, monkeypatch):
     monkeypatch.delenv("PORTFOLIO_PASSWORD")
     assert post(client, "set_offline", token, enabled="0").status_code == 200
     assert "X-PM-Offline" not in client.get("/").headers
+
+
+# ------------------------------------------------------------ versão do esquema e cópias automáticas
+def _legacy_db(folder, monkeypatch):
+    """Base de dados de uma versão antiga: sem as colunas `result` e `last_quote` e sem versão do esquema."""
+    import sqlite3
+    monkeypatch.setenv("PORTFOLIO_DATA_DIR", str(folder))
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        db.session.add(Transaction(date=date(2024, 1, 2), type="DEPOSIT", amount=100.0, currency="EUR"))
+        db.session.commit()
+        db.session.remove()
+        db.engine.dispose()
+    conn = sqlite3.connect(folder / "portfolio.db")
+    conn.execute('ALTER TABLE "transaction" DROP COLUMN result')
+    conn.execute("ALTER TABLE instrument DROP COLUMN last_quote")
+    conn.execute("PRAGMA user_version = 0")
+    conn.commit()
+    conn.close()
+
+
+def test_new_database_starts_at_latest_schema(app):
+    from portfolio_investimentos import migrations
+    assert migrations.schema_version(app.config["DB_PATH"]) == migrations.LATEST
+    assert not (Path(app.config["DB_PATH"]).parent / "copias").exists()  # nada a copiar numa base nova
+
+
+def test_old_database_is_migrated_with_backup(tmp_path, monkeypatch):
+    import sqlite3
+    from portfolio_investimentos import migrations
+    _legacy_db(tmp_path, monkeypatch)
+    app = create_app({"TESTING": True})
+    path = app.config["DB_PATH"]
+    assert migrations.schema_version(path) == migrations.LATEST
+    conn = sqlite3.connect(path)
+    assert "result" in {r[1] for r in conn.execute('PRAGMA table_info("transaction")')}
+    assert "last_quote" in {r[1] for r in conn.execute("PRAGMA table_info(instrument)")}
+    assert conn.execute('SELECT count(*) FROM "transaction"').fetchone()[0] == 1  # os dados seguem lá
+    conn.close()
+    copies = list((tmp_path / "copias").glob("portfolio-*-migracao-v0-v2.db"))
+    assert len(copies) == 1  # a cópia é da base antes de migrar (sem as colunas novas)
+    old = sqlite3.connect(copies[0])
+    assert "result" not in {r[1] for r in old.execute('PRAGMA table_info("transaction")')}
+    old.close()
+
+
+def test_failed_migration_rolls_back_and_names_the_backup(tmp_path, monkeypatch):
+    from portfolio_investimentos import migrations
+    _legacy_db(tmp_path, monkeypatch)
+
+    def broken(conn):
+        conn.execute('ALTER TABLE "transaction" ADD COLUMN extra TEXT')
+        raise RuntimeError("falha de teste")
+    monkeypatch.setattr(migrations, "MIGRATIONS", [(1, "passo avariado", broken)])
+    monkeypatch.setattr(migrations, "LATEST", 1)
+    with pytest.raises(migrations.MigrationError) as exc:
+        create_app({"TESTING": True})
+    assert "passo 1" in str(exc.value) and "copias" in str(exc.value)
+    assert migrations.schema_version(tmp_path / "portfolio.db") == 0
+    import sqlite3
+    conn = sqlite3.connect(tmp_path / "portfolio.db")
+    assert "extra" not in {r[1] for r in conn.execute('PRAGMA table_info("transaction")')}  # desfeito
+    conn.close()
+
+
+def test_database_from_newer_version_is_refused(tmp_path, monkeypatch):
+    import sqlite3
+    from portfolio_investimentos import migrations
+    _legacy_db(tmp_path, monkeypatch)
+    conn = sqlite3.connect(tmp_path / "portfolio.db")
+    conn.execute(f"PRAGMA user_version = {migrations.LATEST + 1}")
+    conn.commit()
+    conn.close()
+    monkeypatch.setenv("PORTFOLIO_DATA_DIR", str(tmp_path))
+    with pytest.raises(migrations.MigrationError, match="mais recente"):
+        create_app({"TESTING": True})
+
+
+def test_automatic_backups_before_destructive_actions_and_restore(app, client):
+    from portfolio_investimentos.services import backups
+    path = app.config["DB_PATH"]
+    token = csrf(client)
+    post(client, "reset_data", token, confirm="APAGAR")  # sem dados: nada a proteger
+    assert backups.list_backups(path) == []
+    post(client, "add_transaction", token, date="2024-01-02", type="DEPOSIT", amount="1000", currency="EUR")
+    post(client, "add_transaction", token, date="2024-01-03", type="BUY", instrument="ACME", quantity="5", price="10")
+    csv = b"date,type,ticker,quantity,price,amount,fees,tax,currency,name\n2024-02-01,DEPOSIT,,,,50,,,EUR,\n"
+    client.post("/api/upload_statement", headers={"X-CSRF-Token": token},
+                data={"broker_key": "generic", "file": (io.BytesIO(csv), "a.csv")}, content_type="multipart/form-data")
+    assert [b.label for b in backups.list_backups(path)] == ["Antes de importar"]
+    post(client, "reset_data", token, confirm="APAGAR")
+    labels = [b.label for b in backups.list_backups(path)]
+    assert labels == ["Antes de apagar tudo", "Antes de importar"]
+    with app.app_context():
+        assert Transaction.query.count() == 0
+    # restaurar a cópia feita antes de apagar tudo: os dados voltam, e fica uma cópia do estado vazio
+    name = backups.list_backups(path)[0].name
+    assert post(client, "restore_backup", token, name=name).status_code == 200
+    with app.app_context():
+        assert Transaction.query.count() == 3
+    assert backups.list_backups(path)[0].label == "Antes de restaurar uma cópia"
+    assert client.get("/definicoes").status_code == 200 and client.get("/carteira").status_code == 200
+    # só nomes de cópias existentes: nada de caminhos
+    assert post(client, "restore_backup", token, name="../portfolio.db").status_code == 400
+    assert post(client, "restore_backup", token, name="portfolio-20200101-000000-x.db").status_code == 400
+
+
+def test_backups_keep_only_the_latest_ten(tmp_path):
+    import sqlite3
+    from portfolio_investimentos.services import backups
+    db_path = tmp_path / "portfolio.db"
+    sqlite3.connect(db_path).execute("CREATE TABLE t (x)").connection.close()
+    for _ in range(13):
+        backups.make_backup(db_path, "manual")
+    assert len(backups.list_backups(db_path)) == backups.KEEP

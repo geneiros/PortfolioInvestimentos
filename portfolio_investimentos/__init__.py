@@ -124,9 +124,8 @@ def create_app(config=None):
         return resp
 
     with app.app_context():
-        from .models import migrate
-        db.create_all()
-        migrate()
+        from .migrations import upgrade
+        upgrade(app)
         from .services.market import ensure_benchmarks
         ensure_benchmarks()
     from .services.data import schedule_warm

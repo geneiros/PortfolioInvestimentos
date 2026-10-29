@@ -13,7 +13,7 @@ from .models import (Alert, Broker, Event, FxRate, ImportBatch, Instrument, News
                      WatchItem, db)
 from . import auth
 from .engine.portfolio import ASSET_TYPES
-from .services import data, importer, market
+from .services import backups, data, importer, market
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -64,6 +64,14 @@ def _ensure_instrument(ticker, name=None, currency="EUR"):
         db.session.add(Instrument(ticker=ticker, instrument_name=name or ticker,
                                   currency=(currency or "EUR").upper(), data_symbol=ticker))
     return ticker
+
+
+def _backup(reason):
+    """Cópia automática antes de uma operação que muda muitos dados; se falhar, a operação não avança."""
+    try:
+        backups.auto_backup(reason)
+    except (OSError, sqlite3.Error) as exc:
+        raise ApiError(f"Não foi possível criar a cópia de segurança antes de continuar: {exc}") from exc
 
 
 ACTIONS = {}
@@ -178,6 +186,7 @@ def upload_statement(broker_key, broker_name=None):
     files = request.files.getlist("file")
     if not files:
         raise ApiError("Escolhe pelo menos um ficheiro.")
+    _backup("importar")
     if Setting.get("demo") == "1":  # os dados reais substituem a demonstração
         reset_data("APAGAR")
     out = []
@@ -194,6 +203,7 @@ def upload_statement(broker_key, broker_name=None):
 @action
 def delete_import(name):
     batch = _get(ImportBatch, name)
+    _backup("apagar-importacao")
     Transaction.query.filter_by(import_batch=batch.id).delete()
     db.session.delete(batch)
     db.session.commit()
@@ -340,6 +350,7 @@ def refresh_status():
 @action
 def load_demo():
     from .services.demo import create_demo
+    _backup("demonstracao")
     return create_demo()
 
 
@@ -347,6 +358,7 @@ def load_demo():
 def reset_data(confirm=""):
     if confirm != "APAGAR":
         raise ApiError('Escreve APAGAR para confirmar.')
+    _backup("apagar-tudo")
     for model in (Transaction, ImportBatch, Alert, WatchItem, Event, News, Price, FxRate):
         model.query.delete()
     Broker.query.delete()
@@ -357,6 +369,33 @@ def reset_data(confirm=""):
         Setting.set(key, None)
     db.session.commit()
     return "Todos os dados foram apagados."
+
+
+@action
+def create_backup():
+    saved = backups.make_backup(current_app.config["DB_PATH"], "manual")
+    return f"Cópia guardada: {saved.name}"
+
+
+@action
+def restore_backup(name):
+    from . import migrations
+    path = current_app.config["DB_PATH"]
+    try:
+        backups.backup_path(path, name)
+    except FileNotFoundError as exc:
+        raise ApiError("Cópia não encontrada.") from exc
+    db.session.remove()
+    db.engine.dispose()
+    try:
+        backups.restore(path, name)
+    except ValueError as exc:
+        raise ApiError(f"Não foi possível restaurar: {exc}.") from exc
+    except sqlite3.Error as exc:
+        raise ApiError(f"Não foi possível restaurar: {exc}") from exc
+    migrations.upgrade(current_app)  # a cópia pode ser de uma versão anterior da aplicação
+    data.invalidate()
+    return "Cópia restaurada."
 
 
 @bp.route("/backup")
