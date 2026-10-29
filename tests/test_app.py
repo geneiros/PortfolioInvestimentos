@@ -75,6 +75,21 @@ def test_import_deduplicates(app, client):
         assert (div.currency, div.tax) == ("USD", pytest.approx(0.07))
 
 
+def test_broker_selector_counts_open_positions_like_portfolio(app, client):
+    """O seletor de corretoras conta as posições como a página Carteira (transferências incluídas)."""
+    from portfolio_investimentos.services import data
+
+    token = csrf(client)
+    bid = post(client, "save_broker", token, broker_name="Teste").get_json()["message"]
+    for typ, qty in (("BUY", "10"), ("BUY", "5"), ("TRANSFER_OUT", "10")):
+        inst = "AAA" if qty == "10" else "BBB"
+        assert post(client, "add_transaction", token, date="2024-03-01", type=typ, instrument=inst, quantity=qty,
+                    price="10", currency="EUR", broker=str(bid)).status_code == 200
+    with app.test_request_context():
+        b = next(x for x in data.brokers() if x.id == bid)
+        assert b.positions == len(data.load_portfolio(str(bid)).open_positions) == 1  # AAA saiu para outra corretora
+
+
 def test_generic_csv_keeps_identical_rows_same_day(app, client):
     """Duas ordens iguais no mesmo dia são duas transações; reimportar o ficheiro continua a ser duplicado."""
     csv = (b"date,type,ticker,quantity,price,amount,fees,tax,currency,name\n"

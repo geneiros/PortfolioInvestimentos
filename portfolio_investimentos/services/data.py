@@ -204,18 +204,10 @@ def _compute_portfolio(broker):
 
 
 def brokers():
-    """Corretoras com nº de posições abertas e data da primeira transação."""
+    """Corretoras com nº de posições abertas (as mesmas regras do motor) e data da primeira transação."""
     since = dict(db.session.query(Transaction.broker, func.min(Transaction.date)).group_by(Transaction.broker))
-    qty = defaultdict(float)
-    for b, inst, typ, q in db.session.query(Transaction.broker, Transaction.instrument, Transaction.type,
-                                            Transaction.quantity).filter(Transaction.type.in_(("BUY", "SELL"))):
-        qty[(b, inst)] += (q or 0) if typ == "BUY" else -(q or 0)
-    open_by = defaultdict(int)
-    for (b, _), q in qty.items():
-        if q > 1e-6:
-            open_by[b] += 1
     return [SimpleNamespace(name=str(b.id), id=b.id, broker_name=b.broker_name, color=b.color,
-                            since=since.get(b.id), positions=open_by.get(b.id, 0))
+                            since=since.get(b.id), positions=len(load_portfolio(str(b.id)).open_positions))
             for b in Broker.query.order_by(Broker.id).all()]
 
 
