@@ -8,6 +8,7 @@ from flask import Blueprint, Response, abort, current_app, jsonify, request, sen
 from .models import (Alert, Broker, Event, FxRate, ImportBatch, Instrument, News, Price, Setting, Transaction,
                      WatchItem, db)
 from . import auth
+from .engine.portfolio import ASSET_TYPES
 from .services import data, importer, market
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -112,10 +113,10 @@ def add_transaction(**kw):
     if typ not in Transaction.TYPES:
         raise ApiError("Tipo inválido.")
     instrument = None
-    if typ in ("BUY", "SELL", "DIVIDEND"):
+    if typ in ASSET_TYPES:
         instrument = _ensure_instrument(kw.get("instrument"), kw.get("instrument_name"), kw.get("currency"))
     qty, amount = _float(kw.get("quantity")), _float(kw.get("amount"))
-    if typ in ("BUY", "SELL") and qty <= 0:
+    if typ in ASSET_TYPES - {"DIVIDEND"} and qty <= 0:
         raise ApiError("A quantidade tem de ser positiva.")
     if typ in ("DEPOSIT", "WITHDRAWAL", "FEE", "INTEREST") and amount <= 0:
         raise ApiError("O montante tem de ser positivo.")

@@ -75,6 +75,32 @@ def test_import_deduplicates(app, client):
         assert (div.currency, div.tax) == ("USD", pytest.approx(0.07))
 
 
+def test_manual_transfer_and_convert_keep_instrument(app, client):
+    """Transferências e conversões manuais têm ativo: antes ficavam sem ele e bloqueavam todas as páginas."""
+    token = csrf(client)
+    for typ in ("TRANSFER_IN", "TRANSFER_OUT", "CONVERT_IN", "CONVERT_OUT"):
+        ok = post(client, "add_transaction", token, date="2024-05-02", type=typ, instrument="acme", quantity="2",
+                  price="10", currency="EUR")
+        assert ok.status_code == 200, typ
+    assert post(client, "add_transaction", token, date="2024-05-02", type="TRANSFER_IN",
+                quantity="2").status_code == 400  # sem ticker
+    with app.app_context():
+        assert Transaction.query.filter(Transaction.instrument.is_(None), Transaction.type != "DEPOSIT").count() == 0
+    for page in ("/", "/carteira", "/transacoes", "/definicoes"):
+        assert client.get(page).status_code == 200, page
+
+
+def test_orphan_asset_transaction_does_not_block_pages(app, client):
+    """Dado inválido já gravado (transferência sem ativo) é ignorado com aviso em vez de dar erro 500."""
+    with app.app_context():
+        db.session.add(Transaction(date=date(2024, 1, 2), type="DEPOSIT", amount=1000.0, currency="EUR"))
+        db.session.add(Transaction(date=date(2024, 1, 3), type="TRANSFER_IN", instrument=None, quantity=1.0,
+                                   price=10.0, currency="EUR"))
+        db.session.commit()
+    for page in ("/", "/carteira", "/transacoes"):
+        assert client.get(page).status_code == 200, page
+
+
 def test_manual_transaction_and_validation(app, client):
     token = csrf(client)
     ok = post(client, "add_transaction", token, date="2024-05-02", type="BUY", instrument="vwce.de",

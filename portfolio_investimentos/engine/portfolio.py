@@ -207,13 +207,22 @@ class Series:
     twr: list             # índice TWR (começa em 1.0)
 
 
+# tipos de transação que dizem respeito a um ativo (os restantes são só movimentos de dinheiro)
+ASSET_TYPES = {"BUY", "SELL", "DIVIDEND", "TRANSFER_IN", "TRANSFER_OUT", "CONVERT_IN", "CONVERT_OUT"}
+
+
 class Portfolio:
     def __init__(self, transactions, book, benchmarks=(), as_of=None):
         order = {"DEPOSIT": 0, "INTEREST": 1, "DIVIDEND": 1, "BUY": 2, "TRANSFER_IN": 2, "CONVERT_OUT": 2.4,
                  "CONVERT_IN": 2.5, "SELL": 3, "TRANSFER_OUT": 3, "FEE": 4, "WITHDRAWAL": 5}
+        self.warnings = []
+        # uma transação de ativo sem ativo (dado inválido) não pode bloquear a aplicação inteira
+        orphans = [t for t in transactions if t.type in ASSET_TYPES and not t.asset]
+        if orphans:
+            self.warnings.append(f"{len(orphans)} transações sem ativo foram ignoradas (apaga-as em Transações).")
+            transactions = [t for t in transactions if t.type not in ASSET_TYPES or t.asset]
         txs = sorted(transactions, key=lambda t: (t.date, order.get(t.type, 9)))
         self.book = book
-        self.warnings = []
         self.opening = self._opening_positions(txs)
         self.transactions = sorted(self.opening + txs, key=lambda t: (t.date, order.get(t.type, 9)))
         self.book = book
