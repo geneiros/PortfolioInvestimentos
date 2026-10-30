@@ -31,12 +31,40 @@ def _int(v, default=0):
         return default
 
 
+def _round(obj, ndigits=5):
+    """Arredonda todos os decimais de uma estrutura de listas/dicionários (o JSON embutido na página pesa menos)."""
+    if isinstance(obj, float):
+        return round(obj, ndigits)
+    if isinstance(obj, (list, tuple)):
+        return [_round(x, ndigits) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _round(v, ndigits) for k, v in obj.items()}
+    return obj
+
+
+def _sample(dates, period):
+    """Índices a desenhar: todos os dias até 1 ano; a partir daí o último dia de cada semana (o gráfico é mais
+    estreito do que o nº de dias) e sempre o primeiro e o último pontos."""
+    if period not in ("3A", "5A", "MAX"):
+        return list(range(len(dates)))
+    weeks = [date.fromisoformat(d).isocalendar()[:2] for d in dates]
+    last = len(dates) - 1
+    return [i for i in range(len(dates)) if i in (0, last) or weeks[i] != weeks[i + 1]]
+
+
 def perf_payload(p, period, benchmarks=None):
+    """Dados do gráfico de evolução da Visão Geral: só o que ele usa, arredondado e, nos períodos longos, semanal."""
     perf = p.performance(period, benchmarks, risk_free=data.risk_free())
     if not perf:
         return None
-    perf["start"], perf["end"] = perf["start"].isoformat(), perf["end"].isoformat()
-    return perf
+    keep = _sample(perf["dates"], period)
+
+    def pick(xs, digits):
+        return [round(xs[i], digits) for i in keep]
+    return {"start": perf["start"].isoformat(), "dates": [perf["dates"][i] for i in keep],
+            "gain": pick(perf["gain"], 2), "value": pick(perf["value"], 2),
+            "benchmarks": [{"ticker": b["ticker"], "name": b["name"], "color": b["color"], "twr": pick(b["twr"], 5)}
+                           for b in perf["benchmarks"]]}
 
 
 @bp.route("/")
@@ -119,12 +147,12 @@ def desempenho():
                      "volatility": _rating(r["volatility"], [0.10, 0.20], ["Baixa", "Moderada", "Alta"]),
                      "max_drawdown": _rating(-r["max_drawdown"], [0.10, 0.25], ["Baixo", "Moderado", "Elevado"])},
             heat=dict(sorted(heat.items())),
-            chart=ctx.js_json({
+            chart=ctx.js_json(_round({
                 "dates": perf["dates"], "twr": perf["twr"], "drawdown": perf["drawdown"], "yearly": perf["yearly"],
                 "bench": b and {"name": b["name"], "color": b["color"], "twr": b["twr"], "drawdown": b["drawdown"],
                                 "yearly": [by.get(k) for k, _ in perf["yearly"]]},
                 "merit": perf["merit"] and {k: perf["merit"][k] for k in ("monthly_excess", "yearly_excess", "sorted")},
-            }),
+            })),
         )
     return render_template("pages/desempenho.html", **c)
 

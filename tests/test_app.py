@@ -584,6 +584,24 @@ def test_market_regions_from_positions(app, client):
         assert context._regions(data.load_portfolio(None)) == {"EU", "US"}
 
 
+def test_overview_chart_payload_is_slim(app, client):
+    from datetime import timedelta
+    from portfolio_investimentos.views import _sample
+
+    days = [(date(2024, 1, 1) + timedelta(days=i)).isoformat() for i in range(0, 800)]
+    weekly = _sample(days, "MAX")
+    assert weekly[0] == 0 and weekly[-1] == len(days) - 1 and len(weekly) < 130
+    assert _sample(days, "1A") == list(range(len(days)))  # até 1 ano, todos os dias
+    token = csrf(client)
+    post(client, "load_demo", token)
+    full = post(client, "performance", token, period="MAX").get_json()["message"]
+    assert set(full) == {"start", "dates", "gain", "value", "benchmarks"}  # nada do que a página não desenha
+    assert all(set(b) == {"ticker", "name", "color", "twr"} for b in full["benchmarks"])
+    assert len(full["dates"]) < 400 and len(full["dates"]) == len(full["value"]) == len(full["gain"])
+    assert all(round(v, 2) == v for v in full["value"])
+    assert len(client.get("/").data) < 120_000  # antes só o gráfico pesava mais de 300 KB
+
+
 def test_merge_instruments_manually(app, client):
     from portfolio_investimentos.models import Instrument, Price
     with app.app_context():
