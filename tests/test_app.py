@@ -602,6 +602,36 @@ def test_overview_chart_payload_is_slim(app, client):
     assert len(client.get("/").data) < 120_000  # antes só o gráfico pesava mais de 300 KB
 
 
+def test_fiscal_groups_by_asset_with_lots_on_demand_and_full_csv(app, client):
+    from datetime import timedelta
+    from portfolio_investimentos.models import Instrument
+    with app.app_context():
+        db.session.add_all([Instrument(ticker="AAA", currency="EUR"), Instrument(ticker="BBB", currency="EUR")])
+        db.session.add(Transaction(date=date(2024, 1, 2), type="DEPOSIT", amount=100000.0, currency="EUR"))
+        for i in range(40):  # compras fracionadas: cada uma é um lote FIFO na venda
+            d = date(2024, 1, 3) + timedelta(days=i)
+            db.session.add(Transaction(date=d, type="BUY", instrument="AAA", quantity=1.0, price=10.0, currency="EUR"))
+        db.session.add(Transaction(date=date(2024, 3, 1), type="BUY", instrument="BBB", quantity=2.0, price=50.0,
+                                   currency="EUR"))
+        db.session.add(Transaction(date=date(2024, 6, 1), type="SELL", instrument="AAA", quantity=40.0, price=12.0,
+                                   currency="EUR"))
+        db.session.add(Transaction(date=date(2024, 6, 1), type="SELL", instrument="BBB", quantity=2.0, price=55.0,
+                                   currency="EUR"))
+        db.session.commit()
+    html = client.get("/fiscal?ano=2024").get_data(as_text=True)
+    assert "2 ativos · 41 linhas FIFO" in html
+    assert html.count("data-lots=") == 2 and html.count("<tr>") < 10  # uma linha por ativo, não por lote
+    frag = client.get("/fiscal/lotes?ano=2024&ativo=AAA").get_data(as_text=True)
+    assert frag.count("<tr>") == 41  # cabeçalho + 40 lotes
+    assert client.get("/fiscal/lotes?ano=2024&ativo=NAO").status_code == 404
+    assert client.get("/fiscal/lotes?ano=1999&ativo=AAA").status_code == 404
+    csv = client.get("/fiscal.csv?ano=2024")
+    assert csv.status_code == 200 and "attachment" in csv.headers["Content-Disposition"]
+    lines = csv.get_data(as_text=True).lstrip("\ufeff").splitlines()
+    assert len(lines) == 1 + 41 and lines[0].startswith("Data venda;Ativo;")
+    assert lines[1].split(";")[:2] == ["2024-06-01", '"AAA"'] and lines[1].split(";")[4] == "12.0"
+
+
 def test_merge_instruments_manually(app, client):
     from portfolio_investimentos.models import Instrument, Price
     with app.app_context():

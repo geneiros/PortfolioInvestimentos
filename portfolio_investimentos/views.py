@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 from types import SimpleNamespace
 
-from flask import Blueprint, current_app, render_template, request
+from flask import Blueprint, Response, abort, current_app, render_template, request
 
 from .engine.portfolio import MERIT_BENCHMARK
 from .models import Alert, Broker, ImportBatch, Instrument, News, Price, Setting, Transaction, WatchItem, db
@@ -198,8 +198,51 @@ def fiscal():
     years = c["p"].fiscal_years() if c["p"].transactions else {}
     sel = _int(request.args.get("ano"))
     year = sel if sel in years else (next(iter(years)) if years else None)
-    c.update(years=years, year=year, y=years.get(year))
+    y = years.get(year)
+    # resumo por ativo: o detalhe de cada lote FIFO carrega-se a pedido (/fiscal/lotes) e vai inteiro no CSV
+    groups = {}
+    for sl in (y["sales"] if y else []):
+        g = groups.setdefault(sl.asset.ticker, SimpleNamespace(asset=sl.asset, lots=0, qty=0.0, proceeds=0.0, cost=0.0))
+        g.lots += 1
+        g.qty += sl.qty
+        g.proceeds += sl.proceeds_eur
+        g.cost += sl.cost_eur
+    c.update(years=years, year=year, y=y, groups=sorted(groups.values(), key=lambda g: g.asset.ticker),
+             n_lots=len(y["sales"]) if y else 0)
     return render_template("pages/fiscal.html", **c)
+
+
+def _fiscal_sales(year, ticker=None):
+    p = data.load_portfolio(data.selected_broker())
+    y = p.fiscal_years().get(year)
+    if y is None:
+        abort(404)
+    return [s for s in y["sales"] if ticker is None or s.asset.ticker == ticker]
+
+
+@bp.route("/fiscal/lotes")
+def fiscal_lotes():
+    """Linhas FIFO de um ativo num ano (fragmento HTML para a janela de detalhe da página Fiscal)."""
+    year, ticker = _int(request.args.get("ano")), request.args.get("ativo", "")
+    sales = _fiscal_sales(year, ticker)
+    if not sales:
+        abort(404)
+    return render_template("pages/_fiscal_lotes.html", sales=sales, year=year, ticker=ticker)
+
+
+@bp.route("/fiscal.csv")
+def fiscal_csv():
+    """Todas as linhas FIFO das vendas de um ano, pela ordem do formulário (separador ; e UTF-8 com BOM)."""
+    year = _int(request.args.get("ano"))
+    sales = _fiscal_sales(year)
+    out = ["Data venda;Ativo;Data aquisição;Quantidade;Valor realização;Valor aquisição;Mais/menos-valia"]
+    for sl in sales:
+        out.append(";".join([sl.date.isoformat(), '"' + sl.asset.ticker.replace('"', '""') + '"',
+                             sl.acquired.isoformat() if sl.acquired else "anterior ao histórico", repr(sl.qty),
+                             repr(round(sl.proceeds_eur, 2)), repr(round(sl.cost_eur, 2)),
+                             repr(round(sl.gain_eur, 2))]))
+    return Response("\ufeff" + "\n".join(out), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename=mais-valias-{year}.csv"})
 
 
 @bp.route("/radar")

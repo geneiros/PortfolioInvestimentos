@@ -38,22 +38,30 @@
 </div>
 
 <div class="pm-card">
-  <div class="d-flex align-items-center mb-3"><div class="pm-label">Vendas de {{ year }} · {{ y.sales|length }} linhas FIFO</div>
-    <button class="btn btn-pm btn-sm ms-auto" id="csvBtn"><i class="bi bi-download"></i> Exportar CSV</button></div>
-  {% if y.sales %}
+  <div class="d-flex align-items-center mb-3"><div class="pm-label">Vendas de {{ year }} · {{ groups|length }} ativos · {{ n_lots }} linhas FIFO</div>
+    <a class="btn btn-pm btn-sm ms-auto" href="/fiscal.csv?ano={{ year }}"><i class="bi bi-download"></i> Exportar CSV (todas as linhas)</a></div>
+  {% if groups %}
   <div class="pm-table-wrap"><table class="table pm-table" id="salesTable">
-    <thead><tr><th data-sort="text">Data venda</th><th data-sort="text">Ativo</th><th data-sort="text">Data aquisição</th>
+    <thead><tr><th data-sort="text">Ativo</th><th data-sort="num" class="text-end">Linhas</th>
       <th data-sort="num" class="text-end">Quantidade</th><th data-sort="num" class="text-end">Valor realização</th>
-      <th data-sort="num" class="text-end">Valor aquisição</th><th data-sort="num" class="text-end">Mais/menos-valia</th></tr></thead>
-    <tbody>{% for sl in y.sales %}
-      <tr><td data-v="{{ sl.date }}">{{ sl.date|ddmmyyyy }}</td><td><b>{{ sl.asset.ticker }}</b> <span class="sub">{{ sl.asset.name }}</span></td>
-        <td data-v="{{ sl.acquired }}">{{ sl.acquired|ddmmyyyy if sl.acquired else 'anterior ao histórico' }}</td><td class="text-end" data-v="{{ sl.qty }}">{{ sl.qty|number(4) }}</td>
-        <td class="text-end money" data-v="{{ sl.proceeds_eur }}">{{ sl.proceeds_eur|money(2) }}</td>
-        <td class="text-end money" data-v="{{ sl.cost_eur }}">{{ sl.cost_eur|money(2) }}</td>
-        <td class="text-end {{ sl.gain_eur|tone }} money" data-v="{{ sl.gain_eur }}">{{ sl.gain_eur|money(2, sign=True) }}</td></tr>
+      <th data-sort="num" class="text-end">Valor aquisição</th><th data-sort="num" class="text-end">Mais/menos-valia</th><th></th></tr></thead>
+    <tbody>{% for g in groups %}{% set gain = g.proceeds - g.cost %}
+      <tr><td data-v="{{ g.asset.ticker }}"><b>{{ g.asset.ticker }}</b> <span class="sub">{{ g.asset.name }}</span></td>
+        <td class="text-end" data-v="{{ g.lots }}">{{ g.lots }}</td><td class="text-end" data-v="{{ g.qty }}">{{ g.qty|number(4) }}</td>
+        <td class="text-end money" data-v="{{ g.proceeds }}">{{ g.proceeds|money(2) }}</td>
+        <td class="text-end money" data-v="{{ g.cost }}">{{ g.cost|money(2) }}</td>
+        <td class="text-end {{ gain|tone }} money" data-v="{{ gain }}">{{ gain|money(2, sign=True) }}</td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-secondary" data-lots="{{ g.asset.ticker }}"><i class="bi bi-list-ul"></i> Lotes</button></td></tr>
     {% endfor %}</tbody>
   </table></div>
   {% else %}<p class="text-secondary">Sem vendas neste ano.</p>{% endif %}
+</div>
+
+<div class="modal fade" id="lotsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h6 class="modal-title" id="lotsTitle"></h6><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+    <div class="modal-body" id="lotsBody"></div>
+  </div></div>
 </div>
 {% endif %}
 {% endautoescape %}{% endblock %}
@@ -61,15 +69,22 @@
 {% block scripts %}
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  const btn = document.getElementById("csvBtn");
-  if (!btn) return;
-  btn.addEventListener("click", () => {
-    const rows = [...document.querySelectorAll("#salesTable tr")].map((tr) =>
-      [...tr.cells].map((c) => `"${(c.dataset.v ?? c.textContent.trim()).toString().replace(/"/g, '""')}"`).join(";"));
-    const blob = new Blob(["﻿" + rows.join("\n")], { type: "text/csv" });
-    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "mais-valias-{{ year }}.csv" });
-    a.click();
-  });
+  const modalEl = document.getElementById("lotsModal");
+  if (!modalEl) return;
+  const modal = new bootstrap.Modal(modalEl), body = document.getElementById("lotsBody");
+  document.querySelectorAll("[data-lots]").forEach((b) => b.addEventListener("click", async () => {
+    const t = b.dataset.lots;
+    document.getElementById("lotsTitle").textContent = `{{ year }} · ${t}: linhas FIFO`;
+    body.innerHTML = '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm"></span> A carregar…</div>';
+    modal.show();
+    try {
+      const r = await fetch(`/fiscal/lotes?ano={{ year }}&ativo=${encodeURIComponent(t)}`, { credentials: "same-origin" });
+      if (!r.ok) throw new Error(r.status);
+      body.innerHTML = await r.text();
+    } catch (e) {
+      body.innerHTML = '<p class="text-secondary mb-0">Não foi possível carregar as linhas (sem ligação à aplicação?).</p>';
+    }
+  }));
 });
 </script>
 {% endblock %}

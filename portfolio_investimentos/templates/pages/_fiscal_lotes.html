@@ -1,0 +1,11 @@
+{# fragmento: lotes FIFO de um ativo num ano (carregado a pedido pela página Fiscal) #}
+<div class="pm-table-wrap"><table class="table pm-table">
+  <thead><tr><th>Data venda</th><th>Data aquisição</th><th class="text-end">Quantidade</th><th class="text-end">Valor realização</th>
+    <th class="text-end">Valor aquisição</th><th class="text-end">Mais/menos-valia</th></tr></thead>
+  <tbody>{% for sl in sales %}
+    <tr><td>{{ sl.date|ddmmyyyy }}</td><td>{{ sl.acquired|ddmmyyyy if sl.acquired else 'anterior ao histórico' }}</td>
+      <td class="text-end">{{ sl.qty|number(4) }}</td>
+      <td class="text-end money">{{ sl.proceeds_eur|money(2) }}</td><td class="text-end money">{{ sl.cost_eur|money(2) }}</td>
+      <td class="text-end {{ sl.gain_eur|tone }} money">{{ sl.gain_eur|money(2, sign=True) }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
