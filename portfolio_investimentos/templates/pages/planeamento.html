@@ -10,7 +10,7 @@
     português, e quando lá chegas com o que tens hoje e o que investes por mês.</p>
 </div>
 
-<div class="pm-label mb-2">Para sempre (regra dos {{ plan.withdrawal_rate|pct(1, sign=False) }}){% if with_pension %}, sem contar com a pensão{% endif %}</div>
+<div class="pm-label mb-2 d-flex align-items-center gap-2 flex-wrap" style="color: #f59e0b"><span class="pm-fire-line" style="border-top: 2px dashed #f59e0b"></span>Para sempre (regra dos {{ plan.withdrawal_rate|pct(1, sign=False) }}){% if with_pension %}, sem contar com a pensão{% endif %}</div>
 <div class="row g-3 mb-3">
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
     <div class="pm-label">O número FIRE {{ help("Despesas anuais ÷ (1 − imposto efetivo sobre os levantamentos) ÷ taxa de levantamento. Ex.: 12 000 € ÷ (1 − 14%) ÷ 4% ≈ 349 000 €.") }}</div>
@@ -36,7 +36,7 @@
 </div>
 
 {% if with_pension %}
-<div class="pm-label mb-2">Para sempre, com a pensão a partir dos {{ life.pension_age|int }}
+<div class="pm-label mb-2 d-flex align-items-center gap-2 flex-wrap" style="color: #a855f7"><span class="pm-fire-line" style="border-top: 2px dotted #a855f7"></span>Para sempre, com a pensão a partir dos {{ life.pension_age|int }}
   {{ help("Duas partes: até à pensão, a carteira paga as despesas todas; a partir dela, só o que a pensão não cobre, pela regra da taxa de levantamento (para sempre). O capital depende da idade em que chegas lá: quanto mais cedo, mais anos até à pensão.") }}</div>
 <div class="row g-3 mb-3">
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
@@ -59,7 +59,7 @@
 </div>
 {% endif %}
 {% if life %}
-<div class="pm-label mb-2">Até aos {{ life.until_age|int }} anos{% if life.pension %}, com a pensão a partir dos {{ life.pension_age|int }}{% endif %}
+<div class="pm-label mb-2 d-flex align-items-center gap-2 flex-wrap" style="color: #ec4899"><span class="pm-fire-line" style="border-top: 2px dashed #ec4899"></span>Até aos {{ life.until_age|int }} anos{% if life.pension %}, com a pensão a partir dos {{ life.pension_age|int }}{% endif %}
   {{ help("Capital que paga as despesas (já com o IRS dos levantamentos) desde a data FIRE até à idade indicada, a render a taxa real do cenário, e acaba perto de zero. A pensão, se indicada, abate às despesas. É menos do que o número FIRE «para sempre», sobretudo para quem se reforma tarde.") }}</div>
 <div class="row g-3 mb-3">
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">

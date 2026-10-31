@@ -144,3 +144,6 @@ body.pm-private .money { filter: blur(7px); }
 .pm-legend-grad { display: inline-block; width: 90px; height: 6px; border-radius: 3px;
   background: linear-gradient(90deg, rgb(220, 38, 38), rgb(71, 85, 105), rgb(22, 163, 74)); }
 .pm-profile.active, .pm-profile.border-primary { background: var(--bs-primary-bg-subtle); }
+
+/* Planeamento: amostra da linha tracejada de cada número FIRE (a mesma cor do gráfico) */
+.pm-fire-line { display: inline-block; width: 28px; height: 0; flex: none; }
