@@ -744,6 +744,12 @@ def test_planning_fire_page_and_settings(app, client):
     assert [tg["label"] for tg in chart["targets"]] == ["Para sempre", "Para sempre, com a pensão aos 67",
                                                         "Até aos 90 anos, com a pensão aos 67"]
     assert len({tg["color"] for tg in chart["targets"]}) == 3
+    # quando cada cenário chega a cada número FIRE: tabela e pontos no gráfico
+    assert 'id="fireReach"' in html and "Quando chegas a cada número FIRE" in html
+    assert [mk["label"] for mk in chart["markers"]] == [tg["label"] for tg in chart["targets"]]
+    assert all(set(m) == {"x", "y", "s", "age"} for mk in chart["markers"] for m in mk["data"])
+    more = [s for s in chart["scenarios"] if s.get("more")]
+    assert more and all(a["x"] <= b["x"] for s in more for a, b in zip(s["more"], s["more"][1:]))
     assert 'id="pensionCovers"' not in html
     assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45", until="90",
                 pension="2000", pension_age="67").status_code == 200

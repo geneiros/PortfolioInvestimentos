@@ -94,9 +94,9 @@
     <div class="pm-label mb-2">Evolução e projeção</div>
     <div style="height: 320px"><canvas id="fireChart"></canvas></div>
     <p class="small text-secondary mt-2 mb-0">Até hoje, o valor real da carteira; daqui em diante, simulações com retornos de 3%, 5% e 7% ao ano
-      acima da inflação (em euros de hoje), não uma promessa. Cada cenário junta o investimento mensal até à data FIRE (o ponto)
+      acima da inflação (em euros de hoje), não uma promessa. Cada cenário junta o investimento mensal até à data FIRE
       {%- if cfg.stop_age %} ou até aos {{ cfg.stop_age|int }} anos{% endif %} e depois levanta o que as despesas pedem{% if life and life.pension %}, menos a pensão{% endif %}.
-      {% if life %}O gráfico vai até aos {{ life.until_age|int }} anos.{% endif %} As linhas tracejadas são os números FIRE: laranja «para sempre»{% if with_pension %}, roxa «para sempre, com a pensão»{% endif %}{% if life %}, rosa «até aos {{ life.until_age|int }} anos»{% endif %} (os que dependem da idade, na data FIRE do cenário base).</p>
+      {% if life %}O gráfico vai até aos {{ life.until_age|int }} anos.{% endif %} As linhas tracejadas são os números FIRE: laranja «para sempre»{% if with_pension %}, roxa «para sempre, com a pensão»{% endif %}{% if life %}, rosa «até aos {{ life.until_age|int }} anos»{% endif %} (os que dependem da idade, na data FIRE do cenário base). Os pontos marcam quando cada cenário chega a cada número FIRE; o pontilhado é a curva se continuasses a investir.</p>
   </div></div>
   <div class="col-xl-4"><div class="pm-card h-100">
     <div class="pm-label mb-2">O teu plano</div>
@@ -122,6 +122,19 @@
     </form>
   </div></div>
 </div>
+
+{% if reach and reach|length > 1 %}
+<div class="pm-card mb-3">
+  <div class="pm-label mb-2">Quando chegas a cada número FIRE {{ help("Para cada número FIRE e cada cenário: o mês em que a carteira chega lá, se continuares a investir até essa data (ou até à idade «Investir até aos»), e o capital necessário nessa data. No gráfico, é o ponto da cor do número FIRE em cima da curva do cenário.") }}</div>
+  <div class="table-responsive"><table class="table pm-table mb-0" id="fireReach">
+    <thead><tr><th>Número FIRE</th>{% for cell in reach[0].cells %}<th class="text-end text-capitalize">{{ cell.name }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for r in reach %}
+      <tr><td><span class="pm-fire-line me-2" style="border-top: 2px dashed {{ r.color }}"></span>{{ r.label }}</td>
+        {% for cell in r.cells %}<td class="text-end">{% if cell.date %}{{ cell.date.strftime('%m/%Y') }}{% if cell.age %} <span class="text-secondary">({{ cell.age|int }} anos)</span>{% endif %}<br><small class="text-secondary money">{{ cell.number|money }}</small>{% else %}<span class="text-secondary">não chega</span>{% endif %}</td>{% endfor %}</tr>
+    {% endfor %}</tbody>
+  </table></div>
+</div>
+{% endif %}
 
 <div class="row g-3">
   <div class="col-xl-5"><div class="pm-card h-100">
@@ -163,17 +176,26 @@ document.addEventListener("DOMContentLoaded", () => {
     const datasets = [
       { label: "Carteira (real)", data: d.history, borderColor: pm.css("--pm-text"), borderWidth: 2, pointRadius: 0, tension: .2 },
       ...d.scenarios.map((s) => ({ label: `${s.name} (${Math.round(s.rate * 100)}%)`, data: s.data, borderColor: colors[s.name],
-        borderWidth: s.name === "base" ? 2.5 : 1.5, tension: .2, fill: false, backgroundColor: colors[s.name],
-        // ponto na data FIRE: a partir daí deixa de investir e passa a levantar
-        pointRadius: s.data.map((pt, i) => (s.fire && i > 0 && s.data[i - 1].x < s.fire && pt.x >= s.fire ? 5 : 0)) })),
+        borderWidth: s.name === "base" ? 2.5 : 1.5, tension: .2, fill: false, backgroundColor: colors[s.name], pointRadius: 0 })),
+      // se continuasses a investir depois da data FIRE desenhada: até ao último número FIRE que o cenário alcança
+      ...d.scenarios.filter((s) => s.more).map((s) => ({ label: `${s.name}, a continuar a investir`, data: s.more, borderColor: colors[s.name],
+        borderWidth: 1.2, borderDash: [2, 3], tension: .2, pointRadius: 0, isExtra: true })),
+      // quando cada cenário chega a cada número FIRE: um ponto da cor do número
+      ...(d.markers || []).map((mk) => ({ type: "scatter", label: mk.label, data: mk.data, isMarker: true,
+        backgroundColor: mk.color, borderColor: pm.css("--pm-surface"), borderWidth: 1.5, pointRadius: 5, pointHoverRadius: 7 })),
       // números FIRE: linhas horizontais tracejadas, uma cor por cálculo
       ...d.targets.map((tg, k) => ({ label: `${tg.label}: ${pm.money(tg.value, 0)}`, data: [{ x: d.start, y: tg.value }, { x: d.end, y: tg.value }],
         borderColor: tg.color, borderDash: [[6, 5], [2, 4], [10, 4, 2, 4]][k % 3], borderWidth: 1.5, pointRadius: 0, isTarget: true })),
     ];
     pm.chart("fireChart", { type: "line", data: { datasets },
       options: { maintainAspectRatio: false, parsing: true, interaction: { mode: "nearest", intersect: false },
-        plugins: { legend: { position: "bottom" },
-          tooltip: { callbacks: { title: (it) => String(Math.floor(it[0].parsed.x)), label: (it) => (it.dataset.isTarget ? it.dataset.label : `${it.dataset.label}: ${pm.money(it.parsed.y, 0)}`) } } },
+        plugins: { legend: { position: "bottom", labels: { filter: (item, data) => { const ds = data.datasets[item.datasetIndex]; return !ds.isMarker && !ds.isExtra; } } },
+          tooltip: { callbacks: { title: (it) => String(Math.floor(it[0].parsed.x)),
+            label: (it) => {
+              if (it.dataset.isTarget) return it.dataset.label;
+              if (it.dataset.isMarker) { const r = it.raw; return `${it.dataset.label} · ${r.s}: ${Math.floor(r.x)}${r.age ? ` (${r.age} anos)` : ""}, ${pm.money(r.y, 0)}`; }
+              return `${it.dataset.label}: ${pm.money(it.parsed.y, 0)}`;
+            } } } },
         scales: { x: { type: "linear", min: d.start, max: d.end, ticks: { callback: (v) => Math.floor(v), maxTicksLimit: 12, maxRotation: 0 }, grid: { display: false } },
                   y: { position: "right", ticks: { callback: (v) => pm.money(v, 0) } } } } });
   };
