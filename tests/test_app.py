@@ -736,6 +736,18 @@ def test_merge_instruments_manually(app, client):
     assert client.get("/definicoes").status_code == 200 and client.get("/carteira").status_code == 200
 
 
+def test_yfinance_deprecation_warnings_are_silenced(monkeypatch):
+    import sys
+    import warnings
+    from portfolio_investimentos.services import market
+    monkeypatch.setitem(sys.modules, "yfinance", _FakeYf)
+    with warnings.catch_warnings(record=True) as seen:
+        market._yahoo_client()
+        warnings.warn_explicit("inplace obsoleto", DeprecationWarning, "yfinance/utils.py", 568, module="yfinance.utils")
+        warnings.warn_explicit("outro aviso", DeprecationWarning, "app.py", 1, module="portfolio_investimentos.x")
+    assert [str(w.message) for w in seen] == ["outro aviso"]  # só se cala o do yfinance
+
+
 def test_refresh_reports_progress_with_last_close(app, monkeypatch):
     """A atualização conta os ativos à medida que avança e mostra o último fecho de cada um."""
     import sys

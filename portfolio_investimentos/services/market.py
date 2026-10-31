@@ -6,6 +6,7 @@ rede, a aplicação continua a funcionar com as cotações já guardadas.
 import logging
 import math
 import threading
+import warnings
 import time as _time
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from statistics import median
@@ -248,6 +249,9 @@ def _yahoo_client():
     """O yfinance quando está instalado; senão o acesso direto, só com a biblioteca padrão (ex.: Android)."""
     try:
         import yfinance
+        # o yfinance 1.x usa opções do pandas 3 já obsoletas e o aviso aparece a cada pedido (o pandas volta a
+        # ativá-lo depois do PYTHONWARNINGS); não é um erro e não depende de nós, por isso cala-se só o dele
+        warnings.filterwarnings("ignore", module=r"yfinance(\.|$)")
         return yfinance
     except ImportError:
         from . import yahoo
