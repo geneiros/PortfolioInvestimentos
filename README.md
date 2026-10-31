@@ -108,40 +108,47 @@ python -m portfolio_investimentos --importar extrato.xlsx  # importa extratos (c
 python -m portfolio_investimentos --testar-yahoo  # testa a ligação ao Yahoo Finance e sai
 ```
 
+O que mudou em cada versão está no [histórico de alterações](CHANGELOG.md).
+
 ## Capturas de ecrã
 
-As capturas usam os dados de demonstração.
+As capturas usam os dados de demonstração (empresas e preços fictícios).
 
 ### Modo claro
 
-| Visão Geral | Evolução e próximos eventos |
+| Visão Geral | Evolução, as minhas posições e próximos eventos |
 | --- | --- |
 | ![Visão Geral](docs/screenshots/01-visao-geral.png) | ![Evolução](docs/screenshots/02-visao-geral-evolucao.png) |
+| **Peso vs retorno e alocação** | **Perfil de investidor** |
+| ![Peso vs retorno e alocação](docs/screenshots/03-visao-geral-peso-alocacao.png) | ![Perfil de investidor](docs/screenshots/04-perfil-investidor.png) |
 | **Carteira** | **Alocação** |
-| ![Carteira](docs/screenshots/03-carteira.png) | ![Alocação](docs/screenshots/04-carteira-alocacao.png) |
+| ![Carteira](docs/screenshots/05-carteira.png) | ![Alocação](docs/screenshots/06-carteira-alocacao.png) |
 | **Desempenho** | **Como foi a jornada** |
-| ![Desempenho](docs/screenshots/05-desempenho.png) | ![Jornada](docs/screenshots/06-desempenho-jornada.png) |
+| ![Desempenho](docs/screenshots/07-desempenho.png) | ![Jornada](docs/screenshots/08-desempenho-jornada.png) |
 | **Retornos mensais** | **Mérito vs mercado** |
-| ![Retornos mensais](docs/screenshots/07-desempenho-mensal.png) | ![Mérito](docs/screenshots/08-desempenho-merito.png) |
+| ![Retornos mensais](docs/screenshots/09-desempenho-mensal.png) | ![Mérito](docs/screenshots/10-desempenho-merito.png) |
 | **Risco e análise avançada** | **Dividendos** |
-| ![Risco](docs/screenshots/09-desempenho-risco.png) | ![Dividendos](docs/screenshots/10-dividendos.png) |
-| **Mapa de rendimento** | **Fiscal** |
-| **Planeamento** | Independência financeira (FIRE): o número FIRE já depois do IRS, a parte já feita, a data em três cenários (3%, 5% e 7% reais ao ano) com o investimento mensal, e o acompanhamento mês a mês. |
-| ![Mapa de dividendos](docs/screenshots/11-dividendos-mapa.png) | ![Fiscal](docs/screenshots/12-fiscal.png) |
+| ![Risco](docs/screenshots/11-desempenho-risco.png) | ![Dividendos](docs/screenshots/12-dividendos.png) |
+| **Mapa de rendimento e datas ex-dividendo** | **Fiscal** |
+| ![Mapa de dividendos](docs/screenshots/13-dividendos-mapa.png) | ![Fiscal](docs/screenshots/14-fiscal.png) |
+| **Planeamento (FIRE)** | **Evolução e projeção** |
+| ![Planeamento](docs/screenshots/15-planeamento.png) | ![Projeção](docs/screenshots/16-planeamento-projecao.png) |
 | **Radar e alertas** | **Importar extrato** |
-| ![Radar](docs/screenshots/13-radar.png) | ![Importar](docs/screenshots/14-importar.png) |
+| ![Radar](docs/screenshots/17-radar.png) | ![Importar](docs/screenshots/18-importar.png) |
 | **Transações** | **Definições** |
-| ![Transações](docs/screenshots/15-transacoes.png) | ![Definições](docs/screenshots/16-definicoes.png) |
+| ![Transações](docs/screenshots/19-transacoes.png) | ![Definições](docs/screenshots/20-definicoes.png) |
 
 ### Modo escuro
 
-| Visão Geral | Carteira |
+| Visão Geral | Peso vs retorno e alocação |
 | --- | --- |
-| ![Visão Geral (escuro)](docs/screenshots/escuro/01-visao-geral.png) | ![Carteira (escuro)](docs/screenshots/escuro/02-carteira.png) |
-| **Desempenho** | **Retornos mensais** |
-| ![Desempenho (escuro)](docs/screenshots/escuro/03-desempenho.png) | ![Retornos mensais (escuro)](docs/screenshots/escuro/04-desempenho-mensal.png) |
-| **Dividendos** | **Importar extrato** |
-| ![Dividendos (escuro)](docs/screenshots/escuro/05-dividendos.png) | ![Importar (escuro)](docs/screenshots/escuro/06-importar.png) |
+| ![Visão Geral (escuro)](docs/screenshots/escuro/01-visao-geral.png) | ![Peso vs retorno (escuro)](docs/screenshots/escuro/02-visao-geral-peso-alocacao.png) |
+| **Carteira** | **Desempenho** |
+| ![Carteira (escuro)](docs/screenshots/escuro/03-carteira.png) | ![Desempenho (escuro)](docs/screenshots/escuro/04-desempenho.png) |
+| **Retornos mensais** | **Dividendos** |
+| ![Retornos mensais (escuro)](docs/screenshots/escuro/05-desempenho-mensal.png) | ![Dividendos (escuro)](docs/screenshots/escuro/06-dividendos.png) |
+| **Planeamento** | **Importar extrato** |
+| ![Planeamento (escuro)](docs/screenshots/escuro/07-planeamento.png) | ![Importar (escuro)](docs/screenshots/escuro/08-importar.png) |
 
 O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro ou Automático.
 
@@ -149,15 +156,16 @@ O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro o
 
 | Página | O que mostra |
 | --- | --- |
-| **Visão Geral** | Valor da carteira, variação diária, retorno total e do ano corrente; máximo histórico (carteira ou retorno); Investor Score e Portfolio Score por perfil de investidor (Passive Index, Concentrated Picker, Diversified Active, Income Focus, Growth/Tech, Active Trader); peso vs retorno (mapa e bolhas); alocação por setor, geografia, classe e corretora; principais movers; resultados (não realizado, realizado, dividendos, comissões) e conta (custo base, depositado, caixa, juros); gráfico de evolução com períodos (1M a Máx) e comparação com S&P 500, Nasdaq 100 e MSCI World; próximos eventos (resultados, ex-dividendo, pagamentos estimados). |
+| **Visão Geral** | Valor da carteira, variação diária, retorno total e do ano corrente; máximo histórico (carteira ou retorno). **Perfil de investidor**: Investor Score e Portfolio Score (0-100, últimos 3 anos) com seis perfis (Passive Index, Concentrated Picker, Diversified Active, Income Focus, Growth/Tech, Active Trader), o perfil sugerido pela carteira e a fórmula de cada métrica no «?». Principais movers; resultados e conta. Gráfico de evolução (retorno ou valor, 1M a Máx) com comparação com S&P 500, Nasdaq 100 e MSCI World e **as minhas posições** (as 5 com maior ganho ou perda e as restantes somadas, ligado por omissão). Próximos eventos dos próximos 90 dias (resultados, com o intervalo quando ainda é estimado, ex-dividendo e pagamentos). **Peso vs retorno** (mapa e bolhas) e **alocação** por setor, geografia, classe e corretora. |
 | **Carteira** | Posições abertas/fechadas, carteira vs mercado no dia, filtros por setor, pesquisa, tabela ordenável (preço, 1D, preço médio, investido, valor, não realizado, dividendos, efeito cambial, comissões, ROI, peso) e alocação por ativo, setor e moeda. |
 | **Desempenho** | Retorno total e IRR, TWR e CAGR vs índice, melhor/pior ano e mês, sequência atual; TWR anual e acumulado; drawdown; mapa de retornos mensais; mérito vs mercado (captura em alta/baixa, beta, % de meses acima do mercado); risco (Sharpe, Sortino, Calmar, volatilidade, max drawdown); alfa de Jensen e distribuição mensal ordenada. |
-| **Dividendos** | Recebido líquido/bruto e retenção na fonte, maior pagador, meses com dividendos, rendimento anualizado, projeção do ano e dos próximos 12 meses, crescimento anual, dividendos por ano, decomposição do crescimento, mapa mensal, yield on cost e histórico. |
-| **Fiscal** | Por ano: mais-valias pelo método FIFO (linha a linha, exportáveis em CSV), dividendos, juros e estimativa de imposto a 28% (Portugal). |
+| **Dividendos** | Recebido líquido/bruto e retenção na fonte, maior pagador, meses com dividendos, rendimento anualizado, crescimento anual. **Projeção** do ano e dos próximos 12 meses com os dividendos recebidos e, para posições recentes, os dividendos por ação do Yahoo, com a origem de cada valor. Dividendos por ano, decomposição do crescimento, **mapa mensal com a linha do próximo ano**, **datas ex-dividendo** (recebido, a receber, sem direito por ter comprado depois, previsto), yield on cost e histórico. |
+| **Fiscal** | Por ano: mais-valias pelo método FIFO resumidas por ativo (as linhas de cada lote abrem a pedido e vão todas no CSV), dividendos com o crédito de imposto estrangeiro limitado a cada dividendo, juros e estimativa de imposto a 28% (Portugal). |
+| **Planeamento** | Independência financeira (FIRE): o número FIRE «para sempre» (regra dos 4%), «para sempre, com a pensão» e «até aos N anos, com a pensão», já depois do IRS dos levantamentos; a parte já feita; a data em três cenários (3%, 5% e 7% reais ao ano), a investir até à data FIRE (ou até uma idade) e a levantar daí em diante; o gráfico da vida inteira com os números FIRE a tracejado; até quando dura o dinheiro em cada cenário; acompanhamento mês a mês. |
 | **Radar e alertas** | Alertas de preço (acima, abaixo, variação diária) e lista de observação com preço-alvo. |
-| **Importar** | Extratos da Trading 212 (CSV), XTB (XLSX), Trade Republic (CSV) e CSV genérico, com deduplicação (podes carregar o mesmo ficheiro várias vezes) e histórico de extratos. |
-| **Transações** | Lista filtrável, inserção manual e exportação CSV. |
-| **Definições** | Corretoras, ativos (setor, símbolo de dados, cor), atualização de cotações, cópia de segurança, demonstração e limpeza de dados. |
+| **Importar** | Extratos da Trading 212 (CSV), XTB (XLSX), Trade Republic (CSV) e CSV genérico, com deduplicação (podes carregar o mesmo ficheiro várias vezes) e histórico de extratos. Antes de importar fica uma cópia automática da base de dados. |
+| **Transações** | Lista filtrável, inserção manual (com validação da quantidade detida nas vendas) e exportação CSV. |
+| **Definições** | Corretoras; ativos com filtro (posições abertas, sem cotações, todos), pesquisa, último fecho e «Juntar» para o mesmo título com dois tickers; atualização de cotações (todas ou só as posições abertas, com o progresso ativo a ativo); taxa sem risco; disponível offline; cópias de segurança automáticas com «Restaurar»; demonstração e limpeza de dados. |
 
 Também há um seletor de corretora (todas ou uma conta específica) e um botão com um olho que esconde os valores.
 
