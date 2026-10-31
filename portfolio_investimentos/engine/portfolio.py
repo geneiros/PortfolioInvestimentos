@@ -668,16 +668,28 @@ class Portfolio:
         # projeção: dividendos por ação dos últimos 12 meses × quantidade atual
         ttm_start = today - timedelta(days=365)
         per_share = defaultdict(float)
+        per_share_month = defaultdict(lambda: defaultdict(float))  # ativo -> mês do pagamento -> por ação
         for t in self.transactions:
             if t.type == "DIVIDEND" and t.date > ttm_start and t.asset:
                 pos = self.positions.get(t.asset.ticker)
                 qty_then = t.quantity or (pos.qty if pos else 0)
                 if qty_then > EPS:
                     g = t.amount or qty_then * (t.price or 0)
-                    per_share[t.asset.ticker] += self.book.to_eur(g, t.currency, t.date) / qty_then
+                    eur = self.book.to_eur(g, t.currency, t.date) / qty_then
+                    per_share[t.asset.ticker] += eur
+                    per_share_month[t.asset.ticker][t.date.month] += eur
         forward_gross = sum(per_share[p.asset.ticker] * p.qty for p in self.open_positions)
         tax_ratio = tax / gross if gross > EPS else 0.0
         forward_net = forward_gross * (1 - tax_ratio)
+        # mapa do próximo ano: cada posição volta a pagar nos mesmos meses dos últimos 12, com as quantidades atuais
+        forward_by_month = defaultdict(float)
+        for p in self.open_positions:
+            for month, eur in per_share_month[p.asset.ticker].items():
+                forward_by_month[month] += eur * p.qty * (1 - tax_ratio)
+        # de onde vem a projeção: posições abertas que pagaram dividendos nos últimos 12 meses
+        forward_by_asset = sorted(((p.asset.ticker, per_share[p.asset.ticker] * p.qty * (1 - tax_ratio))
+                                   for p in self.open_positions if per_share[p.asset.ticker] > EPS),
+                                  key=lambda kv: -kv[1])
 
         # projeção do ano corrente = recebido até hoje + restantes meses do ano pela média TTM
         received_ytd = by_year.get(today.year, 0.0)
@@ -706,6 +718,7 @@ class Portfolio:
             "months_with": len(by_month), "months_total": n_months,
             "annualized": net / years_span,
             "projection_year": projection_year, "forward_net": forward_net, "forward_gross": forward_gross,
+            "forward_by_asset": forward_by_asset, "forward_by_month": dict(forward_by_month),
             "growth": growth,
             "by_year": dict(sorted(by_year.items())),
             "by_month": by_month,

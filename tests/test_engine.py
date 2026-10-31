@@ -99,6 +99,10 @@ def test_dividends_and_fiscal():
     assert s["net"] == pytest.approx(68)
     assert s["months_with"] == 4
     assert s["forward_gross"] == pytest.approx(40)
+    assert [t for t, _ in s["forward_by_asset"]] == ["ACME"]
+    # mapa do próximo ano: paga em março e setembro, como nos últimos 12 meses (20 por mês, sem a retenção de 15%)
+    assert set(s["forward_by_month"]) == {3, 9}
+    assert sum(s["forward_by_month"].values()) == pytest.approx(s["forward_net"])
     fiscal = p.fiscal_years()
     assert fiscal[2024]["div_gross"] == pytest.approx(40)
     assert fiscal[2024]["tax_dividends"] == pytest.approx(40 * 0.28 - 6)

@@ -59,6 +59,12 @@
   <div class="col-xl-7"><div class="pm-card">
     <div class="pm-label mb-3">Dividendos por ano <span class="ms-2 text-primary text-capitalize">■ projeção</span></div>
     <div style="height: 260px"><canvas id="divYear"></canvas></div>
+    <p class="small text-secondary mt-2 mb-0">
+      {% if s.forward_by_asset %}Projeção de {{ p.as_of.year + 1 }} (próximos 12 meses), a partir de:
+        {% for t, v in s.forward_by_asset[:6] %}<b>{{ t }}</b> <span class="money">{{ v|money(2) }}</span>{{ " · " if not loop.last }}{% endfor %}{{ "…" if s.forward_by_asset|length > 6 }}
+      {% else %}Sem projeção para {{ p.as_of.year + 1 }}: nenhuma das posições abertas{{ " desta corretora" if broker }} pagou dividendos
+        nos últimos 12 meses. A projeção usa os dividendos por ação recebidos nos últimos 12 meses × as quantidades atuais.{% endif %}
+    </p>
   </div></div>
   <div class="col-xl-5"><div class="pm-card">
     <div class="pm-label mb-3">Decomposição do crescimento {{ help("Compara o que recebeste este ano até ao mês atual com o mesmo período do ano anterior.") }}</div>
@@ -98,7 +104,15 @@
       {% endfor %}
       <div class="cell text-up money" style="background: transparent">{{ s.by_year.get(y, 0)|money(2, sign=True) }}</div>
     {% endfor %}
+    {% if s.forward_by_month %}{% set ny = p.as_of.year + 1 %}
+      <div class="year text-primary" title="Projeção: os dividendos por ação dos últimos 12 meses, nos mesmos meses, com as quantidades atuais">{{ ny }}*</div>
+      {% for mth in range(1, 13) %}{% set v = s.forward_by_month.get(mth) %}
+        <div class="cell money fst-italic" style="background: {{ 'rgba(96, 165, 250, .25)' if v else 'var(--pm-surface-2)' }}">{% if v %}{{ '<€1' if v < 1 else v|money }}{% endif %}</div>
+      {% endfor %}
+      <div class="cell text-primary money" style="background: transparent">≈ {{ s.forward_net|money(2) }}</div>
+    {% endif %}
   </div></div>
+  {% if s.forward_by_month %}<p class="small text-secondary mt-2 mb-0">* {{ p.as_of.year + 1 }}: projeção (os dividendos por ação dos últimos 12 meses, nos mesmos meses, com as quantidades atuais).</p>{% endif %}
 </div>
 
 <div class="row g-3">
