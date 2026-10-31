@@ -173,17 +173,25 @@ def create_demo(seed=42):
 
 # outros ativos (Património): valor inicial, entrada mensal e rendimento anual, há 36 meses
 OTHER_ASSETS = [
-    ("PPR (fictício)", "ppr", 6000, 100, 0.05, True),
+    ("Conta à ordem (fictícia)", "conta", 6000, 50, 0.0, True),
+    ("Depósito a prazo (fictício)", "deposito", 4000, 0, 0.015, True),
     ("Certificados de aforro (fictícios)", "aforro", 10000, 0, 0.025, True),
-    ("Conta poupança (fictícia)", "deposito", 4000, 50, 0.015, True),
+    ("PPR (fictício)", "ppr", 6000, 100, 0.05, True),
+    ("Casa (fictícia)", "imovel", 210000, 0, 0.03, False),
+    ("Crédito habitação (fictício)", "credito", 150000, -450, 0.0, False),
 ]
+DEMO_EXPENSES = 24000  # despesas anuais de exemplo (meses de reserva), só se ainda não houver
 
 
 def _other_assets(rng, today):
+    house = None
     for label, category, v0, monthly, rate, fire in OTHER_ASSETS:
-        asset = OtherAsset(label=label, category=category, value=v0, fire=fire, updated=today)
+        asset = OtherAsset(label=label, category=category, value=v0, fire=fire, updated=today,
+                           home=category == "imovel", linked=house.id if category == "credito" and house else None)
         db.session.add(asset)
         db.session.flush()
+        if category == "imovel":
+            house = asset
         v = v0
         for k in range(36, -1, -1):
             y, m = divmod(today.year * 12 + today.month - 1 - k, 12)
@@ -192,3 +200,6 @@ def _other_assets(rng, today):
             v = v * (1 + rate) ** (1 / 12) * (1 + rng.gauss(0, 0.002)) + monthly
         asset.value = db.session.query(OtherAssetValue.value).filter_by(asset=asset.id).order_by(
             OtherAssetValue.date.desc()).first()[0]
+    if Setting.get("fire_expenses") is None:
+        Setting.set("fire_expenses", DEMO_EXPENSES)
+        Setting.set("demo_fire_expenses", "1")  # apagado com os dados de demonstração

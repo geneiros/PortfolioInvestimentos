@@ -1,80 +1,114 @@
 {% extends "base.html" %}
 {% block content %}{% autoescape true %}
 {% from "macros.html" import help %}
+{% macro level_badge(key) -%}
+{% if key %}<span class="badge rounded-pill border" style="color: {{ liquidity[key][2] }}; border-color: {{ liquidity[key][2] }} !important">{{ liquidity[key][0] }}</span>{% endif %}
+{%- endmacro %}
 <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
-  <p class="text-secondary mb-0 flex-grow-1">A carteira das corretoras mais o que tens fora delas (PPR, certificados de aforro, depósitos,
-    casa) e o que deves. Os valores destes ativos indicas tu, e atualizas quando quiseres.</p>
+  <p class="text-secondary mb-0 flex-grow-1">A carteira das corretoras mais o que tens fora delas e o que deves, separado pela
+    liquidez: o que podes usar hoje, o que vendes em dias e o que demora meses. Os valores fora das corretoras indicas tu.</p>
   <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#assetModal" data-pm-new><i class="bi bi-plus-lg"></i> Adicionar</button>
 </div>
 
 <div class="row g-3 mb-3">
-  <div class="col-lg-4"><div class="pm-card h-100">
-    <div class="pm-label">Património líquido {{ help("Corretoras + outros ativos − dívidas.") }}</div>
-    <div class="pm-big money" id="netWorth">{{ nw.net|money }}</div>
-    <div class="small text-secondary">{% if nw.debts %}<span class="money">{{ nw.gross|money }}</span> de ativos, <span class="money">{{ nw.debts|money }}</span> de dívidas{% else %}sem dívidas registadas{% endif %}</div>
+  <div class="col-md-6 col-xl-3"><div class="pm-card h-100">
+    <div class="pm-label">Património líquido total {{ help("Imediata + curto prazo + ilíquido (imóveis já sem os créditos ligados e o desconto de venda) − dívidas sem imóvel. Mostra a riqueza, não a capacidade de agir.") }}</div>
+    <div class="pm-big money" id="nwTotal">{{ nw.total|money }}</div>
+    <div class="small text-secondary">imediata <span class="money">{{ nw.imediata|money }}</span> · curto prazo <span class="money">{{ nw.curto|money }}</span>
+      · ilíquido <span class="money">{{ nw.iliquido|money }}</span>{% if nw.loose_debts %} · dívidas <span class="money">{{ (-nw.loose_debts)|money }}</span>{% endif %}</div>
   </div></div>
-  <div class="col-6 col-lg-2"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">Corretoras</div>
-    <div class="pm-mid money">{{ nw.brokers|money }}</div>
-    <div class="small text-secondary">{{ nw.brokers_share|pct(0, sign=False) }} dos ativos</div>
+  <div class="col-md-6 col-xl-3"><div class="pm-card h-100">
+    <div class="pm-label">Património líquido disponível {{ help("Só a liquidez imediata e de curto prazo, menos as dívidas sem imóvel: o que consegues mobilizar em dias, sem vender a casa.") }}</div>
+    <div class="pm-big money" id="nwAvailable">{{ nw.available|money }}</div>
+    <div class="small text-secondary">{{ (nw.available / nw.total if nw.total > 0 else 0)|pct(0, sign=False) }} do património líquido total</div>
   </div></div>
-  <div class="col-6 col-lg-2"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">Outros ativos</div>
-    <div class="pm-mid money">{{ nw.others|money }}</div>
-    <div class="small text-secondary">{{ (nw.others / nw.gross if nw.gross else 0)|pct(0, sign=False) }} dos ativos</div>
+  <div class="col-md-6 col-xl-3"><div class="pm-card h-100">
+    <div class="pm-label">Meses de reserva {{ help("Liquidez imediata ÷ despesas mensais (as despesas anuais do Planeamento ÷ 12). Um fundo de emergência ronda 3 a 6 meses. Mostra se estás seguro, seja qual for o valor dos imóveis.") }}</div>
+    {% if nw.reserve_months is not none %}
+      {% set rm = nw.reserve_months %}
+      <div class="d-flex align-items-center gap-2"><span class="pm-big" id="nwReserve">{{ rm|number(1) }}</span><span class="text-secondary">meses</span>
+        <span class="badge {{ 'text-bg-danger' if rm < 3 else ('text-bg-warning' if rm < 6 else 'text-bg-success') }}">{{ 'abaixo de 3' if rm < 3 else ('3 a 6 meses' if rm < 6 else 'mais de 6') }}</span></div>
+      <div class="small text-secondary">liquidez imediata <span class="money">{{ nw.imediata|money }}</span> · despesas <span class="money">{{ nw.monthly_expenses|money }}</span>/mês</div>
+    {% else %}
+      <div class="pm-big text-secondary" id="nwReserve">—</div>
+      <div class="small text-secondary">Indica as despesas anuais no <a href="/planeamento">Planeamento</a>.</div>
+    {% endif %}
   </div></div>
-  <div class="col-6 col-lg-2"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">Dívidas</div>
-    <div class="pm-mid money {{ 'text-down' if nw.debts }}">{{ (-nw.debts)|money }}</div>
-    <div class="small text-secondary">{{ (nw.debts / nw.gross if nw.gross else 0)|pct(0, sign=False) }} dos ativos</div>
-  </div></div>
-  <div class="col-6 col-lg-2"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">Conta no FIRE {{ help("Soma dos outros ativos marcados com «FIRE» (as dívidas marcadas subtraem). No Planeamento, junta-se ao valor da carteira.") }}</div>
-    <div class="pm-mid money">{{ nw.fire_extra|money }}</div>
-    <div class="small text-secondary"><a href="/planeamento">Planeamento</a></div>
+  <div class="col-md-6 col-xl-3"><div class="pm-card h-100">
+    <div class="pm-label">Ilíquido {{ help("Imóveis e outros ativos que demoram meses a vender. O preço é uma estimativa; os créditos ligados a cada imóvel abatem ao seu valor. O desconto (opcional) cobre os custos de venda: comissão de mediação, mais-valias, amortização antecipada do crédito.") }}</div>
+    <div class="pm-big money" id="nwIlliquid">{{ nw.iliquido|money }}</div>
+    <div class="small text-secondary d-flex align-items-center gap-2 flex-wrap">líquido de dívida, com desconto de venda
+      <select class="form-select form-select-sm w-auto py-0" id="saleDiscount" aria-label="Desconto para custos de venda">
+        {% for d in discounts %}<option value="{{ d }}" {{ 'selected' if (nw.discount * 100)|round|int == d }}>{{ d }}%</option>{% endfor %}
+        {% if (nw.discount * 100)|round|int not in discounts %}<option value="{{ nw.discount * 100 }}" selected>{{ (nw.discount * 100)|number(1) }}%</option>{% endif %}
+      </select></div>
   </div></div>
 </div>
 
 <div class="row g-3 mb-3">
   <div class="col-xl-8"><div class="pm-card h-100">
-    <div class="pm-label mb-2">Composição</div>
+    <div class="pm-label mb-2">Composição por liquidez</div>
     <div class="table-responsive"><table class="table pm-table mb-0" id="nwTable">
-      <thead><tr><th>Ativo</th><th class="text-end">Valor</th><th class="text-end d-none d-md-table-cell">Peso</th>
-        <th class="text-center">FIRE {{ help("Somar ao valor da carteira no Planeamento (FIRE). Por omissão: sim para PPR, certificados, depósitos e outros; não para imóveis e créditos.") }}</th><th></th></tr></thead>
-      <tbody>
-        <tr><td class="pm-nw-name"><i class="bi bi-wallet2 me-2" style="color: var(--pm-accent)"></i><b>Carteira (corretoras)</b>
+      <thead><tr><th>Ativo</th><th class="text-end">Valor</th><th class="text-end d-none d-md-table-cell">% do total {{ help("Peso no total dos ativos (sem as dívidas), com a casa própria.") }}</th>
+        <th class="d-none d-sm-table-cell">Liquidez</th>
+        <th class="text-center">FIRE {{ help("Somar ao valor da carteira no Planeamento (FIRE). A casa própria nunca conta (não a vais vender).") }}</th><th></th></tr></thead>
+      {% for g in nw.groups %}
+      <tbody class="pm-nw-group" data-level="{{ g.key }}">
+        <tr class="pm-nw-head"><td colspan="6"><span class="pm-nw-dot" style="background: {{ g.color }}"></span><b>{{ g.name }}</b>
+          · <b class="money">{{ g.subtotal|money }}</b><div class="sub ms-3">{{ g.desc }}</div></td></tr>
+        {% for a in g.rows %}
+        {% if a.brokers %}
+        <tr><td class="pm-nw-name"><i class="bi bi-wallet2 me-2" style="color: var(--pm-accent)"></i><b>Corretoras (ETF e ações)</b>
             <div class="sub"><a href="/carteira">ver a Carteira</a></div></td>
-          <td class="text-end money">{{ nw.brokers|money }}</td>
-          <td class="text-end d-none d-md-table-cell">{{ nw.brokers_share|pct(1, sign=False) }}</td>
+          <td class="text-end money">{{ a.value|money }}</td>
+          <td class="text-end d-none d-md-table-cell">{{ a.share|pct(1, sign=False) }}</td>
+          <td class="d-none d-sm-table-cell">{{ level_badge("curto") }}</td>
           <td class="text-center"><i class="bi bi-check-lg text-secondary" title="A carteira conta sempre"></i></td><td></td></tr>
-        {% for a in nw.assets %}
-        <tr><td class="pm-nw-name"><i class="bi {{ a.icon }} me-2" style="color: {{ a.color }}"></i><b>{{ a.label }}</b>
+        {% else %}
+        <tr class="{{ 'pm-nw-child' if a.child }}"><td class="pm-nw-name"><i class="bi {{ a.icon }} me-2" style="color: {{ a.color }}"></i><b>{{ a.label }}</b>
+            {% if a.home %}<span class="badge text-bg-secondary ms-1">casa própria</span>{% endif %}
             <div class="sub">{{ a.cat }}{% if a.note %} · {{ a.note }}{% endif %}
-              {% if a.updated %} · <span class="{{ 'text-warning-emphasis' if a.stale }}" {% if a.stale %}title="Valor sem atualizar há mais de 90 dias"{% endif %}>{% if a.stale %}<i class="bi bi-exclamation-triangle"></i> {% endif %}atualizado {{ a.updated.strftime('%d/%m/%Y') }}</span>{% endif %}</div></td>
+              {% if a.updated %} · <span class="{{ 'text-warning-emphasis' if a.stale }}" {% if a.stale %}title="Valor sem atualizar há mais de 90 dias"{% endif %}>{% if a.stale %}<i class="bi bi-exclamation-triangle"></i> {% endif %}atualizado {{ a.updated.strftime('%d/%m/%Y') }}</span>{% endif %}</div>
+            {% if a.category == "imovel" and a.equity is defined and (a.discount or a.loans) %}
+            <div class="sub">mercado <span class="money">{{ a.value|money }}</span>{% if a.discount %} − desconto <span class="money">{{ a.discount|money }}</span>{% endif %}{% if a.loans %} − crédito <span class="money">{{ a.loans|money }}</span>{% endif %}
+              = <b class="money">{{ a.equity|money }}</b> líquido de dívida</div>{% endif %}</td>
           <td class="text-end money {{ 'text-down' if a.debt }}">{{ a.signed|money }}</td>
           <td class="text-end d-none d-md-table-cell">{% if a.debt %}—{% else %}{{ a.share|pct(1, sign=False) }}{% endif %}</td>
-          <td class="text-center"><div class="form-check form-switch d-inline-block m-0"><input class="form-check-input" type="checkbox" role="switch"
-              {{ 'checked' if a.fire }} data-pm-action="set_other_asset_fire" data-args='{"name": "{{ a.name }}", "fire": {{ 0 if a.fire else 1 }}}' aria-label="Contar no FIRE"></div></td>
+          <td class="d-none d-sm-table-cell">{% if a.debt %}<span class="small text-secondary">{{ 'do imóvel' if a.child else 'dívida' }}</span>{% else %}{{ level_badge(a.level) }}{% endif %}</td>
+          <td class="text-center">{% if a.home or a.home_loan %}<i class="bi bi-dash text-secondary" title="A casa própria (e o crédito dela) não conta no FIRE"></i>{% else %}<div class="form-check form-switch d-inline-block m-0"><input class="form-check-input" type="checkbox" role="switch"
+              {{ 'checked' if a.fire }} data-pm-action="set_other_asset_fire" data-args='{"name": "{{ a.name }}", "fire": {{ 0 if a.fire else 1 }}}' aria-label="Contar no FIRE"></div>{% endif %}</td>
           <td class="text-end text-nowrap">
-            <button class="btn btn-sm btn-pm px-2" data-bs-toggle="modal" data-bs-target="#assetModal" title="Atualizar o valor"
-                    data-pm-edit='{{ {"name": a.name, "label": a.label, "category": a.category, "value": a.value, "fire": a.fire, "note": a.note}|tojson|forceescape }}'><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-pm px-2" data-bs-toggle="modal" data-bs-target="#assetModal" title="Atualizar"
+                    data-pm-edit='{{ {"name": a.name, "label": a.label, "category": a.category, "value": a.value, "fire": a.fire, "note": a.note, "liquidity": a.liquidity, "home": a.home, "linked": a.linked|string if a.linked else ""}|tojson|forceescape }}'><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" data-pm-action="delete_other_asset" data-args='{"name": "{{ a.name }}"}' data-confirm="Apagar «{{ a.label }}»?" title="Apagar" style="--bs-btn-padding-x: .5rem"><i class="bi bi-trash"></i></button></td></tr>
-        {% else %}
-        <tr><td colspan="5" class="text-secondary">Ainda não tens outros ativos. Usa «Adicionar» para juntar o PPR, os certificados de aforro, os depósitos, a casa ou o crédito.</td></tr>
+        {% endif %}
         {% endfor %}
       </tbody>
-      <tfoot><tr><th>Património líquido</th><th class="text-end money">{{ nw.net|money }}</th><th class="d-none d-md-table-cell"></th><th></th><th></th></tr></tfoot>
+      {% endfor %}
+      {% if not nw.assets %}<tbody><tr><td colspan="6" class="text-secondary">Ainda não tens outros ativos. Usa «Adicionar» para juntar a conta à ordem, os depósitos, os certificados, o PPR, a casa ou o crédito.</td></tr></tbody>{% endif %}
+      <tfoot>
+        <tr><th>Património líquido disponível</th><th class="text-end money">{{ nw.available|money }}</th><th colspan="4" class="small text-secondary fw-normal d-none d-md-table-cell">imediata + curto prazo{% if nw.loose_debts %} − dívidas{% endif %}</th></tr>
+        <tr><th>Património líquido total</th><th class="text-end money">{{ nw.total|money }}</th><th colspan="4" class="small text-secondary fw-normal d-none d-md-table-cell">+ ilíquido (líquido de dívida)</th></tr>
+      </tfoot>
     </table></div>
   </div></div>
   <div class="col-xl-4"><div class="pm-card h-100">
-    <div class="pm-label mb-2">Por categoria {{ help("Ativos por categoria (sem as dívidas).") }}</div>
-    <div class="position-relative" style="height: 260px"><canvas id="nwDonut"></canvas>
-      <div class="position-absolute top-50 start-50 translate-middle text-center pe-none"><div class="fw-bold fs-5 money">{{ nw.gross|money }}</div><small class="text-secondary">em ativos</small></div></div>
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+      <span class="pm-label">Alocação {{ help("Peso de cada camada e categoria no total dos ativos (sem as dívidas). Sem a casa própria vês o risco de concentração real do que é investimento.") }}</span>
+      {% if nw.allocation.has_home %}
+      <div class="btn-group btn-group-sm ms-auto" id="homeToggle">
+        <button class="btn btn-outline-secondary active" data-variant="with_home">Com a casa</button>
+        <button class="btn btn-outline-secondary" data-variant="without_home">Sem a casa</button>
+      </div>{% endif %}
+    </div>
+    <div class="position-relative" style="height: 220px"><canvas id="nwDonut"></canvas>
+      <div class="position-absolute top-50 start-50 translate-middle text-center pe-none"><div class="fw-bold fs-5 money" id="allocGross"></div><small class="text-secondary">em ativos</small></div></div>
+    <div id="allocCats" class="small mt-3"></div>
   </div></div>
 </div>
 
 <div class="pm-card mb-3">
-  <div class="pm-label mb-2">Evolução mensal {{ help("No fim de cada mês: o valor da carteira e o último valor que registaste de cada outro ativo até essa data. Cada vez que atualizas um valor, fica registado o desse mês.") }}</div>
+  <div class="pm-label mb-2">Evolução mensal {{ help("No fim de cada mês, por camada: o valor da carteira e o último valor que registaste de cada outro ativo até essa data (com o nível de liquidez e as ligações de hoje). Cada vez que atualizas um valor, fica registado o desse mês.") }}</div>
   <div style="height: 300px"><canvas id="nwChart"></canvas></div>
 </div>
 
@@ -84,9 +118,17 @@
     <div class="modal-body d-flex flex-column gap-2">
       <input type="hidden" name="name">
       <label>Categoria<select name="category" class="form-select">
-        {% for key, cat in categories.items() %}<option value="{{ key }}" data-fire="{{ 1 if cat[3] else 0 }}">{{ cat[0] }}</option>{% endfor %}</select></label>
-      <label>Nome<input name="label" class="form-control" maxlength="120" required placeholder="ex.: PPR Invest, Conta poupança, Casa"></label>
-      <label>Valor atual (€) {{ help("Num crédito, o que ainda falta pagar (em positivo).") }}<input name="value" class="form-control" inputmode="decimal" required></label>
+        {% for key, cat in categories.items() %}<option value="{{ key }}" data-fire="{{ 1 if cat[3] else 0 }}" data-level="{{ liquidity[cat[5]][0] if cat[5] else '' }}">{{ cat[0] }}</option>{% endfor %}</select></label>
+      <label>Nome<input name="label" class="form-control" maxlength="120" required placeholder="ex.: Conta à ordem, PPR, Casa, Crédito habitação"></label>
+      <label><span data-value-label>Valor atual (€)</span> {{ help("Num imóvel, o valor de mercado estimado. Num crédito, o que ainda falta pagar (em positivo).") }}<input name="value" class="form-control" inputmode="decimal" required></label>
+      <label data-for="asset">Liquidez<select name="liquidity" class="form-select">
+        <option value="" data-default>Por omissão</option>
+        {% for key, l in liquidity.items() %}<option value="{{ key }}">{{ l[0] }} · {{ l[1] }}</option>{% endfor %}</select></label>
+      <div class="form-check form-switch" data-for="imovel"><input class="form-check-input" type="checkbox" role="switch" name="home" value="1" id="assetHome">
+        <label class="form-check-label" for="assetHome">Casa de habitação própria (não conta no FIRE nem na alocação «sem a casa»)</label></div>
+      <label data-for="credito">Crédito do imóvel<select name="linked" class="form-select">
+        <option value="">Nenhum (abate ao património disponível)</option>
+        {% for pr in nw.properties %}<option value="{{ pr.name }}">{{ pr.label }}</option>{% endfor %}</select></label>
       <label>Nota (opcional)<input name="note" class="form-control" maxlength="255"></label>
       <div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" name="fire" value="1" id="assetFire">
         <label class="form-check-label" for="assetFire">Contar no FIRE (Planeamento)</label></div>
@@ -100,37 +142,75 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const d = {{ chart|safe }};
-  // modal: novo (valores por omissão da categoria) ou editar (preenchido)
+  // modal: os campos dependem da categoria; novo (valores por omissão) ou editar (preenchido)
   const form = document.querySelector("#assetModal form");
-  const cat = form.elements.category, fire = form.elements.fire;
-  cat.addEventListener("change", () => { if (!form.elements.name.value) fire.checked = cat.selectedOptions[0].dataset.fire === "1"; });
+  const el = form.elements, cat = el.category;
+  const sync = () => {
+    const opt = cat.selectedOptions[0], debt = cat.value === "credito";
+    form.querySelectorAll("[data-for]").forEach((x) => x.classList.toggle("d-none",
+      x.dataset.for === "asset" ? debt : x.dataset.for !== cat.value));
+    form.querySelector("[data-default]").textContent = `Por omissão (${(opt.dataset.level || "").toLowerCase()})`;
+    form.querySelector("[data-value-label]").textContent = debt ? "Em dívida (€)" : cat.value === "imovel" ? "Valor de mercado (€)" : "Valor atual (€)";
+  };
+  cat.addEventListener("change", () => { if (!el.name.value) el.fire.checked = cat.selectedOptions[0].dataset.fire === "1"; sync(); });
   document.querySelectorAll("[data-pm-new]").forEach((b) => b.addEventListener("click", () => {
-    form.reset(); form.elements.name.value = ""; fire.checked = cat.selectedOptions[0].dataset.fire === "1";
+    form.reset(); el.name.value = ""; el.fire.checked = cat.selectedOptions[0].dataset.fire === "1"; sync();
     document.getElementById("assetTitle").textContent = "Adicionar ativo ou dívida";
   }));
   document.querySelectorAll("[data-pm-edit]").forEach((b) => b.addEventListener("click", () => {
     const a = JSON.parse(b.dataset.pmEdit);
-    form.elements.name.value = a.name; cat.value = a.category; form.elements.label.value = a.label;
-    form.elements.value.value = String(a.value).replace(".", ","); form.elements.note.value = a.note || ""; fire.checked = !!a.fire;
+    el.name.value = a.name; cat.value = a.category; el.label.value = a.label;
+    el.value.value = String(a.value).replace(".", ","); el.note.value = a.note || ""; el.fire.checked = !!a.fire;
+    el.liquidity.value = a.liquidity || ""; el.home.checked = !!a.home; el.linked.value = a.linked || "";
+    sync();
     document.getElementById("assetTitle").textContent = "Atualizar " + a.label;
+  }));
+  sync();
+
+  document.getElementById("saleDiscount").addEventListener("change", async (e) => {
+    await pm.call("set_sale_discount", { percent: e.target.value });
+    location.reload();
+  });
+
+  let variant = "with_home";
+  const drawAlloc = () => {
+    const a = d.allocation[variant];
+    document.getElementById("allocGross").textContent = pm.money(a.gross, 0);
+    pm.chart("nwDonut", { type: "doughnut",
+      data: { labels: a.layers.map((l) => l.name), datasets: [{ data: a.layers.map((l) => l.value), backgroundColor: a.layers.map((l) => l.color), borderWidth: 0 }] },
+      options: { maintainAspectRatio: false, cutout: "68%", plugins: { legend: { position: "bottom" },
+        tooltip: { callbacks: { label: (it) => `${it.label}: ${pm.money(it.parsed, 0)} (${pm.pct(a.layers[it.dataIndex].share, 1, false)})` } } } } });
+    const box = document.getElementById("allocCats");
+    box.replaceChildren();
+    a.categories.forEach((c) => {
+      const line = document.createElement("div");
+      line.className = "d-flex align-items-center gap-2 py-1 border-bottom";
+      const sw = document.createElement("span");
+      Object.assign(sw.style, { width: "9px", height: "9px", borderRadius: "2px", background: c.color, flex: "none" });
+      const name = document.createElement("span"); name.className = "flex-grow-1 text-truncate"; name.textContent = c.name;
+      const v = document.createElement("span"); v.className = "money text-end text-nowrap"; v.textContent = pm.money(c.value, 0);
+      const p = document.createElement("b"); p.className = "text-end"; p.style.minWidth = "3.5rem"; p.textContent = pm.pct(c.share, 1, false);
+      line.append(sw, name, v, p);
+      box.append(line);
+    });
+  };
+  document.querySelectorAll("#homeToggle button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#homeToggle button").forEach((x) => x.classList.toggle("active", x === b));
+    variant = b.dataset.variant; drawAlloc();
   }));
 
   const draw = () => {
-    const accent = pm.css("--pm-accent");
-    const cats = [{ name: "Carteira (corretoras)", value: d.brokers, color: accent }, ...d.categories.filter((c) => !c.debt)];
-    const total = cats.reduce((s, c) => s + c.value, 0);
-    pm.chart("nwDonut", { type: "doughnut",
-      data: { labels: cats.map((c) => c.name), datasets: [{ data: cats.map((c) => c.value), backgroundColor: cats.map((c) => c.color), borderWidth: 0 }] },
-      options: { maintainAspectRatio: false, cutout: "68%", plugins: { legend: { position: "bottom" },
-        tooltip: { callbacks: { label: (it) => `${it.label}: ${pm.money(it.parsed, 0)} (${pm.pct(total ? it.parsed / total : 0, 1, false)})` } } } } });
+    drawAlloc();
     const h = d.history;
     const labels = h.months.map((m) => { const [y, mo] = m.split("-"); return `${mo}/${y}`; });
     const area = (label, data, color, fill) => ({ label, data, borderColor: color, backgroundColor: color + "40", fill, borderWidth: 1, pointRadius: 0, stack: "s", tension: .2 });
     const datasets = [
-      { label: "Património líquido", data: h.net, borderColor: pm.css("--pm-text"), borderWidth: 2.5, pointRadius: 0, tension: .2, fill: false, order: -1, stack: "net" },
-      area("Corretoras", h.brokers, accent, "origin"),
-      area("Outros ativos", h.others, "#a855f7", "-1"),
+      { label: "Total", data: h.total, borderColor: pm.css("--pm-text"), borderWidth: 2.5, pointRadius: 0, tension: .2, fill: false, order: -2, stack: "total" },
+      { label: "Disponível", data: h.available, borderColor: "#3b82f6", borderDash: [6, 4], borderWidth: 2, pointRadius: 0, tension: .2, fill: false, order: -1, stack: "available" },
+      area("Imediata", h.imediata, "#22c55e", "origin"),
+      area("Curto prazo", h.curto, "#3b82f6", "-1"),
     ];
+    if (h.iliquido.some((v) => v)) datasets.push(area("Ilíquido", h.iliquido, "#f59e0b", "-1"));
     if (h.debts.some((v) => v)) datasets.push(area("Dívidas", h.debts, "#ef4444", "origin"));
     pm.chart("nwChart", { type: "line", data: { labels, datasets },
       options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },

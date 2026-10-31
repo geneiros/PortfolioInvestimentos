@@ -10,7 +10,7 @@ from datetime import date
 
 from flask import Blueprint, Response, abort, current_app, jsonify, request, send_file, session
 
-from .models import (OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, FxRate, ImportBatch, Instrument,
+from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, FxRate, ImportBatch, Instrument,
                      OtherAsset, OtherAssetValue, Price, Setting, Transaction, WatchItem, db)
 from . import auth
 from .engine.portfolio import ASSET_TYPES
@@ -331,8 +331,12 @@ def delete_watch(name):
 
 
 # --------------------------------------------------------- património (outros ativos)
+def _flag(v):
+    return str(v).lower() in ("1", "true", "on", "sim")
+
+
 @action
-def save_other_asset(label, category, value, fire="", note="", name=""):
+def save_other_asset(label, category, value, fire="", note="", name="", liquidity="", home="", linked=""):
     from .services import networth
     label = (label or "").strip()
     if not label:
@@ -342,10 +346,24 @@ def save_other_asset(label, category, value, fire="", note="", name=""):
     amount = _float(value)
     if not math.isfinite(amount) or amount < 0:
         raise ApiError("O valor tem de ser um número positivo (as dívidas também: o sinal vem da categoria).")
+    liquidity = (liquidity or "").strip()
+    if liquidity and liquidity not in LIQUIDITY:
+        raise ApiError("Nível de liquidez desconhecido.")
+    debt = OTHER_CATEGORIES[category][4]
     asset = _get(OtherAsset, name) if name else OtherAsset()
+    target = None
+    if linked not in (None, ""):
+        if not debt:
+            raise ApiError("Só um crédito se pode ligar a um imóvel.")
+        target = _get(OtherAsset, linked)
+        if target.category != "imovel" or target.id == asset.id:
+            raise ApiError("O crédito só se pode ligar a um imóvel.")
     asset.label, asset.category, asset.value = label[:120], category, round(amount, 2)
-    asset.fire = str(fire).lower() in ("1", "true", "on", "sim")
+    asset.fire = _flag(fire)
     asset.note = (note or "").strip()[:255] or None
+    asset.liquidity = None if debt else (liquidity or None)
+    asset.home = category == "imovel" and _flag(home)
+    asset.linked = target.id if target else None
     asset.updated = date.today()
     db.session.add(asset)
     db.session.flush()
@@ -357,16 +375,26 @@ def save_other_asset(label, category, value, fire="", note="", name=""):
 @action
 def set_other_asset_fire(name, fire):
     asset = _get(OtherAsset, name)
-    asset.fire = str(fire).lower() in ("1", "true", "on", "sim")
+    asset.fire = _flag(fire)
     db.session.commit()
 
 
 @action
 def delete_other_asset(name):
     asset = _get(OtherAsset, name)
+    OtherAsset.query.filter_by(linked=asset.id).update({"linked": None})  # créditos deste imóvel ficam soltos
     OtherAssetValue.query.filter_by(asset=asset.id).delete()
     db.session.delete(asset)
     db.session.commit()
+
+
+@action
+def set_sale_discount(percent):
+    value = _float(percent)
+    if not math.isfinite(value) or not 0 <= value <= 20:
+        raise ApiError("O desconto para os custos de venda tem de estar entre 0% e 20%.")
+    Setting.set("networth_sale_discount", value)
+    return f"Imóveis com {value:g}% de desconto para custos de venda." if value else "Imóveis pelo valor de mercado."
 
 
 # --------------------------------------------------------- dados e mercado
@@ -423,6 +451,7 @@ def save_fire(expenses, swr, tax, monthly, age="", until="90", pension="0", pens
                   fire_stop_age=stop_v)
     for key, value in values.items():
         Setting.set(key, value)
+    Setting.set("demo_fire_expenses", None)  # as despesas passam a ser tuas (não se apagam com a demonstração)
     return "Plano guardado."
 
 
@@ -451,6 +480,9 @@ def reset_data(confirm=""):
         model.query.delete()
     Broker.query.delete()
     Instrument.query.filter(Instrument.kind != "index").delete()
+    if Setting.get("demo_fire_expenses") == "1":  # despesas de exemplo da demonstração (não as tuas)
+        Setting.set("fire_expenses", None)
+        Setting.set("demo_fire_expenses", None)
     # também o estado da atualização de cotações (senão o aviso "ainda não atualizaste" deixava de aparecer)
     for key in ("broker", "demo", "last_refresh", "refresh_missing", "refresh_updated", "refresh_report",
                 "refresh_status", "hide_banner"):

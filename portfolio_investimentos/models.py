@@ -160,14 +160,23 @@ class Event(db.Model):
     estimated = False
 
 
-# outros ativos (fora das corretoras): chave → (nome, ícone, cor, conta no FIRE por omissão, é dívida)
+# níveis de liquidez do património: chave → (nome, descrição, cor)
+LIQUIDITY = {
+    "imediata": ("Imediata", "o que podes usar hoje", "#22c55e"),
+    "curto": ("Curto prazo", "vende-se ou resgata-se em dias", "#3b82f6"),
+    "iliquido": ("Ilíquido", "meses a vender, com custos e preço estimado", "#f59e0b"),
+}
+
+# outros ativos (fora das corretoras):
+# chave → (nome, ícone, cor, conta no FIRE por omissão, é dívida, nível de liquidez por omissão)
 OTHER_CATEGORIES = {
-    "ppr": ("PPR", "bi-piggy-bank", "#a855f7", True, False),
-    "aforro": ("Certificados de aforro / tesouro", "bi-bank", "#14b8a6", True, False),
-    "deposito": ("Depósitos", "bi-safe", "#06b6d4", True, False),
-    "imovel": ("Imóveis", "bi-house", "#f59e0b", False, False),
-    "outro": ("Outros", "bi-box", "#64748b", True, False),
-    "credito": ("Créditos (dívidas)", "bi-credit-card", "#ef4444", False, True),
+    "conta": ("Contas à ordem e poupança à vista", "bi-cash-coin", "#22c55e", True, False, "imediata"),
+    "deposito": ("Depósitos a prazo", "bi-safe", "#06b6d4", True, False, "curto"),
+    "aforro": ("Certificados de aforro / tesouro", "bi-bank", "#14b8a6", True, False, "curto"),
+    "ppr": ("PPR", "bi-piggy-bank", "#a855f7", True, False, "curto"),
+    "outro": ("Outros", "bi-box", "#64748b", True, False, "curto"),
+    "imovel": ("Imóveis", "bi-house", "#f59e0b", False, False, "iliquido"),
+    "credito": ("Créditos (dívidas)", "bi-credit-card", "#ef4444", False, True, None),
 }
 
 
@@ -181,10 +190,22 @@ class OtherAsset(NameMixin, db.Model):
     note = db.Column(db.String(255))
     updated = db.Column(db.Date)
     creation = db.Column(db.DateTime, default=utcnow)
+    liquidity = db.Column(db.String(16))  # imediata | curto | iliquido; vazio = o da categoria
+    home = db.Column(db.Boolean, default=False)  # imóvel: casa de habitação própria (não entra no FIRE)
+    linked = db.Column(db.Integer)  # crédito: o imóvel que financia (abate ao valor dele)
 
     @property
     def debt(self):
         return OTHER_CATEGORIES.get(self.category, OTHER_CATEGORIES["outro"])[4]
+
+    @property
+    def level(self):
+        """Nível de liquidez efetivo (None nas dívidas)."""
+        if self.debt:
+            return None
+        if self.liquidity in LIQUIDITY:
+            return self.liquidity
+        return OTHER_CATEGORIES.get(self.category, OTHER_CATEGORIES["outro"])[5]
 
     @property
     def signed(self):

@@ -1404,7 +1404,7 @@ def test_old_database_is_migrated_with_backup(tmp_path, monkeypatch):
     assert "last_quote" in {r[1] for r in conn.execute("PRAGMA table_info(instrument)")}
     assert conn.execute('SELECT count(*) FROM "transaction"').fetchone()[0] == 1  # os dados seguem lá
     conn.close()
-    copies = list((tmp_path / "copias").glob("portfolio-*-migracao-v0-v3.db"))
+    copies = list((tmp_path / "copias").glob(f"portfolio-*-migracao-v0-v{migrations.LATEST}.db"))
     assert len(copies) == 1  # a cópia é da base antes de migrar (sem as colunas novas)
     old = sqlite3.connect(copies[0])
     assert "result" not in {r[1] for r in old.execute('PRAGMA table_info("transaction")')}
@@ -1483,49 +1483,105 @@ def test_backups_keep_only_the_latest_ten(tmp_path):
 
 
 def test_networth_other_assets(app, client):
-    from portfolio_investimentos.models import OtherAsset, OtherAssetValue
+    from portfolio_investimentos.models import OtherAsset, OtherAssetValue, Setting
     from portfolio_investimentos.services import networth
     token = csrf(client)
     assert client.get("/patrimonio").status_code == 200  # sem dados
-    assert post(client, "save_other_asset", token, label="PPR", category="ppr", value="10 000".replace(" ", ""),
+
+    def save(**kw):
+        return post(client, "save_other_asset", token, **kw)
+
+    def ident(label):
+        with app.app_context():
+            return OtherAsset.query.filter_by(label=label).one().name
+
+    assert save(label="Conta", category="conta", value="6000", fire="1").status_code == 200
+    assert save(label="PPR", category="ppr", value="10000", fire="1").status_code == 200
+    assert save(label="Casa", category="imovel", value="200000", home="1").status_code == 200
+    assert save(label="Crédito casa", category="credito", value="150000,5", linked=ident("Casa"),
                 fire="1").status_code == 200
-    assert post(client, "save_other_asset", token, label="Casa", category="imovel", value="200000").status_code == 200
-    assert post(client, "save_other_asset", token, label="Crédito", category="credito", value="150000,5",
-                fire="1").status_code == 200
-    for bad in ({"value": "nan"}, {"value": "inf"}, {"value": "-5"}, {"category": "ouro"}, {"label": " "}):
+    assert save(label="Carro", category="credito", value="5000").status_code == 200  # dívida solta
+    for bad in ({"value": "nan"}, {"value": "inf"}, {"value": "-5"}, {"category": "ouro"}, {"label": " "},
+                {"liquidity": "agora"}, {"linked": ident("Conta")}, {"category": "credito", "linked": ident("Conta")}):
         args = {"label": "X", "category": "ppr", "value": "1", **bad}
-        assert post(client, "save_other_asset", token, **args).status_code == 400
+        assert save(**args).status_code == 400, bad
     with app.app_context():
-        ppr = OtherAsset.query.filter_by(label="PPR").one()
-        assert ppr.fire and not OtherAsset.query.filter_by(label="Casa").one().fire
+        s = networth.summary(data_portfolio(), expenses=24000)
+        # camadas: imediata 6000; curto 10000 (sem corretoras); ilíquido 200000 − 150000,5; dívida solta 5000
+        assert s["imediata"] == 6000 and s["curto"] == 10000 and s["iliquido"] == 200000 - 150000.5
+        assert s["loose_debts"] == 5000
+        assert s["available"] == 6000 + 10000 - 5000
+        assert s["total"] == 6000 + 10000 + 200000 - 150000.5 - 5000
+        assert s["reserve_months"] == 6000 / 2000  # 3 meses
+        assert networth.summary(data_portfolio())["reserve_months"] is None  # sem despesas: não se adivinha
+        casa = next(r for r in s["assets"] if r["label"] == "Casa")
+        assert casa["equity"] == 200000 - 150000.5 and casa["level"] == "iliquido"
+        groups = {g["key"]: g for g in s["groups"]}
+        assert [r["label"] for r in groups["iliquido"]["rows"]] == ["Casa", "Crédito casa"]
+        assert [r["label"] for r in groups["dividas"]["rows"]] == ["Carro"]
+        # alocação com e sem a casa própria
+        alloc = s["allocation"]
+        assert alloc["has_home"] and alloc["with_home"]["gross"] == 216000 and alloc["without_home"]["gross"] == 16000
+        # FIRE: a casa e o crédito dela nunca contam; PPR e conta marcados contam
+        assert networth.fire_extra() == 16000
+    # mudar o nível de liquidez (PPR sem resgate → ilíquido) e o desconto de venda
+    assert save(name=ident("PPR"), label="PPR", category="ppr", value="12000", fire="1",
+                liquidity="iliquido").status_code == 200
+    assert post(client, "set_sale_discount", token, percent="5").status_code == 200
+    assert post(client, "set_sale_discount", token, percent="nan").status_code == 400
+    assert post(client, "set_sale_discount", token, percent="50").status_code == 400
+    with app.app_context():
         s = networth.summary(data_portfolio())
-        assert s["others"] == 210000 and s["debts"] == 150000.5 and s["net"] == 210000 - 150000.5
-        assert networth.fire_extra() == 10000 - 150000.5  # o crédito marcado subtrai
-        name = ppr.name
-    # atualizar no mesmo mês: um só registo por mês
-    assert post(client, "save_other_asset", token, name=name, label="PPR", category="ppr", value="12000",
-                fire="1").status_code == 200
-    with app.app_context():
-        assert OtherAssetValue.query.filter_by(asset=int(name)).count() == 1
-        assert OtherAssetValue.query.filter_by(asset=int(name)).one().value == 12000
+        assert s["curto"] == 0 and s["iliquido"] == 12000 + 200000 * 0.95 - 150000.5  # o desconto só nos imóveis
+        ppr = OtherAsset.query.filter_by(label="PPR").one()
+        assert OtherAssetValue.query.filter_by(asset=ppr.id).count() == 1  # um registo por mês
+        assert OtherAssetValue.query.filter_by(asset=ppr.id).one().value == 12000
         h = networth.history(data_portfolio())
-        assert h["net"][-1] == 12000 + 200000 - 150000.5 and h["debts"][-1] == -150000.5
-    assert post(client, "set_other_asset_fire", token, name=name, fire="0").status_code == 200
+        assert h["total"][-1] == round(s["total"], 2) and h["available"][-1] == round(s["available"], 2)
+        assert h["debts"][-1] == -5000
     html = client.get("/patrimonio").get_data(as_text=True)
-    assert "Património líquido" in html and "Crédito" in html and 'id="nwChart"' in html
-    # no Planeamento, os outros ativos marcados somam-se à carteira
-    post(client, "load_demo", token)  # a demonstração substitui os outros ativos pelos de exemplo
-    html = client.get("/planeamento").get_data(as_text=True)
-    assert 'id="fireExtra"' in html
+    for text in ("Património líquido total", "Património líquido disponível", "Meses de reserva", 'id="homeToggle"',
+                 "casa própria", 'id="nwChart"', "líquido de dívida"):
+        assert text in html, text
+    # apagar o imóvel deixa o crédito solto
+    assert post(client, "delete_other_asset", token, name=ident("Casa")).status_code == 200
+    with app.app_context():
+        assert OtherAsset.query.filter_by(label="Crédito casa").one().linked is None
+    # demonstração: exemplos com casa própria e crédito ligado; despesas de exemplo só se não houver
+    post(client, "load_demo", token)
+    assert 'id="fireExtra"' in client.get("/planeamento").get_data(as_text=True)
     assert 'id="netWorthLink"' in client.get("/").get_data(as_text=True)
     with app.app_context():
-        assert OtherAsset.query.count() == 3 and networth.fire_extra() > 0
-        assert client.get("/patrimonio").status_code == 200
-        oid = OtherAsset.query.first().name
-    assert post(client, "delete_other_asset", token, name=oid).status_code == 200
+        assert OtherAsset.query.filter_by(home=True).count() == 1 and OtherAsset.query.filter(
+            OtherAsset.linked.isnot(None)).count() == 1
+        assert Setting.get("demo_fire_expenses") == "1"
+    assert 'id="nwReserve"' in client.get("/patrimonio").get_data(as_text=True)
+    assert post(client, "set_other_asset_fire", token, name=ident("PPR (fictício)"), fire="0").status_code == 200
     assert post(client, "reset_data", token, confirm="APAGAR").status_code == 200
     with app.app_context():
         assert OtherAsset.query.count() == 0 and OtherAssetValue.query.count() == 0
+        assert Setting.get("fire_expenses") is None  # as despesas de exemplo vão com a demonstração
+
+
+def test_networth_migration_adds_liquidity_columns(tmp_path, monkeypatch):
+    import sqlite3
+    from portfolio_investimentos import migrations
+    from portfolio_investimentos.models import OtherAsset
+    _legacy_db(tmp_path, monkeypatch)
+    conn = sqlite3.connect(tmp_path / "portfolio.db")  # Património da versão anterior (sem as colunas novas)
+    conn.execute("DROP TABLE other_asset")
+    conn.execute("CREATE TABLE other_asset (id INTEGER PRIMARY KEY, label VARCHAR(120) NOT NULL, "
+                 "category VARCHAR(16) NOT NULL, value FLOAT NOT NULL, fire BOOLEAN, note VARCHAR(255), "
+                 "updated DATE, creation DATETIME)")
+    conn.execute("INSERT INTO other_asset (label, category, value, fire) VALUES ('Casa', 'imovel', 1000, 0)")
+    conn.execute("PRAGMA user_version = 0")  # a base antiga também não tem as colunas dos passos 1 e 2
+    conn.commit()
+    conn.close()
+    app = create_app({"TESTING": True})
+    assert migrations.schema_version(app.config["DB_PATH"]) == migrations.LATEST
+    with app.app_context():
+        casa = OtherAsset.query.one()
+        assert casa.level == "iliquido" and not casa.home and casa.linked is None
 
 
 def data_portfolio():

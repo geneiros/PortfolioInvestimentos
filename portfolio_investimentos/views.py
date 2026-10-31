@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from flask import Blueprint, Response, abort, current_app, render_template, request
 
 from .engine.portfolio import MERIT_BENCHMARK
-from .models import (OTHER_CATEGORIES, Alert, Broker, Event, ImportBatch, Instrument, Price, Setting, Transaction,
+from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, Event, ImportBatch, Instrument, Price, Setting, Transaction,
                      WatchItem, db)
 from . import auth
 from .services import context as ctx
@@ -491,11 +491,19 @@ def planeamento():
 def patrimonio():
     c = ctx.build("patrimonio", "Património")
     p_all = data.load_portfolio(None)  # o património conta sempre todas as corretoras
-    summary = networth.summary(p_all)
-    hist = networth.history(p_all)
-    c.update(nw=summary, categories=OTHER_CATEGORIES, chart=ctx.js_json({
-        "history": hist, "categories": summary["categories"], "brokers": round(summary["brokers"], 2)}))
+    summary = networth.summary(p_all, _saved_expenses())
+    c.update(nw=summary, categories=OTHER_CATEGORIES, liquidity=LIQUIDITY, discounts=networth.SALE_DISCOUNTS,
+             chart=ctx.js_json({"history": networth.history(p_all), "allocation": summary["allocation"]}))
     return render_template("pages/patrimonio.html", **c)
+
+
+def _saved_expenses():
+    """Despesas anuais guardadas no Planeamento (None se ainda não foram indicadas: não se adivinha)."""
+    try:
+        v = float(Setting.get("fire_expenses"))
+    except (TypeError, ValueError):
+        return None
+    return v if v > 0 else None
 
 
 @bp.route("/sw.js")

@@ -36,11 +36,21 @@ def _m003_drop_news(conn):
     conn.execute("DROP TABLE IF EXISTS news")
 
 
+def _m004_other_asset_liquidity(conn):
+    # a tabela só existe se já se usou o Património; senão o create_all cria-a com as colunas novas
+    if not _columns(conn, "other_asset"):
+        return
+    _add_column(conn, "other_asset", "liquidity", "VARCHAR(16)")
+    _add_column(conn, "other_asset", "home", "BOOLEAN DEFAULT 0")
+    _add_column(conn, "other_asset", "linked", "INTEGER")
+
+
 # (versão, descrição, função)
 MIGRATIONS = [
     (1, "Resultado indicado pela corretora em cada venda", _m001_transaction_result),
     (2, "Data da última cotação obtida de cada ativo", _m002_instrument_last_quote),
     (3, "Notícias retiradas da aplicação", _m003_drop_news),
+    (4, "Património: nível de liquidez, casa própria e crédito ligado ao imóvel", _m004_other_asset_liquidity),
 ]
 LATEST = MIGRATIONS[-1][0]
 
