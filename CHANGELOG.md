@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-10-31
 
-- **Património: atualizar todos os valores de uma vez, com lembrete mensal**  
+- **Esconder valores: «€ ••••» na cor do valor e botão selecionado**  
+  O texto que substitui cada valor mantém a cor do valor (verde nos ganhos, vermelho nas perdas…) em vez de ficar cinzento. Enquanto o modo está ligado, o botão fica selecionado, com o olho riscado e o título «Mostrar valores», logo desde o início de cada página.
+- **Património: atualizar todos os valores de uma vez, com lembrete mensal** `af5a3eb`  
   Botão «Atualizar valores» que abre um formulário com todos os ativos e dívidas (o valor de hoje editável e o do mês anterior como referência). «Guardar tudo» regista o valor do mês de todos (ação save_other_asset_values: aceita espaços como separador de milhares, deixa como está um campo vazio e recusa nan e negativos). Quando um valor passa um mês sem atualizar, aparece um lembrete no Património e um aviso «N por atualizar» na Visão Geral. Com «Esconder valores», os números do formulário só se veem ao editar.
 - **Património: de onde veio o crescimento, ano a ano** `501757d`  
   A variação do património líquido total em cada ano dividida em poupança investida, valorização do mercado, contas/depósitos/certificados/PPR, imóveis e amortização da dívida (a soma dá a variação; registar um ativo não conta como crescimento), com seletor de ano e gráfico de barras empilhadas.

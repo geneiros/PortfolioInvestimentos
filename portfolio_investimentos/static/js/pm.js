@@ -247,11 +247,18 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     document.documentElement.classList.toggle("pm-private", store.get("pm-private") === "1");
+    const privateLabel = () => document.querySelectorAll("[data-pm-toggle=private]").forEach((b) => {
+      const on = document.documentElement.classList.contains("pm-private");
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      b.title = on ? "Mostrar valores" : "Esconder valores";
+    });
+    privateLabel();
     if (store.get("pm-collapsed") === "1") document.body.classList.add("pm-collapsed");
 
     document.querySelectorAll("[data-pm-toggle=private]").forEach((b) => b.addEventListener("click", () => {
       const on = document.documentElement.classList.toggle("pm-private");
       store.set("pm-private", on ? "1" : "0");
+      privateLabel();
     }));
     document.querySelectorAll("[data-pm-theme]").forEach((b) => b.addEventListener("click", () => pm.setTheme(b.dataset.pmTheme)));
     pm.applyTheme();

@@ -126,11 +126,16 @@ body.pm-offline :is([data-pm-action], [data-pm-refresh], [data-pm-broker], [data
   opacity: .5; cursor: not-allowed; }
 
 /* privacidade */
-/* o valor é trocado por "€ ••••" (com um espaço fino): o texto real fica transparente e sem largura (letter-spacing negativo) */
-html.pm-private .money, html.pm-private .money * { color: transparent !important; letter-spacing: -1em; user-select: none; }
+/* o valor é trocado por "€ ••••" (com um espaço fino): o texto real fica invisível (text-fill transparente) e sem largura
+   (letter-spacing negativo), mas o elemento mantém a cor, por isso o "€ ••••" sai na cor do valor (verde, vermelho...) */
+html.pm-private .money, html.pm-private .money * { -webkit-text-fill-color: transparent; letter-spacing: -1em; user-select: none; }
 html.pm-private .money { white-space: nowrap; }
 html.pm-private .pm-monthly-input:not(:focus) { color: transparent !important; }  /* formulário mensal: só se vê ao editar */
-html.pm-private .money::before { content: "\20AC\2009\2022\2022\2022\2022"; letter-spacing: 0; color: var(--bs-secondary-color); }
+html.pm-private .money::before { content: "\20AC\2009\2022\2022\2022\2022"; letter-spacing: 0; -webkit-text-fill-color: currentColor; }
+/* botão «Esconder valores» fica selecionado (e com o olho riscado) enquanto o modo está ligado, logo desde o início */
+html.pm-private [data-pm-toggle=private] { color: var(--bs-btn-active-color); background-color: var(--bs-btn-active-bg);
+  border-color: var(--bs-btn-active-border-color); }
+html.pm-private [data-pm-toggle=private] .bi-eye::before { content: "\f340"; }
 
 @media (max-width: 991.98px) {
   .pm-sidebar { position: fixed; left: calc(-1 * var(--pm-sidebar-width) - 20px); z-index: 1040; transition: left .2s; }
