@@ -261,6 +261,21 @@ def test_fire_stops_investing_and_withdraws_after_fire():
     assert stop["date"] is None or stop["date"] > life["date"]
 
 
+def test_fire_forever_with_pension():
+    from portfolio_investimentos.engine import fire
+    # sem retorno: dos 60 aos 67 todas as despesas (7 × 12 000); depois (12 000 − 8 400) / 4% = 90 000
+    need = fire.required_with_pension(0.0, 12000, 0.04, 0.0, 60, 8400, 67, months=40 * 12)
+    assert need[0] == pytest.approx(7 * 12000 + 90000)
+    assert need[7 * 12] == pytest.approx(90000) and need[-1] == pytest.approx(90000)
+    # a pensão paga tudo: só é preciso chegar à idade da pensão
+    assert fire.required_with_pension(0.0, 12000, 0.04, 0.0, 60, 12600, 67, months=480)[0] == pytest.approx(84000)
+    start = date(2026, 11, 1)
+    wp = fire.pension_plan(100000, 12000, 0.04, 0.14, 1000, 45, 8400, 67, 90, start=start)
+    forever = fire.plan(100000, 12000, 0.04, 0.14, 1000, start=start)
+    assert wp["date"] < forever["date"] and wp["number"] < forever["number"]
+    assert wp["after"] == pytest.approx(fire.fire_number(3600, 0.04, 0.14))
+
+
 def test_fiscal_dividend_credit_is_limited_per_dividend():
     """A retenção a mais num dividendo (30% nos EUA) não abate o imposto de outro dividendo do mesmo ano."""
     d0 = date(2024, 1, 2)

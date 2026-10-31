@@ -411,6 +411,10 @@ def planeamento():
     plan = fire.plan(p.total_value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100, cfg["monthly"], age=age,
                      pension=pension, pension_age=pension_age, stop_age=stop_age,
                      horizon_age=cfg["until"] if age else None)
+    with_pension = None
+    if age and pension:
+        with_pension = fire.pension_plan(p.total_value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100,
+                                         cfg["monthly"], age, pension, pension_age, cfg["until"], stop_age=stop_age)
     life = None
     if age:
         life = fire.lifetime_plan(p.total_value, cfg["expenses"], cfg["tax"] / 100, cfg["monthly"], age,
@@ -436,7 +440,7 @@ def planeamento():
     if life:
         base = next(sc for sc in life["scenarios"] if sc["name"] == "base")
         chart["life"] = [{"x": year(d), "y": round(v)} for d, v in base["curve"] if d.year <= end_year]
-    c.update(cfg=cfg, plan=plan, life=life, chart=ctx.js_json(chart),
+    c.update(cfg=cfg, plan=plan, life=life, with_pension=with_pension, chart=ctx.js_json(chart),
              track=fire.monthly_track(s.dates, s.value, plan["number"]))
     return render_template("pages/planeamento.html", **c)
 

@@ -10,7 +10,7 @@
     português, e quando lá chegas com o que tens hoje e o que investes por mês.</p>
 </div>
 
-<div class="pm-label mb-2">Para sempre (regra dos {{ plan.withdrawal_rate|pct(1, sign=False) }})</div>
+<div class="pm-label mb-2">Para sempre (regra dos {{ plan.withdrawal_rate|pct(1, sign=False) }}){% if with_pension %}, sem contar com a pensão{% endif %}</div>
 <div class="row g-3 mb-3">
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
     <div class="pm-label">O número FIRE {{ help("Despesas anuais ÷ (1 − imposto efetivo sobre os levantamentos) ÷ taxa de levantamento. Ex.: 12 000 € ÷ (1 − 14%) ÷ 4% ≈ 349 000 €.") }}</div>
@@ -35,6 +35,29 @@
   </div></div>
 </div>
 
+{% if with_pension %}
+<div class="pm-label mb-2">Para sempre, com a pensão a partir dos {{ life.pension_age|int }}
+  {{ help("Duas partes: até à pensão, a carteira paga as despesas todas; a partir dela, só o que a pensão não cobre, pela regra da taxa de levantamento (para sempre). O capital depende da idade em que chegas lá: quanto mais cedo, mais anos até à pensão.") }}</div>
+<div class="row g-3 mb-3">
+  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
+    <div class="pm-label">O número FIRE com a pensão</div>
+    <div class="pm-mid money">{{ with_pension.number|money if with_pension.number is not none else "—" }}</div>
+    <div class="small text-secondary">{% if with_pension.age_at %}na data FIRE, aos {{ with_pension.age_at|round|int }} anos (cenário base){% else %}não chega antes dos {{ cfg.until|int }} anos{% endif %};
+      depois da pensão: <span class="money">{{ with_pension.after|money }}</span></div>
+  </div></div>
+  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
+    <div class="pm-label">Se te reformasses hoje</div>
+    <div class="pm-mid">{{ with_pension.done|pct(2, sign=False) }}</div>
+    <div class="pm-progress mt-2"><div style="width: {{ [[with_pension.done * 100, 0]|max, 100]|min }}%"></div></div>
+    <div class="small text-secondary mt-1"><span class="money">{{ plan.value|money }}</span> de <span class="money">{{ with_pension.now|money }}</span></div>
+  </div></div>
+  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
+    <div class="pm-label">A data FIRE</div>
+    <div class="pm-mid">{{ with_pension.date.year if with_pension.date else "—" }}</div>
+    <div class="small text-secondary">{% if with_pension.earliest and with_pension.latest %}Entre {{ with_pension.earliest.year }} e {{ with_pension.latest.year }}{% elif with_pension.earliest %}A partir de {{ with_pension.earliest.year }}{% else %}Não chega com estes valores{% endif %}</div>
+  </div></div>
+</div>
+{% endif %}
 {% if life %}
 <div class="pm-label mb-2">Até aos {{ life.until_age|int }} anos{% if life.pension %}, com a pensão a partir dos {{ life.pension_age|int }}{% endif %}
   {{ help("Capital que paga as despesas (já com o IRS dos levantamentos) desde a data FIRE até à idade indicada, a render a taxa real do cenário, e acaba perto de zero. A pensão, se indicada, abate às despesas. É menos do que o número FIRE «para sempre», sobretudo para quem se reforma tarde.") }}</div>

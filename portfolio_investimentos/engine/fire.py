@@ -141,3 +141,41 @@ def monthly_track(dates, values, target, months=12):
             rows.append({"month": key, "value": v, "done": v / target if target > 0 else 0.0, "change": v - prev})
         prev = v
     return list(reversed(rows))
+
+
+def required_with_pension(rate, expenses, withdrawal_rate, tax_rate, age, pension, pension_age, months):
+    """Capital necessário em cada mês para viver para sempre, contando com a pensão a partir de `pension_age`.
+
+    Duas partes: até à pensão, pagar as despesas todas (com o IRS dos levantamentos); a partir dela, o que a
+    pensão não cobre, pela regra da taxa de levantamento (para sempre). Calcula-se para trás desde o mês da pensão:
+    necessário(t) = levantamento(t) + necessário(t + 1) / (1 + g), e daí em diante fica o número da segunda parte.
+    """
+    g = (1 + rate) ** (1 / 12) - 1
+    after = fire_number(max(expenses - pension, 0.0), withdrawal_rate, tax_rate) if expenses > pension else 0.0
+    to_pension = max(int(round((pension_age - age) * 12)), 0)
+    need = [after] * (max(months, to_pension) + 1)
+    for t in range(to_pension - 1, -1, -1):
+        need[t] = _withdrawal(expenses, tax_rate, age + t / 12, 0.0, None) + need[t + 1] / (1 + g)
+    return need
+
+
+def pension_plan(value, expenses, withdrawal_rate, tax_rate, monthly, age, pension, pension_age, horizon_age,
+                 start=None, stop_age=None):
+    """Para sempre, com a pensão: a data FIRE é o primeiro mês em que a carteira chega ao capital necessário
+    (até à pensão as despesas todas; depois, o que a pensão não cobre, para sempre)."""
+    start = start or date.today().replace(day=1)
+    months = max(int(round((horizon_age - age) * 12)), 12)
+    scenarios = []
+    for name, rate in SCENARIOS:
+        need = required_with_pension(rate, expenses, withdrawal_rate, tax_rate, age, pension, pension_age, months)
+        points, fire_m, empty_m = simulate(value, monthly, rate, start, months, lambda m, v: v >= need[m],
+                                           expenses, tax_rate, age, pension, pension_age, stop_age)
+        s = _summary(name, rate, start, points, fire_m, empty_m, age, None if fire_m is None else need[fire_m])
+        s["now"] = need[0]
+        scenarios.append(s)
+    base = next(s for s in scenarios if s["name"] == "base")
+    return {"scenarios": scenarios, "date": base["date"], "number": base["number"], "now": base["now"],
+            "age_at": base["age"], "done": value / base["now"] if base["now"] else 0.0,
+            "earliest": next((s["date"] for s in reversed(scenarios) if s["date"]), None),
+            "latest": scenarios[0]["date"],
+            "after": fire_number(max(expenses - pension, 0.0), withdrawal_rate, tax_rate) if expenses > pension else 0.0}
