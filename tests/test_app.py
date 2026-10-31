@@ -661,7 +661,7 @@ def test_background_refresh_retries_when_database_is_locked(app, monkeypatch):
     # um erro que não é de bloqueio não se repete
     calls.clear()
 
-    def broken():
+    def broken(**kwargs):
         calls.append(1)
         raise RuntimeError("falha qualquer")
     monkeypatch.setattr(market, "refresh_all", broken)
