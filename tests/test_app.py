@@ -1004,7 +1004,62 @@ def test_login_rate_limited(app):
         c.post("/login", data={"csrf_token": t, "password": "x"}, environ_base=REMOTE)
     resp = c.post("/login", data={"csrf_token": t, "password": "segredo123"}, environ_base=REMOTE)
     assert "Demasiadas tentativas" in resp.get_data(as_text=True)
-    auth._fails.clear()
+
+
+def test_login_limit_is_per_visitor_behind_a_proxy(tmp_path, monkeypatch):
+    """Atrás de um proxy, sem PORTFOLIO_PROXY todos partilham o endereço do proxy; com ela, cada visitante conta."""
+    from portfolio_investimentos import auth
+    from portfolio_investimentos.models import LoginFailure, Setting
+    from werkzeug.security import generate_password_hash
+    monkeypatch.setenv("PORTFOLIO_DATA_DIR", str(tmp_path))
+    proxy = {"REMOTE_ADDR": "10.0.0.1"}
+
+    def attempts(app, client_ip, password, n=1):
+        c = app.test_client()
+        headers = {"X-Forwarded-For": client_ip}
+        page = c.get("/login", environ_base=proxy, headers=headers).get_data(as_text=True)
+        t = re.search(r'name="csrf_token" value="([0-9a-f]+)"', page).group(1)
+        for _ in range(n):
+            resp = c.post("/login", data={"csrf_token": t, "password": password}, environ_base=proxy, headers=headers)
+        return resp
+
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        Setting.set("password_hash", generate_password_hash("segredo123"))
+    attempts(app, "198.51.100.9", "x", auth.MAX_FAILS)  # um atacante...
+    blocked = attempts(app, "203.0.113.5", "segredo123")  # ...bloqueia o dono: o endereço é o do proxy
+    assert "Demasiadas tentativas" in blocked.get_data(as_text=True)
+    with app.app_context():
+        LoginFailure.query.delete()
+        db.session.commit()
+
+    monkeypatch.setenv("PORTFOLIO_PROXY", "1")
+    app = create_app({"TESTING": True})
+    attempts(app, "198.51.100.9", "x", auth.MAX_FAILS)
+    assert "Demasiadas tentativas" in attempts(app, "198.51.100.9", "segredo123").get_data(as_text=True)
+    assert attempts(app, "203.0.113.5", "segredo123").status_code == 302  # o dono entra
+    # as tentativas ficam na base de dados: um processo novo (ou um reinício) continua a bloquear
+    app2 = create_app({"TESTING": True})
+    assert "Demasiadas tentativas" in attempts(app2, "198.51.100.9", "segredo123").get_data(as_text=True)
+
+
+def test_current_password_checks_are_rate_limited(app, client):
+    from portfolio_investimentos import auth
+    from portfolio_investimentos.models import Setting
+    from werkzeug.security import generate_password_hash
+    with app.app_context():
+        Setting.set("password_hash", generate_password_hash("segredo123"))
+    with client.session_transaction() as s:
+        s["auth"] = None
+    # entrar primeiro (no próprio computador também é preciso, com palavra-passe definida)
+    page = client.get("/login").get_data(as_text=True)
+    t = re.search(r'name="csrf_token" value="([0-9a-f]+)"', page).group(1)
+    assert client.post("/login", data={"csrf_token": t, "password": "segredo123"}).status_code == 302
+    token = csrf(client)
+    for _ in range(auth.MAX_FAILS):
+        assert post(client, "remove_password", token, current_password="errada").status_code == 400
+    blocked = post(client, "remove_password", token, current_password="segredo123")
+    assert blocked.status_code == 400 and "Demasiadas tentativas" in blocked.get_json()["error"]
 
 
 def test_env_password(app, monkeypatch):

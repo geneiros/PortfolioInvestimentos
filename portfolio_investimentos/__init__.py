@@ -79,6 +79,13 @@ def create_app(config=None):
 
     db.init_app(app)
 
+    # atrás de um proxy (PythonAnywhere, nginx): PORTFOLIO_PROXY=n confia nos cabeçalhos X-Forwarded-* dos n
+    # proxies à frente, para o endereço do pedido ser o do visitante (limite de tentativas de login por pessoa)
+    proxies = os.environ.get("PORTFOLIO_PROXY", "").strip()
+    if proxies.isdigit() and int(proxies) > 0:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=int(proxies), x_proto=int(proxies))
+
     def static_max_age(filename):
         # bibliotecas e ícones não mudam entre páginas: sem validade em cache, o browser voltava a pedir
         # a fonte dos ícones a cada página e estes desapareciam por instantes

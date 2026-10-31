@@ -471,8 +471,10 @@ def backup():
 def set_password(new_password, confirm, current_password=""):
     if auth.env_password():
         raise ApiError("A palavra-passe está definida na variável PORTFOLIO_PASSWORD: muda-a no servidor.")
-    if auth.password_enabled() and not auth.check_password(current_password):
-        raise ApiError("A palavra-passe atual está errada.")
+    if auth.password_enabled():
+        problem = auth.verify_current_password(current_password)
+        if problem:
+            raise ApiError(problem)
     if len(new_password) < auth.MIN_LENGTH:
         raise ApiError(f"A palavra-passe tem de ter pelo menos {auth.MIN_LENGTH} caracteres.")
     if new_password != confirm:
@@ -485,8 +487,9 @@ def set_password(new_password, confirm, current_password=""):
 def remove_password(current_password=""):
     if auth.env_password():
         raise ApiError("A palavra-passe está definida na variável PORTFOLIO_PASSWORD: remove-a no servidor.")
-    if not auth.check_password(current_password):
-        raise ApiError("A palavra-passe atual está errada.")
+    problem = auth.verify_current_password(current_password)
+    if problem:
+        raise ApiError(problem)
     if not auth.is_local_request():
         raise ApiError("Só podes remover a palavra-passe no computador onde a aplicação corre.")
     auth.clear_password()

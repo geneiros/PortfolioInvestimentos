@@ -3,6 +3,10 @@
 No próprio computador a palavra-passe é opcional. Quando a aplicação é acedida de outro dispositivo
 (rede local, cloud ou atrás de um proxy) só abre depois de definida uma palavra-passe, em Definições
 ou na variável de ambiente PORTFOLIO_PASSWORD.
+
+Depois de MAX_FAILS tentativas erradas do mesmo endereço, esse endereço fica bloqueado LOCK_SECONDS. As
+tentativas ficam na base de dados. Atrás de um proxy (ex.: PythonAnywhere, nginx), define PORTFOLIO_PROXY=1
+para o endereço ser o do visitante e não o do proxy (senão um visitante bloqueava toda a gente).
 """
 import hashlib
 import hmac
@@ -14,13 +18,12 @@ from urllib.parse import urlsplit
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .models import Setting
+from .models import LoginFailure, Setting, db
 
 bp = Blueprint("auth", __name__)
 LOCAL = {"127.0.0.1", "::1"}
 MIN_LENGTH = 8
 MAX_FAILS, LOCK_SECONDS = 5, 300
-_fails = {}  # ip -> (tentativas falhadas, instante da primeira)
 OPEN_ENDPOINTS = {"auth.login", "static", "pages.service_worker", "pages.ping"}
 
 
@@ -88,17 +91,47 @@ def _safe_next(target):
     return target
 
 
-def _locked(ip):
-    n, since = _fails.get(ip, (0, 0.0))
-    if time.monotonic() - since > LOCK_SECONDS:
-        _fails.pop(ip, None)
-        return False
-    return n >= MAX_FAILS
+def client_ip():
+    return request.remote_addr or ""
 
 
-def _register_failure(ip):
-    n, since = _fails.get(ip, (0, time.monotonic()))
-    _fails[ip] = (n + 1, since)
+def locked(ip):
+    """Se o endereço tem tentativas erradas a mais na janela atual (e limpa as janelas já expiradas)."""
+    now = time.time()
+    LoginFailure.query.filter(LoginFailure.since < now - LOCK_SECONDS).delete(synchronize_session=False)
+    db.session.commit()
+    row = db.session.get(LoginFailure, ip)
+    return bool(row and row.count >= MAX_FAILS)
+
+
+def register_failure(ip):
+    now = time.time()
+    row = db.session.get(LoginFailure, ip)
+    if row is None or now - row.since > LOCK_SECONDS:
+        row = row or LoginFailure(ip=ip)
+        row.count, row.since = 0, now
+    row.count += 1
+    db.session.add(row)
+    db.session.commit()
+
+
+def clear_failures(ip):
+    LoginFailure.query.filter_by(ip=ip).delete(synchronize_session=False)
+    db.session.commit()
+
+
+def verify_current_password(password):
+    """Verifica a palavra-passe atual (Definições) com o mesmo limite de tentativas do login.
+
+    Devolve None se estiver certa, ou a mensagem de erro."""
+    ip = client_ip()
+    if locked(ip):
+        return "Demasiadas tentativas. Espera alguns minutos e tenta de novo."
+    if not check_password(password or ""):
+        register_failure(ip)
+        return "A palavra-passe atual está errada."
+    clear_failures(ip)
+    return None
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -110,17 +143,17 @@ def login():
         expected = session.get("csrf")
         if not expected or not hmac.compare_digest(request.form.get("csrf_token", ""), expected):
             abort(403)
-        ip = request.remote_addr or ""
-        if _locked(ip):
+        ip = client_ip()
+        if locked(ip):
             error = "Demasiadas tentativas. Espera alguns minutos e tenta de novo."
         elif check_password(request.form.get("password", "")):
-            _fails.pop(ip, None)
+            clear_failures(ip)
             session.clear()
             session.permanent = True
             session["auth"] = _version()
             session["csrf"] = secrets.token_hex(16)
             return redirect(_safe_next(request.args.get("next")))
         else:
-            _register_failure(ip)
+            register_failure(ip)
             error = "Palavra-passe errada."
     return render_template("pages/login.html", error=error), 401 if error else 200

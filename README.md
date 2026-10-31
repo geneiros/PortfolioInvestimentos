@@ -93,7 +93,8 @@ Em **Definições → Segurança** podes definir uma palavra-passe. A partir da�
 - **Sem palavra-passe**, a aplicação só abre no computador onde corre. Qualquer acesso de outro dispositivo, ou através de um proxy, mostra uma página a pedir que definas a palavra-passe primeiro.
 - **Para abrir na rede local** (ex.: no telemóvel): define a palavra-passe e arranca com `python -m portfolio_investimentos --host 0.0.0.0`.
 - **Num servidor ou na cloud**: usa `wsgi.py` (ex.: `gunicorn wsgi:app`) e define a palavra-passe na variável de ambiente `PORTFOLIO_PASSWORD`. Se o site usar HTTPS, define também `PORTFOLIO_HTTPS=1`, para o cookie de sessão só seguir por ligações cifradas.
-- Ao mudar a palavra-passe, as sessões abertas noutros dispositivos terminam. Depois de 5 tentativas erradas, o login fica bloqueado durante 5 minutos.
+- **Atrás de um proxy** (PythonAnywhere, nginx, Caddy…): define também `PORTFOLIO_PROXY=1` (o número de proxies à frente da aplicação). Assim o endereço de cada pedido é o do visitante e não o do proxy, e o limite de tentativas de login vale por visitante. Sem ela, todos os visitantes parecem vir do mesmo endereço, e as tentativas erradas de alguém bloqueiam também o teu acesso. Não a definas sem proxy: os cabeçalhos `X-Forwarded-For` podiam ser falsificados.
+- Ao mudar a palavra-passe, as sessões abertas noutros dispositivos terminam. Depois de 5 tentativas erradas do mesmo endereço, o login (e a palavra-passe atual pedida em Definições) fica bloqueado para esse endereço durante 5 minutos. As tentativas ficam guardadas na base de dados, por isso valem entre processos e depois de reiniciar.
 
 ### Opções da linha de comandos
 

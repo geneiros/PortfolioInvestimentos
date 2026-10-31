@@ -140,6 +140,13 @@ class DividendHistory(db.Model):
     __table_args__ = (db.UniqueConstraint("instrument", "date"),)
 
 
+class LoginFailure(db.Model):
+    """Tentativas de login falhadas por endereço (na base de dados: valem para todos os processos e reinícios)."""
+    ip = db.Column(db.String(64), primary_key=True)
+    count = db.Column(db.Integer, nullable=False, default=0)
+    since = db.Column(db.Float, nullable=False)  # instante (time.time) da primeira falha da janela
+
+
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     instrument = db.Column(db.String(32), db.ForeignKey("instrument.ticker", ondelete="CASCADE"), nullable=False)
