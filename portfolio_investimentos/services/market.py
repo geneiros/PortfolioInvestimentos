@@ -237,7 +237,7 @@ def check_alerts(p):
 
 # --------------------------------------------------------------------- yfinance
 _lock = threading.Lock()
-_background = {"on": False}  # atualização lançada pela página (só essa deixa sinal de vida no estado)
+_background = {"on": False, "only_open": False}  # atualização lançada pela página (só essa deixa sinal de vida no estado)
 _progress = {"done": 0, "total": 0, "current": ""}  # ativo em curso da atualização (para a página mostrar)
 
 
@@ -548,11 +548,18 @@ def _set_status(value):
     return False
 
 
+def _running_status(only_open, done=0, total=0, current=""):
+    """"running:<hora>|<só abertas>|<feitos>|<total>|<ativo>": a hora serve de sinal de vida e o resto, de progresso
+    para qualquer processo do servidor (a página pode ser servida por outro que não o da atualização)."""
+    return (f"running:{datetime.now().isoformat(timespec='seconds')}|{int(only_open)}|{done}|{total}|"
+            f"{current.replace('|', ' ')}")
+
+
 def _beat():
     """Sinal de vida da atualização lançada pela página: sem ele, o estado "a atualizar" caduca em 5 minutos."""
     if _background["on"]:
         try:
-            Setting.set("refresh_status", "running:" + datetime.now().isoformat(timespec="seconds"))
+            Setting.set("refresh_status", _running_status(_background["only_open"], **_progress))
         except Exception:  # só um sinal de vida: se a base estiver ocupada, o do ativo seguinte chega
             db.session.rollback()
 
@@ -561,11 +568,11 @@ def refresh_in_background(app, only_open=False):
     """Corre a atualização numa thread e guarda o estado para as páginas o mostrarem."""
     if _lock.locked():
         return
-    Setting.set("refresh_status", "running:" + datetime.now().isoformat(timespec="seconds"))
+    Setting.set("refresh_status", _running_status(only_open))
 
     def run():
         with app.app_context():
-            _background["on"] = True
+            _background.update(on=True, only_open=only_open)
             try:
                 for attempt in range(3):
                     try:
@@ -588,6 +595,16 @@ def refresh_in_background(app, only_open=False):
     threading.Thread(target=run, daemon=True).start()
 
 
+def refresh_progress():
+    """Progresso da atualização em curso, lido do estado (vale para qualquer processo do servidor)."""
+    status = Setting.get("refresh_status") or ""
+    parts = status.split("|")
+    if not status.startswith("running:") or len(parts) < 5:
+        return {"only_open": False, "done": 0, "total": 0, "current": ""}
+    return {"only_open": parts[1] == "1", "done": int(parts[2] or 0), "total": int(parts[3] or 0),
+            "current": parts[4]}
+
+
 def refresh_state():
     """Estado da última atualização: (em curso, erro, tickers sem cotações)."""
     status = Setting.get("refresh_status") or ""
@@ -596,7 +613,8 @@ def refresh_state():
     if status.startswith("running:"):
         # a atualização renova este estado a cada ativo; se a aplicação foi fechada a meio (ex.: o servidor
         # recarregou), o estado fica para trás e ignora-se ao fim de 5 minutos sem sinal de vida
-        running = datetime.now() - datetime.fromisoformat(status[len("running:"):]) < timedelta(minutes=5)
+        stamp = status[len("running:"):].split("|")[0]
+        running = datetime.now() - datetime.fromisoformat(stamp) < timedelta(minutes=5)
     missing = [t for t in (Setting.get("refresh_missing") or "").split(",") if t]
     return running, error, missing
 

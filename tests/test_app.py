@@ -852,12 +852,18 @@ def test_refresh_status_is_cleared_even_if_the_database_is_busy_once(app, monkey
         monkeypatch.setattr(Setting, "set", staticmethod(busy_once))
         assert market._set_status("") is True  # repete e consegue
         assert Setting.get("refresh_status") == ""
-        market._background["on"] = True
+        market._background.update(on=True, only_open=True)
+        market._progress.update(done=2, total=5, current="eventos de VWCE.DE")
         try:
-            market._beat()  # sinal de vida renova a hora
+            market._beat()  # sinal de vida renova a hora e deixa o progresso para qualquer processo do servidor
         finally:
-            market._background["on"] = False
+            market._background.update(on=False, only_open=False)
+            market._progress.update(done=0, total=0, current="")
         assert Setting.get("refresh_status").startswith("running:")
+        assert market.refresh_state()[0] is True
+        assert market.refresh_progress() == {"only_open": True, "done": 2, "total": 5, "current": "eventos de VWCE.DE"}
+        Setting.set("refresh_status", "")
+        assert market.refresh_progress()["total"] == 0
 
 
 REMOTE = {"REMOTE_ADDR": "203.0.113.7"}

@@ -114,21 +114,31 @@
     b.innerHTML = on ? '<span class="spinner-border spinner-border-sm me-1"></span> A atualizar cotações…' : b.dataset.label;
     if (where) b.append(document.createTextNode(where));  // texto (não HTML): o ticker vem dos dados
   });
-  pm.watchRefresh = async () => {
-    setRefreshing(true);
+  // ao voltar à página com a atualização já a correr, o spinner vai para o botão que a lançou
+  const pickButton = (progress) => {
+    if (!activeRefresh && progress) {
+      activeRefresh = [...refreshButtons()].find((b) => !!b.dataset.onlyOpen === !!progress.only_open) || null;
+    }
+  };
+  pm.watchRefresh = async (initial) => {
+    pickButton(initial && initial.progress);
+    setRefreshing(true, initial && initial.progress);
     let st;
     try {
       do {
         await new Promise((r) => setTimeout(r, 3000));
         st = await pm.call("refresh_status", {}, { silent: true });
+        pickButton(st.progress);
         if (st.running) setRefreshing(true, st.progress);
       } while (st.running);
     } catch (err) {
       setRefreshing(false);
+      activeRefresh = null;
       pm.toast("Não foi possível saber o estado da atualização. Recarrega a página.", "warning");
       return;
     }
     setRefreshing(false);
+    activeRefresh = null;
     if (st.error) {
       pm.toast("A atualização de cotações falhou: " + st.error, "danger");
       return;
@@ -266,7 +276,7 @@
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
     // se a página abrir com uma atualização em curso, continua a acompanhá-la
     if (refreshButtons().length) {
-      pm.call("refresh_status", {}, { silent: true }).then((st) => { if (st.running) pm.watchRefresh(); }).catch(() => {});
+      pm.call("refresh_status", {}, { silent: true }).then((st) => { if (st.running) pm.watchRefresh(st); }).catch(() => {});
     }
   });
 

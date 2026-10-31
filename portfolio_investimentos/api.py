@@ -345,7 +345,7 @@ def refresh_status():
     running, error, missing = market.refresh_state()
     indices = {t for (t,) in db.session.query(Instrument.ticker).filter_by(kind="index")}
     return {"running": running, "error": error, "missing": [t for t in missing if t not in indices], "last_refresh": Setting.get("last_refresh"),
-            "updated": int(Setting.get("refresh_updated") or 0), "progress": dict(market._progress)}
+            "updated": int(Setting.get("refresh_updated") or 0), "progress": market.refresh_progress()}
 
 
 @action
