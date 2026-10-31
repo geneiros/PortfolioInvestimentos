@@ -11,6 +11,8 @@
       try { pref = localStorage.getItem("pm-theme") || "auto"; } catch (e) {}
       const dark = pref === "dark" || (pref === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+      // esconder valores já antes de a página aparecer (sem mostrar os valores por instantes)
+      try { if (localStorage.getItem("pm-private") === "1") document.documentElement.classList.add("pm-private"); } catch (e) {}
     })();
   </script>
   <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">

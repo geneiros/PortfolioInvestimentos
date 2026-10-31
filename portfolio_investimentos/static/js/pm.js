@@ -246,12 +246,12 @@
   prefersDark.addEventListener("change", () => { if ((store.get("pm-theme") || "auto") === "auto") pm.applyTheme(); });
 
   document.addEventListener("DOMContentLoaded", () => {
-    if (store.get("pm-private") === "1") document.body.classList.add("pm-private");
+    document.documentElement.classList.toggle("pm-private", store.get("pm-private") === "1");
     if (store.get("pm-collapsed") === "1") document.body.classList.add("pm-collapsed");
 
     document.querySelectorAll("[data-pm-toggle=private]").forEach((b) => b.addEventListener("click", () => {
-      document.body.classList.toggle("pm-private");
-      store.set("pm-private", document.body.classList.contains("pm-private") ? "1" : "0");
+      const on = document.documentElement.classList.toggle("pm-private");
+      store.set("pm-private", on ? "1" : "0");
     }));
     document.querySelectorAll("[data-pm-theme]").forEach((b) => b.addEventListener("click", () => pm.setTheme(b.dataset.pmTheme)));
     pm.applyTheme();
