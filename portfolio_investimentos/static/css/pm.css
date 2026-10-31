@@ -122,10 +122,10 @@ body.pm-offline :is([data-pm-action], [data-pm-refresh], [data-pm-broker], [data
   opacity: .5; cursor: not-allowed; }
 
 /* privacidade */
-/* o valor é trocado por "€••••" (pontos juntos ao €): o texto real fica transparente e sem largura (letter-spacing negativo) */
+/* o valor é trocado por "€ ••••" (com um espaço fino): o texto real fica transparente e sem largura (letter-spacing negativo) */
 html.pm-private .money, html.pm-private .money * { color: transparent !important; letter-spacing: -1em; user-select: none; }
 html.pm-private .money { white-space: nowrap; }
-html.pm-private .money::before { content: "\20AC\2022\2022\2022\2022"; letter-spacing: 0; color: var(--bs-secondary-color); }
+html.pm-private .money::before { content: "\20AC\2009\2022\2022\2022\2022"; letter-spacing: 0; color: var(--bs-secondary-color); }
 
 @media (max-width: 991.98px) {
   .pm-sidebar { position: fixed; left: calc(-1 * var(--pm-sidebar-width) - 20px); z-index: 1040; transition: left .2s; }
