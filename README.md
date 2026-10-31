@@ -253,7 +253,7 @@ python -m portfolio_investimentos
 ## Próximos passos
 
 - Parsers para DEGIRO, IBKR, Revolut e eToro.
-- Planeamento (objetivos, simulação de contribuições) e Análise (sobreposição de ETFs, exposição geográfica).
+- Análise (sobreposição de ETFs, exposição geográfica); no Planeamento, simulações com os anos reais dos mercados e o efeito de vender ou comprar.
 - Executável único (PyInstaller) para quem não quer instalar o Python.
 
 ## Licença
