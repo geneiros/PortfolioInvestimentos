@@ -120,6 +120,7 @@ def overview():
         instruments=instruments, fired=check_alerts(p), perf=ctx.js_json(perf_payload(p, "MAX")),
         benchmarks=p.benchmarks, scores=insights.scores(p),
         networth=networth.summary(data.load_portfolio(None)) if networth.assets() else None,
+        networth_late=len(networth.reminder()),
         insights_data=ctx.js_json({"wr": insights.weight_return(p), "alloc": insights.allocation(p, c["broker"])}),
     )
     return render_template("pages/index.html", **c)
@@ -493,6 +494,12 @@ def patrimonio():
     p_all = data.load_portfolio(None)  # o património conta sempre todas as corretoras
     summary = networth.summary(p_all, _saved_expenses())
     growth = networth.growth(p_all)
+    items = networth.assets()
+    previous = networth.previous_values(items)
+    c.update(today=date.today(), late=networth.reminder(items), monthly=[
+        {"name": a.name, "label": a.label, "cat": OTHER_CATEGORIES[a.category][0], "icon": OTHER_CATEGORIES[a.category][1],
+         "color": OTHER_CATEGORIES[a.category][2], "debt": a.debt, "value": a.value, "updated": a.updated,
+         "previous": previous.get(a.id)} for a in items])
     c.update(nw=summary, categories=OTHER_CATEGORIES, liquidity=LIQUIDITY, discounts=networth.SALE_DISCOUNTS,
              growth=growth, chart=ctx.js_json({"history": networth.history(p_all), "allocation": summary["allocation"],
                                                "growth": growth}))

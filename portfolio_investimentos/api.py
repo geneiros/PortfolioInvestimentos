@@ -373,6 +373,31 @@ def save_other_asset(label, category, value, fire="", note="", name="", liquidit
 
 
 @action
+def save_other_asset_values(**values):
+    """Formulário mensal: o valor atual de todos os ativos e dívidas de uma vez (campos v_<id>)."""
+    from .services import networth
+    parsed = {}
+    for key, raw in values.items():
+        raw = str(raw or "").replace(" ", "").replace("\u00a0", "").replace("\u202f", "").replace("€", "")
+        if not key.startswith("v_") or not key[2:].isdigit() or not raw:  # vazio: fica como está
+            continue
+        amount = _float(raw)
+        if not math.isfinite(amount) or amount < 0:
+            asset = db.session.get(OtherAsset, int(key[2:]))
+            raise ApiError(f"{asset.label if asset else 'Valor'}: tem de ser um número positivo.")
+        parsed[int(key[2:])] = round(amount, 2)
+    if not parsed:
+        raise ApiError("Sem valores para guardar.")
+    today = date.today()
+    for ident, amount in parsed.items():
+        asset = _get(OtherAsset, ident)
+        asset.value, asset.updated = amount, today
+        networth.record(asset)
+    db.session.commit()
+    return f"{len(parsed)} valores atualizados."
+
+
+@action
 def set_other_asset_fire(name, fire):
     asset = _get(OtherAsset, name)
     asset.fire = _flag(fire)

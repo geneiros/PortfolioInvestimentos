@@ -10,11 +10,12 @@ Património líquido total = imediata + curto prazo + ilíquido − dívidas sem
 Património líquido disponível = imediata + curto prazo − dívidas sem imóvel.
 """
 from bisect import bisect_right
-from datetime import date
+from datetime import date, timedelta
 
 from ..models import LIQUIDITY, OTHER_CATEGORIES, OtherAsset, OtherAssetValue, Setting, db
 
-STALE_DAYS = 90  # valor sem atualizar há mais tempo do que isto: aviso na página
+STALE_DAYS = 90  # valor sem atualizar há mais tempo do que isto: aviso na linha do ativo
+REMIND_DAYS = 31  # lembrete para atualizar os valores (formulário mensal)
 SALE_DISCOUNTS = (0, 5, 10)  # % para os custos de venda dos imóveis (opções da página)
 BROKERS_KEY = "corretoras"
 
@@ -29,6 +30,25 @@ def sale_discount():
         return min(max(float(Setting.get("networth_sale_discount") or 0), 0.0), 20.0) / 100
     except ValueError:
         return 0.0
+
+
+def reminder(items=None):
+    """Ativos sem valor atualizado há mais de um mês (para o lembrete): lista, do mais antigo para o mais recente."""
+    items = assets() if items is None else items
+    today = date.today()
+    late = [a for a in items if not a.updated or (today - a.updated).days > REMIND_DAYS]
+    return sorted(late, key=lambda a: a.updated or date.min)
+
+
+def previous_values(items):
+    """Último valor registado antes do mês atual de cada ativo (referência no formulário mensal): id → (data, valor)."""
+    first = date.today().replace(day=1)
+    out = {}
+    for aid, (dates, values) in _records(items).items():
+        j = bisect_right(dates, first - timedelta(days=1)) - 1
+        if j >= 0:
+            out[aid] = (dates[j], values[j])
+    return out
 
 
 def _homes(items):

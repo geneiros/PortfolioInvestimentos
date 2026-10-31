@@ -22,7 +22,7 @@
         <div class="col-md-7">
           <div class="pm-label">Carteira {{ help("Valor de mercado das posições abertas, em euros.") }}</div>
           <div class="pm-hero-value money my-3">{{ p.holdings_value|money }}</div>
-          {% if networth %}<a href="/patrimonio" class="small text-secondary text-decoration-none d-inline-block mt-n2" id="netWorthLink">Património líquido <span class="money">{{ networth.total|money }}</span> · disponível <span class="money">{{ networth.available|money }}</span> <i class="bi bi-chevron-right"></i></a>{% endif %}
+          {% if networth %}<a href="/patrimonio" class="small text-secondary text-decoration-none d-inline-block mt-n2" id="netWorthLink">Património líquido <span class="money">{{ networth.total|money }}</span> · disponível <span class="money">{{ networth.available|money }}</span>{% if networth_late %} <span class="badge text-bg-warning" title="Valores do Património sem atualizar há mais de um mês"><i class="bi bi-calendar-check"></i> {{ networth_late }} por atualizar</span>{% endif %} <i class="bi bi-chevron-right"></i></a>{% endif %}
           <div class="pm-label mt-4">Variação diária · {{ p.as_of|ddmm }} {{ help("Variação do valor desde o fecho anterior, sem contar depósitos.") }}</div>
           <div class="pm-big {{ day_change[0]|tone }}">{{ day_change[1]|pct(1) }} <small class="fs-5 money">· {{ day_change[0]|money(sign=True) }}</small></div>
         </div>

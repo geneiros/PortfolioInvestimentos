@@ -7,8 +7,19 @@
 <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
   <p class="text-secondary mb-0 flex-grow-1">A carteira das corretoras mais o que tens fora delas e o que deves, separado pela
     liquidez: o que podes usar hoje, o que vendes em dias e o que demora meses. Os valores fora das corretoras indicas tu.</p>
+  {% if monthly %}<button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#monthlyModal" id="monthlyOpen"><i class="bi bi-arrow-repeat"></i> Atualizar valores</button>{% endif %}
   <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#assetModal" data-pm-new><i class="bi bi-plus-lg"></i> Adicionar</button>
 </div>
+{% if late %}
+<div class="alert alert-warning d-flex align-items-center gap-2 py-2" id="monthlyReminder">
+  <i class="bi bi-calendar-check flex-shrink-0"></i>
+  <div class="flex-grow-1" style="min-width: 0">{% if late|length == 1 %}<b>{{ late[0].label }}</b> não é atualizado há mais de um mês
+    {%- if late[0].updated %} (desde {{ late[0].updated.strftime('%d/%m/%Y') }}){% endif %}. Atualiza-o
+    {%- else %}<b>{{ late|length }} valores</b> não são atualizados há mais de um mês
+    {%- if late[0].updated %} (o mais antigo desde {{ late[0].updated.strftime('%d/%m/%Y') }}){% endif %}. Atualiza-os{% endif %} para o património e a evolução mensal estarem certos.</div>
+  <button class="btn btn-sm btn-warning flex-shrink-0" data-bs-toggle="modal" data-bs-target="#monthlyModal">Atualizar valores</button>
+</div>
+{% endif %}
 
 <div class="row g-3 mb-3">
   <div class="col-md-6 col-xl-3"><div class="pm-card h-100">
@@ -167,6 +178,27 @@
     <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
   </form></div>
 </div>
+{% if monthly %}
+<div class="modal fade" id="monthlyModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable"><form class="modal-content" data-pm-method="save_other_asset_values" data-pm-success="Valores atualizados.">
+    <div class="modal-header"><h5 class="modal-title">Atualizar valores · {{ MONTHS[today.month - 1] }} {{ today.year }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+    <div class="modal-body">
+      <p class="small text-secondary">O valor de hoje de cada ativo e dívida (num crédito, o que falta pagar). Fica registado o valor deste mês de todos; deixa como está o que não mudou.</p>
+      <div class="table-responsive"><table class="table pm-table mb-0">
+        <thead><tr><th>Ativo</th><th class="text-end d-none d-sm-table-cell">Mês anterior</th><th class="text-end">Valor de hoje (€)</th></tr></thead>
+        <tbody>{% for a in monthly %}
+          <tr><td class="pm-nw-name"><i class="bi {{ a.icon }} me-2" style="color: {{ a.color }}"></i><b>{{ a.label }}</b>
+              <div class="sub">{{ a.cat }}{% if a.updated %} · atualizado {{ a.updated.strftime('%d/%m/%Y') }}{% endif %}</div></td>
+            <td class="text-end d-none d-sm-table-cell">{% if a.previous %}<span class="money">{{ a.previous[1]|money }}</span><div class="sub">{{ a.previous[0].strftime('%m/%Y') }}</div>{% else %}—{% endif %}</td>
+            <td class="text-end"><input name="v_{{ a.name }}" class="form-control form-control-sm text-end ms-auto pm-monthly-input {{ 'text-down' if a.debt }}" style="max-width: 9rem" inputmode="decimal"
+                value="{{ ('%.2f' % a.value).rstrip('0').rstrip('.').replace('.', ',') }}" aria-label="Valor de hoje de {{ a.label }}"></td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar tudo</button></div>
+  </form></div>
+</div>
+{% endif %}
 {% endautoescape %}{% endblock %}
 
 {% block scripts %}

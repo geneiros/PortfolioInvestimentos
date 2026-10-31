@@ -1629,3 +1629,43 @@ def test_networth_growth_by_year(app, client):
         years = networth.growth(data_portfolio())
         assert years and all(abs(sum(p["value"] for p in y["parts"]) - y["change"]) < 0.05 for y in years)
         assert any(p["key"] == "savings" and p["value"] > 0 for y in years for p in y["parts"])
+
+
+def test_networth_monthly_update_and_reminder(app, client):
+    from portfolio_investimentos.models import OtherAsset, OtherAssetValue
+    from portfolio_investimentos.services import networth
+    today = date.today()
+    old = today - timedelta(days=45)
+    with app.app_context():
+        conta = OtherAsset(label="Conta", category="conta", value=5000, updated=old)
+        cred = OtherAsset(label="Crédito", category="credito", value=100000, updated=today)
+        db.session.add_all([conta, cred])
+        db.session.flush()
+        db.session.add_all([OtherAssetValue(asset=conta.id, date=old, value=5000),
+                            OtherAssetValue(asset=cred.id, date=today, value=100000)])
+        db.session.commit()
+        ids = (conta.name, cred.name)
+        assert [a.label for a in networth.reminder()] == ["Conta"]  # só a conta passou um mês
+        if old.month != today.month:
+            assert networth.previous_values(networth.assets())[conta.id] == (old, 5000)
+    html = client.get("/patrimonio").get_data(as_text=True)
+    assert 'id="monthlyReminder"' in html and 'id="monthlyModal"' in html and f'name="v_{ids[0]}"' in html
+    token = csrf(client)
+    for bad in ("nan", "-1", "abc"):
+        assert post(client, "save_other_asset_values", token, **{f"v_{ids[0]}": bad}).status_code == 400
+    assert post(client, "save_other_asset_values", token).status_code == 400  # nada para guardar
+    # espaços como separador de milhares e campo vazio (fica como está)
+    r = post(client, "save_other_asset_values", token, **{f"v_{ids[0]}": "6 250,5", f"v_{ids[1]}": ""})
+    assert r.status_code == 200
+    with app.app_context():
+        conta = db.session.get(OtherAsset, int(ids[0]))
+        assert conta.value == 6250.5 and conta.updated == today
+        assert db.session.get(OtherAsset, int(ids[1])).value == 100000
+        assert OtherAssetValue.query.filter_by(asset=conta.id).count() == (1 if old.month == today.month else 2)
+        assert networth.reminder() == []
+    # guardar de novo no mesmo mês substitui o registo do mês
+    assert post(client, "save_other_asset_values", token, **{f"v_{ids[0]}": "6300"}).status_code == 200
+    with app.app_context():
+        rows = OtherAssetValue.query.filter_by(asset=int(ids[0])).order_by(OtherAssetValue.date).all()
+        assert rows[-1].value == 6300 and len(rows) == (1 if old.month == today.month else 2)
+    assert 'id="monthlyReminder"' not in client.get("/patrimonio").get_data(as_text=True)
