@@ -333,7 +333,7 @@ def _asset_rows(p, tickers):
         # (nas vendidas essa lista pode estar desatualizada, por isso só se olha para as cotações guardadas)
         no_quotes = date_ is None or (is_held and i.ticker in missing)
         rows.append(SimpleNamespace(i=i, ticker=i.ticker, held=is_held, no_quotes=no_quotes,
-                                    last_date=date_, last_close=close, attention=is_held or date_ is None))
+                                    last_date=date_, last_close=close))
     return rows
 
 

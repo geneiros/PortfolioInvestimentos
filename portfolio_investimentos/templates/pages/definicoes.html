@@ -136,18 +136,19 @@
     </form>
     {% endif %}
     {% set n_open = instruments|selectattr('held')|list|length %}
-    {% set n_attention = instruments|selectattr('attention')|list|length %}
+    {% set n_noq = instruments|selectattr('no_quotes')|list|length %}
     <div class="d-flex flex-wrap gap-2 align-items-center mb-2" id="assetFilter">
       <input type="search" id="assetSearch" class="form-control form-control-sm" style="max-width: 270px" placeholder="Pesquisar ticker, nome ou ISIN">
       <div class="btn-group btn-group-sm" role="group">
-        <button type="button" class="btn btn-outline-secondary active" data-asset-group="attention" title="{{ n_open }} posições abertas; as restantes são ativos vendidos que não têm nenhuma cotação guardada">Posições abertas e sem cotações ({{ n_attention }})</button>
+        <button type="button" class="btn btn-outline-secondary active" data-asset-group="open">Posições abertas ({{ n_open }})</button>
+        <button type="button" class="btn btn-outline-secondary" data-asset-group="noq" title="Ativos, abertos ou vendidos, sem nenhuma cotação guardada (ou que a última atualização não encontrou)">Sem cotações ({{ n_noq }})</button>
         <button type="button" class="btn btn-outline-secondary" data-asset-group="all">Todos ({{ instruments|length }})</button>
       </div>
     </div>
     <p class="small text-body-secondary d-none" id="assetNone">Nenhum ativo corresponde.</p>
     {% for r in instruments %}{% set i = r.i %}
-      <form class="{{ 'd-flex' if r.attention else 'd-none' }} gap-2 align-items-center py-2 border-bottom" data-pm-method="update_instrument" data-pm-success="Ativo atualizado." data-pm-reload="false"
-            data-asset-row data-attention="{{ 1 if r.attention else 0 }}" data-ticker="{{ i.ticker }}"
+      <form class="{{ 'd-flex' if r.held else 'd-none' }} gap-2 align-items-center py-2 border-bottom" data-pm-method="update_instrument" data-pm-success="Ativo atualizado." data-pm-reload="false"
+            data-asset-row data-open="{{ 1 if r.held else 0 }}" data-noq="{{ 1 if r.no_quotes else 0 }}" data-ticker="{{ i.ticker }}"
             data-search="{{ (i.ticker ~ ' ' ~ (i.instrument_name or '') ~ ' ' ~ (i.isin or ''))|lower }}">
         <input type="hidden" name="ticker" value="{{ i.ticker }}">
         <div style="min-width: 130px"><b class="small">{{ i.ticker }}</b>
@@ -167,16 +168,16 @@
 </div>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  // ativos: por omissão só os que precisam de atenção; a pesquisa procura em todos (?ativo=XXX abre a pesquisa)
+  // ativos: por omissão só as posições abertas; a pesquisa procura em todos (?ativo=XXX abre a pesquisa)
   const rows = [...document.querySelectorAll("[data-asset-row]")], box = document.getElementById("assetSearch");
   const pills = [...document.querySelectorAll("[data-asset-group]")], none = document.getElementById("assetNone");
   if (box) {
-    let group = "attention";
+    let group = "open";
     const apply = () => {
       const q = box.value.trim().toLowerCase();
       let shown = 0;
       rows.forEach((r) => {
-        const ok = q ? r.dataset.search.includes(q) : (group === "all" || r.dataset.attention === "1");
+        const ok = q ? r.dataset.search.includes(q) : (group === "all" || (group === "open" ? r.dataset.open === "1" : r.dataset.noq === "1"));
         r.classList.toggle("d-none", !ok);
         r.classList.toggle("d-flex", ok);
         shown += ok;
