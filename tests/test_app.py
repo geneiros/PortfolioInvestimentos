@@ -785,6 +785,55 @@ def test_refresh_only_open_positions(app, monkeypatch):
         assert "NOV.DE" in calls
 
 
+RSS_FINV = b"""<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Yahoo! Finance: FINV News</title>
+<item><title>FinVolution Joins 2026 IWF World Championships as Official Partner</title>
+<link>https://finance.yahoo.com/news/finvolution-joins-iwf-123.html</link><pubDate>Mon, 27 Oct 2026 14:05:00 +0000</pubDate></item>
+<item><title></title><link>https://finance.yahoo.com/news/sem-titulo.html</link></item>
+<item><title>FinVolution and NUS Business School share project findings</title>
+<link>https://finance.yahoo.com/news/finvolution-nus-456.html</link><pubDate>Thu, 02 Oct 2026 09:00:00 +0000</pubDate></item>
+</channel></rss>"""
+
+
+def test_direct_news_falls_back_to_rss_when_search_is_empty(app, monkeypatch):
+    """O Yahoo tem notícias do FINV na página do ativo mesmo quando a pesquisa não devolve nenhuma."""
+    from portfolio_investimentos.models import News
+    from portfolio_investimentos.services import market, yahoo
+
+    def fake_json(url, params):
+        return {"news": [], "quotes": []}  # a pesquisa não traz notícias
+    monkeypatch.setattr(yahoo, "_get_json", fake_json)
+    monkeypatch.setattr(yahoo, "_fetch", lambda url: RSS_FINV if "feeds.finance.yahoo.com" in url and "s=FINV" in url
+                        else (_ for _ in ()).throw(OSError("inesperado " + url)))
+    t = yahoo.Ticker("FINV")
+    items = t.news
+    assert [i["title"][:20] for i in items] == ["FinVolution Joins 20", "FinVolution and NUS "]  # sem a do título vazio
+    assert t.news_error is None and items[0]["providerPublishTime"] > 1_700_000_000
+    with app.app_context():
+        assert market._store_news("FINV", items) == 2
+        row = News.query.filter_by(instrument="FINV").order_by(News.published_on.desc()).first()
+        assert row.url.endswith("iwf-123.html") and row.source == "Yahoo Finance"
+
+
+def test_news_detail_explains_empty_results(app, monkeypatch):
+    import sys
+    from portfolio_investimentos.models import Instrument
+    from portfolio_investimentos.services import market, yahoo
+    monkeypatch.setitem(sys.modules, "yfinance", _FakeYf)
+    monkeypatch.setattr(yahoo, "_get_json", lambda url, params: {"news": [], "quotes": []})
+    monkeypatch.setattr(yahoo, "_fetch", lambda url: (_ for _ in ()).throw(OSError("HTTP 403")))
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="ADB", currency="EUR", isin="US00724F1012", data_symbol="ADB.DE"),
+            Transaction(date=date(2026, 8, 27), type="BUY", instrument="ADB", quantity=1, price=240.4, currency="EUR"),
+        ])
+        db.session.commit()
+        lines = []
+        report = market.refresh_all(start=date(2026, 10, 1), progress=lines.append)
+        assert "Notícias: 0 novas; sem notícias: ADB" in report
+        assert "Notícias, detalhe: ADB: yfinance 0; direto 0 (RSS: HTTP 403)" in report
+        assert any(ln.startswith("[notícias 1/1] ADB: yfinance 0; direto 0") and ln.endswith(" s)") for ln in lines)
+
+
 def test_refresh_reports_progress_with_last_close(app, monkeypatch):
     """A atualização conta os ativos à medida que avança e mostra o último fecho de cada um."""
     import sys

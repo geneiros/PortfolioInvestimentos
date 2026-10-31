@@ -6,6 +6,8 @@ Usado quando o `yfinance` não pode ser instalado, por exemplo no Android/Termux
 """
 import json
 import time as _time
+import xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -18,6 +20,7 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KH
                          "Chrome/128.0 Mobile Safari/537.36", "Accept": "application/json"}
 
 
+RSS_URL = "https://feeds.finance.yahoo.com/rss/2.0/headline"  # as notícias da página do ativo, em RSS
 HOSTS = ("query1.finance.yahoo.com", "query2.finance.yahoo.com")
 _state = {"opener": None, "crumb": None}
 
@@ -137,11 +140,42 @@ class Ticker:
 
     @property
     def news(self):
+        """Notícias do ativo: a pesquisa do Yahoo e, se vier vazia, o RSS da página do ativo.
+
+        O motivo de uma falha fica em `news_error` (para o resumo da atualização).
+        """
+        self.news_error = None
         try:
             data = _get_json(SEARCH_URL, {"q": self.symbol, "quotesCount": 0, "newsCount": 10})
-        except (OSError, ValueError):
-            return []
-        return data.get("news") or []
+            items = data.get("news") or []
+        except (OSError, ValueError) as exc:
+            items, self.news_error = [], str(exc)
+        if not items:
+            try:
+                items = _rss_news(self.symbol)
+                if items:
+                    self.news_error = None
+            except (OSError, ValueError, ET.ParseError) as exc:
+                self.news_error = self.news_error or f"RSS: {exc}"
+        return items
+
+
+def _rss_news(symbol):
+    """Notícias da página do ativo no Yahoo Finance (feed RSS), no formato que `market._store_news` lê."""
+    raw = _fetch(RSS_URL + "?" + urllib.parse.urlencode({"s": symbol, "region": "US", "lang": "en-US"}))
+    if len(raw) > 2_000_000:
+        raise ValueError("resposta demasiado grande")
+    out = []
+    for item in ET.fromstring(raw).iter("item"):
+        title, link = (item.findtext("title") or "").strip(), (item.findtext("link") or "").strip()
+        if not title or not link:
+            continue
+        try:
+            stamp = parsedate_to_datetime(item.findtext("pubDate") or "").timestamp()
+        except (TypeError, ValueError):
+            stamp = _time.time()
+        out.append({"title": title, "link": link, "providerPublishTime": stamp, "publisher": "Yahoo Finance"})
+    return out[:10]
 
 
 class Search:

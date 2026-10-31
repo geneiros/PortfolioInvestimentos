@@ -371,7 +371,7 @@ def refresh_all(start=None, progress=None, only_open=False):
                 db.session.rollback()
                 note(f"EUR/{cur}: erro ({exc})")
 
-        news_new, news_empty, news_errors = 0, [], {}
+        news_new, news_empty, news_errors, news_detail = 0, [], {}, []
         where[0] = ""
         # notícias, eventos e setor só interessam para as posições abertas; os ativos vendidos
         # podem já nem existir em bolsa (ex.: empresas compradas ou fundidas)
@@ -379,8 +379,7 @@ def refresh_all(start=None, progress=None, only_open=False):
         _progress.update(done=0, total=len(news_queue), current="")
         for k, inst in enumerate(news_queue, 1):
             _progress.update(done=k - 1, current=f"notícias de {inst.ticker}")
-            if progress:
-                progress(f"[notícias {k}/{len(news_queue)}] {inst.ticker}")
+            news_started = _time.monotonic()
             t = yf.Ticker(inst.data_symbol or inst.ticker)
             if not inst.sector and inst.kind == "etf":
                 inst.sector = "ETF"  # o Yahoo não tem "dados fundamentais" de ETF: o pedido só dava erro
@@ -390,12 +389,14 @@ def refresh_all(start=None, progress=None, only_open=False):
                     inst.sector = info.get("sector") or ("ETF" if info.get("quoteType") == "ETF" else None)
                 except Exception:  # informação opcional
                     pass
+            detail = ""
             try:
-                items, err = _news_items(yf, t, inst)
+                items, err, detail = _news_items(yf, t, inst)
                 added = _store_news(inst.ticker, items)
                 news_new += added
                 if not items:
                     news_empty.append(inst.ticker)
+                    news_detail.append(f"{inst.ticker}: {detail}")
                 if err and not items:
                     news_errors.setdefault(err, []).append(inst.ticker)
             except Exception as exc:
@@ -404,11 +405,16 @@ def refresh_all(start=None, progress=None, only_open=False):
                 _store_calendar(inst.ticker, t.calendar or {})
             except Exception as exc:
                 note(f"{inst.ticker} calendário: erro ({exc})")
+            if progress:
+                progress(f"[notícias {k}/{len(news_queue)}] {inst.ticker}: {detail or 'sem detalhe'} "
+                         f"({_time.monotonic() - news_started:.1f} s)")
         if news_new or news_empty or news_errors:
             note(f"Notícias: {news_new} novas" + (f"; sem notícias: {', '.join(news_empty[:12])}"
                                                            + ("…" if len(news_empty) > 12 else "") if news_empty else ""))
             for msg, tickers in news_errors.items():
                 note(f"Notícias: erro em {len(tickers)} ativos ({msg[:200]})")
+            if news_detail:  # o que cada via devolveu nos primeiros ativos sem notícias
+                note("Notícias, detalhe: " + " | ".join(news_detail[:3]))
         if closed:
             note(f"Só posições abertas: {closed} ativos fechados não foram atualizados.")
         if quick or skipped:
@@ -625,20 +631,31 @@ def _upsert(model, key_field, key, value_field, hist, scale=1.0):
 
 
 def _news_items(yf, t, inst):
-    """Notícias de um ativo: as do yfinance e, se falhar ou vier vazio, as do acesso direto ao Yahoo."""
-    items, err = [], None
+    """Notícias de um ativo: as do yfinance e, se falhar ou vier vazio, as do acesso direto ao Yahoo.
+
+    Devolve (notícias, erro, detalhe); o detalhe diz o que cada via devolveu, para o resumo da atualização.
+    """
+    items, err, detail = [], None, []
     try:
         items = list(t.news or [])
+        detail.append(f"yfinance {len(items)}")
     except Exception as exc:
         err = str(exc)
+        detail.append(f"yfinance erro ({err[:80]})")
     if not items:
         from . import yahoo
         if yf is not yahoo:
             try:
-                items = list(yahoo.Ticker(inst.data_symbol or inst.ticker).news or [])
+                direct = yahoo.Ticker(inst.data_symbol or inst.ticker)
+                items = list(direct.news or [])
+                detail.append(f"direto {len(items)}" + (f" ({direct.news_error[:80]})" if direct.news_error else ""))
+                err = err or (direct.news_error if not items else None)
             except Exception as exc:
                 err = err or str(exc)
-    return items, err
+                detail.append(f"direto erro ({str(exc)[:80]})")
+        elif getattr(t, "news_error", None):
+            detail.append(f"direto 0 ({t.news_error[:80]})")
+    return items, err, "; ".join(detail)
 
 
 def _store_news(ticker, items):
