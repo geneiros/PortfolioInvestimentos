@@ -90,7 +90,7 @@
     <p class="small text-secondary mt-2 mb-0">Até hoje, o valor real da carteira; daqui em diante, simulações com retornos de 3%, 5% e 7% ao ano
       acima da inflação (em euros de hoje), não uma promessa. Cada cenário junta o investimento mensal até à data FIRE (o ponto)
       {%- if cfg.stop_age %} ou até aos {{ cfg.stop_age|int }} anos{% endif %} e depois levanta o que as despesas pedem{% if life and life.pension %}, menos a pensão{% endif %}.
-      {% if life %}O gráfico vai até aos {{ life.until_age|int }} anos; a linha roxa é o capital necessário até lá.{% endif %} A linha tracejada laranja é o número FIRE «para sempre».</p>
+      {% if life %}O gráfico vai até aos {{ life.until_age|int }} anos.{% endif %} As linhas tracejadas são os números FIRE: laranja «para sempre»{% if with_pension %}, roxa «para sempre, com a pensão»{% endif %}{% if life %}, rosa «até aos {{ life.until_age|int }} anos»{% endif %} (os que dependem da idade, na data FIRE do cenário base).</p>
   </div></div>
   <div class="col-xl-4"><div class="pm-card h-100">
     <div class="pm-label mb-2">O teu plano</div>
@@ -160,14 +160,14 @@ document.addEventListener("DOMContentLoaded", () => {
         borderWidth: s.name === "base" ? 2.5 : 1.5, tension: .2, fill: false, backgroundColor: colors[s.name],
         // ponto na data FIRE: a partir daí deixa de investir e passa a levantar
         pointRadius: s.data.map((pt, i) => (s.fire && i > 0 && s.data[i - 1].x < s.fire && pt.x >= s.fire ? 5 : 0)) })),
-      ...(d.life ? [{ label: "Necessário até ao fim", data: d.life, borderColor: "#a855f7", borderDash: [3, 4], borderWidth: 1.5, pointRadius: 0 }] : []),
-      { label: "Número FIRE", data: [{ x: d.start, y: d.target }, { x: d.end, y: d.target }], borderColor: "#f59e0b",
-        borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0 },
+      // números FIRE: linhas horizontais tracejadas, uma cor por cálculo
+      ...d.targets.map((tg, k) => ({ label: `${tg.label}: ${pm.money(tg.value, 0)}`, data: [{ x: d.start, y: tg.value }, { x: d.end, y: tg.value }],
+        borderColor: tg.color, borderDash: [[6, 5], [2, 4], [10, 4, 2, 4]][k % 3], borderWidth: 1.5, pointRadius: 0, isTarget: true })),
     ];
     pm.chart("fireChart", { type: "line", data: { datasets },
       options: { maintainAspectRatio: false, parsing: true, interaction: { mode: "nearest", intersect: false },
         plugins: { legend: { position: "bottom" },
-          tooltip: { callbacks: { title: (it) => String(Math.floor(it[0].parsed.x)), label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0)}` } } },
+          tooltip: { callbacks: { title: (it) => String(Math.floor(it[0].parsed.x)), label: (it) => (it.dataset.isTarget ? it.dataset.label : `${it.dataset.label}: ${pm.money(it.parsed.y, 0)}`) } } },
         scales: { x: { type: "linear", min: d.start, max: d.end, ticks: { callback: (v) => Math.floor(v), maxTicksLimit: 12, maxRotation: 0 }, grid: { display: false } },
                   y: { position: "right", ticks: { callback: (v) => pm.money(v, 0) } } } } });
   };

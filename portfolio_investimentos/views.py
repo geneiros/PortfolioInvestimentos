@@ -437,9 +437,15 @@ def planeamento():
         "target": round(plan["number"]), "start": year(history[0][0]) if history else date.today().year,
         "end": end_year,
     }
-    if life:
-        base = next(sc for sc in life["scenarios"] if sc["name"] == "base")
-        chart["life"] = [{"x": year(d), "y": round(v)} for d, v in base["curve"] if d.year <= end_year]
+    # números FIRE como linhas horizontais (o valor na data FIRE do cenário base)
+    targets = [{"label": "Para sempre", "value": round(plan["number"]), "color": "#f59e0b"}]
+    if with_pension and with_pension["number"] is not None:
+        targets.append({"label": f"Para sempre, com a pensão aos {int(pension_age)}",
+                        "value": round(with_pension["number"]), "color": "#a855f7"})
+    if life and life["number"] is not None:
+        label = f"Até aos {int(cfg['until'])} anos" + (f", com a pensão aos {int(pension_age)}" if pension else "")
+        targets.append({"label": label, "value": round(life["number"]), "color": "#ec4899"})
+    chart["targets"] = targets
     c.update(cfg=cfg, plan=plan, life=life, with_pension=with_pension, chart=ctx.js_json(chart),
              track=fire.monthly_track(s.dates, s.value, plan["number"]))
     return render_template("pages/planeamento.html", **c)

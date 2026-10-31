@@ -739,6 +739,11 @@ def test_planning_fire_page_and_settings(app, client):
     html = client.get("/planeamento").get_data(as_text=True)
     assert "Até aos 90 anos, com a pensão a partir dos 67" in html and "Se te reformasses hoje" in html
     assert "Para sempre, com a pensão a partir dos 67" in html and "sem contar com a pensão" in html
+    import json
+    chart = json.loads(re.search(r"const d = (\{.*?\});\n", html).group(1))
+    assert [tg["label"] for tg in chart["targets"]] == ["Para sempre", "Para sempre, com a pensão aos 67",
+                                                        "Até aos 90 anos, com a pensão aos 67"]
+    assert len({tg["color"] for tg in chart["targets"]}) == 3
     assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="0", age="95",
                 until="90").status_code == 400
     assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45",
