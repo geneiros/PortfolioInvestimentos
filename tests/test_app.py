@@ -772,8 +772,13 @@ def test_refresh_only_open_positions(app, monkeypatch):
             Transaction(date=date(2026, 9, 20), type="SELL", instrument="NOV", quantity=1, price=38.0, currency="EUR"),
         ])
         db.session.commit()
-        report = market.refresh_all(only_open=True)
+        lines = []
+        report = market.refresh_all(only_open=True, progress=lines.append)
         assert "ADB.DE" in calls and "NOV.DE" not in calls  # NOV está vendida
+        # o contador só conta o que se atualiza: ADB e os 3 índices de comparação (não a posição vendida)
+        assert any(ln.startswith("[1/4] ") for ln in lines) and not any("/5]" in ln for ln in lines)
+        assert any(ln.startswith("[1/4] ") and ln.endswith(" s)") for ln in lines)  # com o tempo de cada ativo
+        assert any(ln.startswith("[notícias 1/1] ADB") for ln in lines)
         assert "1 ativos fechados não foram atualizados" in report
         calls.clear()
         market.refresh_all()  # sem a opção, pede também a fechada

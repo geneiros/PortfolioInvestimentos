@@ -103,9 +103,11 @@
   // botão "Atualizar cotações agora": a atualização corre no servidor em segundo plano,
   // por isso consulta o estado até terminar e só então avisa e recarrega a página
   const refreshButtons = () => document.querySelectorAll("[data-pm-refresh]");
+  let activeRefresh = null;  // o botão em que se carregou (o outro só fica desativado)
   const setRefreshing = (on, progress) => refreshButtons().forEach((b) => {
     if (!b.dataset.label) b.dataset.label = b.innerHTML;
     b.disabled = on;
+    if (on && b !== (activeRefresh || refreshButtons()[0])) return;  // sem o spinner no outro botão
     // com o ativo em curso: "A atualizar cotações… 12/280 · VWCE.DE"
     const where = on && progress && progress.total ? ` ${progress.done + 1}/${progress.total} · ${progress.current}` : "";
     b.textContent = "";
@@ -139,6 +141,7 @@
     const btn = e.target.closest("[data-pm-refresh]");
     if (!btn) return;
     e.preventDefault();
+    activeRefresh = btn;
     try {
       pm.toast(await pm.call("refresh_market", { only_open: btn.dataset.onlyOpen || "" }), "info");
     } catch (err) { return; /* já mostrado */ }

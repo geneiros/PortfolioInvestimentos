@@ -274,11 +274,14 @@ def refresh_all(start=None, progress=None, only_open=False):
         start = start or (first_tx - timedelta(days=7) if first_tx else date.today() - timedelta(days=365))
         report, missing, updated = [], [], 0
         where = [""]  # "[n/total] " do ativo em curso
+        started = [0.0]
 
         def note(line):
             report.append(line)
             if progress:
-                progress(where[0] + line)
+                # com o tempo que o ativo levou, para se ver qual é o lento (ex.: o Yahoo a limitar os pedidos)
+                took = f" ({_time.monotonic() - started[0]:.1f} s)" if where[0] else ""
+                progress(where[0] + line + took)
         # os erros do yfinance (ex.: "No fundamentals data found") já ficam no resumo por ativo
         logging.getLogger("yfinance").setLevel(logging.CRITICAL)
         from .data import load_portfolio
@@ -290,15 +293,16 @@ def refresh_all(start=None, progress=None, only_open=False):
             Transaction.instrument, db.func.min(Transaction.date), db.func.max(Transaction.date)
         ).group_by(Transaction.instrument)}
         price_min = dict(db.session.query(Price.instrument, db.func.min(Price.date)).group_by(Price.instrument))
-        quick = skipped = closed = 0
-        _progress.update(done=0, total=len(insts), current="")
-        for position, inst in enumerate(insts, 1):
+        quick = skipped = 0
+        # só com as posições abertas, a fila são elas (e os índices): o contador [n/total] conta só esses
+        queue = [i for i in insts if not only_open or i.kind == "index" or i.ticker in held]
+        closed = len(insts) - len(queue)
+        _progress.update(done=0, total=len(queue), current="")
+        for position, inst in enumerate(queue, 1):
             if inst in gone:
                 continue
-            if only_open and inst.kind != "index" and inst.ticker not in held:
-                closed += 1
-                continue
-            where[0] = f"[{position}/{len(insts)}] "
+            where[0] = f"[{position}/{len(queue)}] "
+            started[0] = _time.monotonic()
             _progress.update(done=position - 1, current=inst.ticker)
             problems = []
             mode = _plan(inst, held, tx_span, price_min, full)
@@ -368,12 +372,15 @@ def refresh_all(start=None, progress=None, only_open=False):
                 note(f"EUR/{cur}: erro ({exc})")
 
         news_new, news_empty, news_errors = 0, [], {}
-        for inst in insts:
-            # notícias, eventos e setor só interessam para as posições abertas; os ativos vendidos
-            # podem já nem existir em bolsa (ex.: empresas compradas ou fundidas)
-            if inst in gone or inst.kind == "index" or inst.ticker not in held:
-                continue
-            _progress["current"] = f"notícias de {inst.ticker}"
+        where[0] = ""
+        # notícias, eventos e setor só interessam para as posições abertas; os ativos vendidos
+        # podem já nem existir em bolsa (ex.: empresas compradas ou fundidas)
+        news_queue = [i for i in insts if i not in gone and i.kind != "index" and i.ticker in held]
+        _progress.update(done=0, total=len(news_queue), current="")
+        for k, inst in enumerate(news_queue, 1):
+            _progress.update(done=k - 1, current=f"notícias de {inst.ticker}")
+            if progress:
+                progress(f"[notícias {k}/{len(news_queue)}] {inst.ticker}")
             t = yf.Ticker(inst.data_symbol or inst.ticker)
             if not inst.sector and inst.kind == "etf":
                 inst.sector = "ETF"  # o Yahoo não tem "dados fundamentais" de ETF: o pedido só dava erro
