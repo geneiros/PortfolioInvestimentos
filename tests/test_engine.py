@@ -239,6 +239,28 @@ def test_fire_lifetime_needs_less_than_forever_and_counts_the_pension():
     assert rich["date"] == start and rich["done"] > 1
 
 
+def test_fire_stops_investing_and_withdraws_after_fire():
+    from portfolio_investimentos.engine import fire
+    start = date(2026, 11, 1)
+    # vida inteira sem retorno: depois da data FIRE, o capital desce até perto de zero aos 90
+    life = fire.lifetime_plan(100000, 12000, 0.0, 2000, 45, 90, start=start)
+    pess = next(s for s in life["scenarios"] if s["name"] == "pessimista")
+    assert pess["date"] and pess["empty"] is None  # chega até aos 90 (acaba perto de zero, mas chega)
+    last_value = pess["points"][-1][1]
+    assert 0 <= last_value < pess["number"]
+    # para sempre, sem idade: depois do número FIRE, a regra dos 4% com 5% de retorno real quase não gasta o capital
+    forever = fire.plan(100000, 12000, 0.04, 0.0, 2000, start=start)
+    base = next(s for s in forever["scenarios"] if s["name"] == "base")
+    after = [v for d, v in base["points"] if d > base["date"]]
+    assert after and min(after) >= base["number"] * 0.95 and base["empty"] is None
+    # a 3% real e levantamento de 4% do número FIRE, o dinheiro acaba (≈ 47 anos depois)
+    pess = next(s for s in forever["scenarios"] if s["name"] == "pessimista")
+    assert pess["empty"] is not None and pess["empty"] > pess["date"]
+    # deixar de investir aos 46 (antes da data FIRE): chega mais tarde (ou não chega)
+    stop = fire.lifetime_plan(100000, 12000, 0.0, 2000, 45, 90, start=start, stop_age=46)
+    assert stop["date"] is None or stop["date"] > life["date"]
+
+
 def test_fiscal_dividend_credit_is_limited_per_dividend():
     """A retenção a mais num dividendo (30% nos EUA) não abate o imposto de outro dividendo do mesmo ano."""
     d0 = date(2024, 1, 2)

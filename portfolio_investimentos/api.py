@@ -357,7 +357,7 @@ def set_risk_free(rate):
 
 
 @action
-def save_fire(expenses, swr, tax, monthly, age="", until="90", pension="0", pension_age="67"):
+def save_fire(expenses, swr, tax, monthly, age="", until="90", pension="0", pension_age="67", stop_age=""):
     values = {"fire_expenses": _float(expenses), "fire_swr": _float(swr), "fire_tax": _float(tax),
               "fire_monthly": _float(monthly)}
     age_v = _float(age) if str(age).strip() else None
@@ -368,6 +368,9 @@ def save_fire(expenses, swr, tax, monthly, age="", until="90", pension="0", pens
         raise ApiError("A idade até quando o dinheiro tem de durar tem de ser maior do que a tua idade.")
     if pension_v < 0 or not 40 <= pension_age_v <= 80:
         raise ApiError("Indica uma pensão positiva e uma idade de reforma entre 40 e 80 anos.")
+    stop_v = _float(stop_age) if str(stop_age).strip() else None
+    if stop_v is not None and (age_v is None or not age_v < stop_v <= until_v):
+        raise ApiError("A idade em que deixas de investir tem de estar entre a tua idade e a idade até quando dura.")
     if values["fire_expenses"] <= 0:
         raise ApiError("Indica as despesas anuais.")
     if not 0.5 <= values["fire_swr"] <= 10:
@@ -376,7 +379,8 @@ def save_fire(expenses, swr, tax, monthly, age="", until="90", pension="0", pens
         raise ApiError("O imposto deve estar entre 0% e 60%.")
     if values["fire_monthly"] < 0:
         raise ApiError("O investimento mensal não pode ser negativo.")
-    values.update(fire_age=age_v, fire_until=until_v, fire_pension=pension_v, fire_pension_age=pension_age_v)
+    values.update(fire_age=age_v, fire_until=until_v, fire_pension=pension_v, fire_pension_age=pension_age_v,
+                  fire_stop_age=stop_v)
     for key, value in values.items():
         Setting.set(key, value)
     return "Plano guardado."

@@ -740,6 +740,12 @@ def test_planning_fire_page_and_settings(app, client):
     assert "Até aos 90 anos, com a pensão a partir dos 67" in html and "Se te reformasses hoje" in html
     assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="0", age="95",
                 until="90").status_code == 400
+    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45",
+                until="90", stop_age="55").status_code == 200
+    html = client.get("/planeamento").get_data(as_text=True)
+    assert "ou até aos 55 anos" in html and "O dinheiro dura" in html
+    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45",
+                until="90", stop_age="40").status_code == 400
     assert post(client, "save_fire", token, expenses="0", swr="4", tax="0", monthly="0").status_code == 400
     assert post(client, "save_fire", token, expenses="1000", swr="50", tax="0", monthly="0").status_code == 400
 

@@ -393,7 +393,7 @@ def fire_settings(p):
             "tax": get("fire_tax", round(28 * max(gain_share, 0.5), 1)), "monthly": get("fire_monthly", round(monthly)),
             "custom": Setting.get("fire_expenses") is not None,
             "age": get("fire_age", None), "until": get("fire_until", 90.0), "pension": get("fire_pension", 0.0),
-            "pension_age": get("fire_pension_age", 67.0)}
+            "pension_age": get("fire_pension_age", 67.0), "stop_age": get("fire_stop_age", None)}
 
 
 @bp.route("/planeamento")
@@ -404,24 +404,36 @@ def planeamento():
     if not p.transactions:
         return render_template("pages/planeamento.html", **c)
     cfg = fire_settings(p)
-    plan = fire.plan(p.total_value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100, cfg["monthly"])
+    age = cfg["age"] or None
+    pension = cfg["pension"] * 14 if age and cfg["pension"] else 0.0  # pensão mensal líquida × 14 meses
+    pension_age = cfg["pension_age"] if pension else None
+    stop_age = cfg["stop_age"] if age and cfg["stop_age"] else None
+    plan = fire.plan(p.total_value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100, cfg["monthly"], age=age,
+                     pension=pension, pension_age=pension_age, stop_age=stop_age,
+                     horizon_age=cfg["until"] if age else None)
+    life = None
+    if age:
+        life = fire.lifetime_plan(p.total_value, cfg["expenses"], cfg["tax"] / 100, cfg["monthly"], age,
+                                  cfg["until"], pension, pension_age, stop_age=stop_age)
     s = p.series
     history = [(d, v) for d, v in zip(s.dates, s.value)]
-    last = plan["date"] or plan["latest"] or plan["earliest"]
-    end_year = (last.year + 3) if last else date.today().year + 30
+    shown = life or plan  # com a idade, o gráfico mostra a vida inteira até à idade indicada
+    if age:
+        end_year = date.today().year + int(cfg["until"] - age)
+    else:
+        last = plan["date"] or plan["latest"] or plan["earliest"]
+        end_year = min((last.year if last else date.today().year) + 30, date.today().year + fire.MAX_YEARS)
     year = lambda d: round(d.year + (d.month - 1) / 12 + (d.day - 1) / 365, 3)  # noqa: E731
     chart = {
-        "history": [{"x": year(d), "y": round(v)} for i, (d, v) in enumerate(history) if i % 5 == 0 or i == len(history) - 1],
-        "scenarios": [{"name": sc["name"], "rate": sc["rate"],
+        "history": [{"x": year(d), "y": round(v)} for i, (d, v) in enumerate(history)
+                    if i % 5 == 0 or i == len(history) - 1],
+        "scenarios": [{"name": sc["name"], "rate": sc["rate"], "fire": year(sc["date"]) if sc["date"] else None,
                        "data": [{"x": year(d), "y": round(v)} for d, v in sc["points"] if d.year <= end_year]}
-                      for sc in plan["scenarios"]],
-        "target": round(plan["number"]), "start": year(history[0][0]) if history else date.today().year, "end": end_year,
+                      for sc in shown["scenarios"]],
+        "target": round(plan["number"]), "start": year(history[0][0]) if history else date.today().year,
+        "end": end_year,
     }
-    life = None
-    if cfg["age"]:
-        # pensão mensal líquida × 14 meses (como em Portugal)
-        life = fire.lifetime_plan(p.total_value, cfg["expenses"], cfg["tax"] / 100, cfg["monthly"], cfg["age"],
-                                  cfg["until"], cfg["pension"] * 14, cfg["pension_age"] if cfg["pension"] else None)
+    if life:
         base = next(sc for sc in life["scenarios"] if sc["name"] == "base")
         chart["life"] = [{"x": year(d), "y": round(v)} for d, v in base["curve"] if d.year <= end_year]
     c.update(cfg=cfg, plan=plan, life=life, chart=ctx.js_json(chart),
