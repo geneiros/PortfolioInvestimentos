@@ -17,19 +17,19 @@
 
 {% macro score_card(title, help_text, block, profile_label=None) -%}
 <div class="pm-card h-100 d-flex flex-column">
-  <div class="d-flex gap-3 align-items-start flex-grow-1">
+  <div class="pm-score-card flex-grow-1">
     {{ ring(block.score, bar_color(block.score)) }}
-    <div class="flex-grow-1 min-w-0">
+    <div class="pm-score-body">
       <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
         <b>{{ title }}</b> {{ help(help_text) }}
         {% if block.tier %}<span class="badge border" style="color: {{ bar_color(block.score) }}; border-color: {{ bar_color(block.score) }} !important">Tier {{ block.tier }} · {{ block.label }}</span>{% endif %}
         {% if profile_label %}<span class="small text-secondary ms-auto">{{ profile_label }}</span>{% endif %}
       </div>
       {% for m in block.metrics %}
-      <div class="d-flex align-items-center gap-2 small mb-1">
-        <span class="text-truncate" style="width: 11.5rem">{{ m.name }}</span>{{ help(m.help ~ (" Agora: " ~ m.detail ~ "." if m.detail else "")) }}
-        <div class="flex-grow-1 pm-scorebar"><div style="width: {{ m.score or 0 }}%; background: {{ bar_color(m.score) }}"></div></div>
-        <b class="text-end" style="width: 2rem; color: {{ bar_color(m.score) }}">{{ m.score if m.score is not none else "—" }}</b>
+      <div class="pm-score-row small mb-1">
+        <span class="pm-score-name text-truncate">{{ m.name }}</span>{{ help(m.help ~ (" Agora: " ~ m.detail ~ "." if m.detail else "")) }}
+        <div class="pm-scorebar"><div style="width: {{ m.score or 0 }}%; background: {{ bar_color(m.score) }}"></div></div>
+        <b class="pm-score-value" style="color: {{ bar_color(m.score) }}">{{ m.score if m.score is not none else "—" }}</b>
       </div>
       {% endfor %}
     </div>
