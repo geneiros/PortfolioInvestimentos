@@ -742,6 +742,62 @@ class Portfolio:
             "records": sorted(divs, key=lambda d: d.date, reverse=True),
         }
 
+    def dividend_calendar(self, announced, confirmed=None, lookback_days=90, horizon_days=365):
+        """Dividendos por data ex-dividendo: quem tem direito é quem já detinha as ações antes dessa data.
+
+        `announced`: ativo -> [(data ex-dividendo, por ação na moeda do ativo)] (Yahoo, últimos ~13 meses);
+        `confirmed`: ativo -> [próximas datas ex-dividendo anunciadas] (calendário do yfinance, se houver).
+        Devolve linhas ordenadas por data, com o estado:
+          - "recebido": detinhas ações antes da data ex e o dividendo já entrou;
+          - "a receber": detinhas ações antes da data ex e o pagamento ainda não entrou;
+          - "sem direito": compraste depois da data ex (esse dividendo não é teu);
+          - "previsto": data ex futura (a do ano anterior + 1 ano, ou a anunciada), com as ações de hoje.
+        """
+        today = self.as_of
+        divs = self.dividends
+        gross = sum(d.gross_eur for d in divs)
+        tax_ratio = sum(d.tax_eur for d in divs) / gross if gross > EPS else 0.0
+        plus, minus = ("BUY", "TRANSFER_IN", "CONVERT_IN"), ("SELL", "TRANSFER_OUT", "CONVERT_OUT")
+
+        def held_before(ticker, day):
+            q = 0.0
+            for t in self.transactions:
+                if t.asset and t.asset.ticker == ticker and t.date < day:
+                    q += t.quantity if t.type in plus else -t.quantity if t.type in minus else 0.0
+            return max(q, 0.0)
+
+        rows = []
+        # também as vendidas depois de uma data ex recente: esse dividendo ainda é teu
+        for pos in (p for p in self.positions.values() if p.asset.ticker in (announced or {})):
+            a = pos.asset
+            history = sorted((d, v) for d, v in (announced or {}).get(a.ticker, []))
+            paid_on = sorted(d.date for d in divs if d.asset.ticker == a.ticker)
+            for ex, per_share in history:
+                if today - timedelta(days=lookback_days) <= ex <= today:
+                    eur = self.book.to_eur(per_share, a.currency, ex)
+                    qty = held_before(a.ticker, ex)
+                    if qty <= EPS:
+                        status = "sem direito"
+                    else:
+                        status = "recebido" if any(ex <= d <= ex + timedelta(days=75) for d in paid_on) else "a receber"
+                    rows.append({"date": ex, "asset": a, "status": status, "per_share_eur": eur, "qty": qty,
+                                 "amount_eur": eur * qty * (1 - tax_ratio), "estimated": False})
+            if not pos.is_open:
+                continue
+            # próximas: cada data ex dos últimos 12 meses volta um ano depois (ou a data anunciada mais próxima)
+            announced_next = sorted(d for d in (confirmed or {}).get(a.ticker, []) if d > today)
+            for ex, per_share in history:
+                if ex <= today - timedelta(days=365):
+                    continue
+                nxt = ex + timedelta(days=365)
+                if not today < nxt <= today + timedelta(days=horizon_days):
+                    continue
+                exact = next((d for d in announced_next if abs((d - nxt).days) <= 30), None)
+                eur = self.book.to_eur(per_share, a.currency, today)
+                rows.append({"date": exact or nxt, "asset": a, "status": "previsto", "per_share_eur": eur,
+                             "qty": pos.qty, "amount_eur": eur * pos.qty * (1 - tax_ratio), "estimated": exact is None})
+        return sorted(rows, key=lambda r: (r["date"], r["asset"].ticker))
+
     # ---------------------------------------------------------------- fiscal
     def fiscal_years(self):
         years = defaultdict(lambda: {"sales": [], "gains": 0.0, "losses": 0.0,

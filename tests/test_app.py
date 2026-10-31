@@ -1112,6 +1112,8 @@ def test_refresh_stores_yahoo_dividends_per_share_for_open_positions(app, client
         assert "Dividendos por ação (Yahoo, últimos 12 meses): 1 de 1 posições abertas pagam." in report
     html = client.get("/dividendos").get_data(as_text=True)
     assert "a partir de:" in html and "<b>FINV</b>" in html and "(Yahoo)" in html
+    # data ex há 20 dias, comprado há 30: tem direito e ainda não recebeu; as próximas aparecem como previstas
+    assert "Datas ex-dividendo" in html and ">a receber<" in html and html.count(">previsto<") == 2
 
 
 def test_yahoo_direct_parse():

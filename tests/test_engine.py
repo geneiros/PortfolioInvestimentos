@@ -127,6 +127,30 @@ def test_dividend_projection_uses_yahoo_per_share_for_recent_positions():
     assert p.dividend_summary()["forward_net"] < s["forward_net"]  # sem o Yahoo só contava o ACME
 
 
+def test_dividend_calendar_by_ex_date():
+    """Só tem direito ao dividendo quem detinha as ações antes da data ex-dividendo."""
+    d0 = date(2026, 1, 2)
+    today = date(2026, 10, 30)
+    prices = book_linear("ACME", d0, today, 10, 10)
+    prices.update(book_linear("USCO", d0, today, 50, 50))
+    txs = [Tx(d0, "BUY", ACME, quantity=10, price=10),
+           Tx(date(2026, 8, 25), "DIVIDEND", ACME, quantity=10, amount=5),       # pago 5 dias depois da data ex
+           Tx(date(2026, 9, 15), "BUY", USCO, quantity=100, price=50),           # depois da data ex de 1/9
+           Tx(date(2026, 10, 1), "BUY", ACME, quantity=5, price=10)]             # mais ações antes de 20/10
+    announced = {"ACME": [(date(2026, 8, 20), 0.5), (date(2026, 10, 20), 0.5), (date(2025, 11, 20), 0.5)],
+                 "USCO": [(date(2026, 9, 1), 0.25)]}
+    p = Portfolio(txs, PriceBook(prices, {"USD": [(d0, 1.25)]}), as_of=today)
+    cal = p.dividend_calendar(announced, confirmed={"ACME": [date(2026, 11, 24)]})
+    got = [(r["date"], r["asset"].ticker, r["status"], r["qty"]) for r in cal]
+    assert (date(2026, 8, 20), "ACME", "recebido", 10) in got
+    assert (date(2026, 10, 20), "ACME", "a receber", 15) in got           # ainda não pago; 15 ações antes da data ex
+    assert (date(2026, 9, 1), "USCO", "sem direito", 0) in got             # comprado depois da data ex
+    # 20/11/2025 + 1 ano ≈ 20/11/2026, mas a data anunciada é 24/11: usa-se essa, com as 15 ações de hoje
+    nxt = next(r for r in cal if r["status"] == "previsto" and r["asset"].ticker == "ACME" and r["date"].month == 11)
+    assert nxt["date"] == date(2026, 11, 24) and nxt["qty"] == 15 and not nxt["estimated"]
+    assert [r["date"] for r in cal] == sorted(r["date"] for r in cal)
+
+
 def test_fiscal_dividend_credit_is_limited_per_dividend():
     """A retenção a mais num dividendo (30% nos EUA) não abate o imposto de outro dividendo do mesmo ano."""
     d0 = date(2024, 1, 2)

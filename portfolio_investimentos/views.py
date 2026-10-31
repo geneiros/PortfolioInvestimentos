@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from flask import Blueprint, Response, abort, current_app, render_template, request
 
 from .engine.portfolio import MERIT_BENCHMARK
-from .models import Alert, Broker, ImportBatch, Instrument, Price, Setting, Transaction, WatchItem, db
+from .models import Alert, Broker, Event, ImportBatch, Instrument, Price, Setting, Transaction, WatchItem, db
 from . import auth
 from .services import context as ctx
 from .services import backups, data
@@ -159,8 +159,14 @@ def desempenho():
 def dividendos():
     c = ctx.build("dividendos", "Dividendos")
     p = c["p"]
-    s = p.dividend_summary(data.dividend_history()) if p.transactions else None
+    announced = data.dividend_history()
+    s = p.dividend_summary(announced) if p.transactions else None
     c["s"] = s
+    if p.transactions:
+        confirmed = {}
+        for ev in Event.query.filter(Event.kind == "ex_dividend", Event.date > p.as_of):
+            confirmed.setdefault(ev.instrument, []).append(ev.date)
+        c["calendar"] = p.dividend_calendar(announced, confirmed)
     if s and s["records"]:
         today, years = p.as_of, s["years"]
         start = _int(request.args.get("desde"), years[0])
