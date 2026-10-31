@@ -841,6 +841,84 @@ class Portfolio:
         days = self.PERIODS.get(period)
         return end - timedelta(days=days) if days else s.dates[0]
 
+    def position_lines(self, period="MAX", top=5):
+        """Contributo de cada posição no período, dia a dia, para o gráfico da Visão Geral.
+
+        Por posição: ganho = valor + vendas + dividendos líquidos − compras (em euros, desde o início do período)
+        e o valor de mercado. Devolve as `top` posições com maior ganho em valor absoluto e a soma das restantes.
+        """
+        s = self.series
+        if not s.dates:
+            return None
+        start = self.period_start(period)
+        k0 = max(self._index_before(start) or 0, 0) if start > s.dates[0] else 0
+        dates = s.dates[k0:]
+        txs_by, divs_by = defaultdict(list), defaultdict(list)
+        for t in self.transactions:
+            if t.asset and t.type in ASSET_TYPES - {"DIVIDEND"}:
+                txs_by[t.asset.ticker].append(t)
+        for d in self.dividends:
+            divs_by[d.asset.ticker].append((d.date, d.net_eur))
+        plus = ("BUY", "TRANSFER_IN", "CONVERT_IN")
+        lines = []
+        for ticker, txs in txs_by.items():
+            asset = txs[0].asset
+            if txs[-1].date < dates[0] and not self.positions.get(ticker, Position(asset)).is_open:
+                continue  # vendida antes do período: não contribui
+            divs = divs_by.get(ticker, [])
+            qty = cash = invested = 0.0
+            last_px, i, j = None, 0, 0
+            gains, values, g0 = [], [], None
+            for k, d in enumerate(s.dates):
+                while i < len(txs) and txs[i].date <= d:
+                    t = txs[i]
+                    fx = self.book.fx(t.currency, t.date)
+                    px = t.price
+                    if not px:  # conversões sem preço: o de mercado nesse dia
+                        mkt = self.book.price(ticker, t.date)
+                        px = mkt * fx / self.book.fx(asset.currency, t.date) if mkt else 0.0
+                    flow = (t.quantity * px + ((t.fees or 0.0) if t.type == "BUY" else -(t.fees or 0.0))) / fx
+                    if t.type in plus:
+                        qty += t.quantity
+                        cash -= flow
+                        if k > k0:  # as do primeiro dia já estão no valor inicial
+                            invested += flow
+                    else:
+                        qty -= t.quantity
+                        cash += flow
+                    if t.price:
+                        last_px = (t.price, t.currency)
+                    i += 1
+                while j < len(divs) and divs[j][0] <= d:
+                    cash += divs[j][1]
+                    j += 1
+                if k < k0:
+                    continue
+                value = 0.0
+                if qty > 1e-9:
+                    p = self.book.price(ticker, d)
+                    if p is not None:
+                        value = qty * p / self.book.fx(asset.currency, d)
+                    elif last_px:
+                        value = qty * last_px[0] / self.book.fx(last_px[1], d)
+                gain = value + cash
+                if g0 is None:
+                    g0, invested = gain, invested + value  # base do %: o valor no início e o que entrou depois
+                gains.append(gain - g0)
+                values.append(value)
+            lines.append({"asset": asset, "gain": gains, "value": values, "total": gains[-1] if gains else 0.0,
+                          "pct": gains[-1] / invested if gains and invested > EPS else None})
+        lines.sort(key=lambda ln: -abs(ln["total"]))
+        shown, rest = lines[:top], lines[top:]
+        others = None
+        if rest:
+            n = len(dates)
+            g = [sum(ln["gain"][i] for ln in rest) for i in range(n)]
+            v = [sum(ln["value"][i] for ln in rest) for i in range(n)]
+            base = sum(ln["total"] / ln["pct"] for ln in rest if ln["pct"])
+            others = {"count": len(rest), "gain": g, "value": v, "total": g[-1], "pct": g[-1] / base if base else None}
+        return {"dates": dates, "lines": shown, "others": others}
+
     def performance(self, period="MAX", benchmarks=None, risk_free=None):
         """Dados para os gráficos e cartões da página Desempenho."""
         rf = RISK_FREE if risk_free is None else risk_free

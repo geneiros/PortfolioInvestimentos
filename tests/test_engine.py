@@ -151,6 +151,29 @@ def test_dividend_calendar_by_ex_date():
     assert [r["date"] for r in cal] == sorted(r["date"] for r in cal)
 
 
+def test_position_lines_split_the_portfolio_gain_by_position():
+    d0, d1 = date(2024, 1, 2), date(2024, 12, 31)
+    prices = book_linear("ACME", d0, d1, 10, 20)
+    prices.update(book_linear("USCO", d0, d1, 100, 80))
+    txs = [Tx(d0, "DEPOSIT", amount=3000),
+           Tx(d0, "BUY", ACME, quantity=100, price=10),
+           Tx(d0, "BUY", USCO, quantity=10, price=100, currency="USD"),
+           Tx(date(2024, 6, 3), "DIVIDEND", ACME, quantity=100, amount=50)]
+    fx = {"USD": [(d0, 1.0)]}
+    p = Portfolio(txs, PriceBook(prices, fx), as_of=d1)
+    out = p.position_lines("MAX", top=5)
+    by = {ln["asset"].ticker: ln for ln in out["lines"]}
+    assert out["dates"][0] == d0 and len(by["ACME"]["gain"]) == len(out["dates"])
+    assert by["ACME"]["total"] == pytest.approx(100 * 10 + 50)      # valorização + dividendo
+    assert by["USCO"]["total"] == pytest.approx(10 * -20)
+    assert by["ACME"]["pct"] == pytest.approx(1050 / 1000)
+    assert [ln["asset"].ticker for ln in out["lines"]] == ["ACME", "USCO"]  # maior ganho em valor absoluto primeiro
+    # as posições somam o ganho da carteira (aqui não há caixa a render)
+    perf = p.performance("MAX")
+    assert by["ACME"]["total"] + by["USCO"]["total"] == pytest.approx(perf["gain"][-1])
+    assert p.position_lines("MAX", top=1)["others"]["count"] == 1
+
+
 def test_fiscal_dividend_credit_is_limited_per_dividend():
     """A retenção a mais num dividendo (30% nos EUA) não abate o imposto de outro dividendo do mesmo ano."""
     d0 = date(2024, 1, 2)

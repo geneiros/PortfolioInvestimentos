@@ -67,6 +67,36 @@ def perf_payload(p, period, benchmarks=None):
                            for b in perf["benchmarks"]]}
 
 
+# cores para as posições sem cor própria no gráfico "As minhas posições"
+POSITION_COLORS = ["#14b8a6", "#ec4899", "#a78bfa", "#06b6d4", "#f97316", "#22c55e", "#eab308", "#ef4444"]
+
+
+def positions_payload(p, period):
+    """Ganho e valor das principais posições no período (o resto somado em "Outras"), como o gráfico da Visão Geral."""
+    out = p.position_lines(period)
+    if not out:
+        return None
+    keep = _sample([d.isoformat() for d in out["dates"]], period)
+
+    def pick(xs):
+        return [round(xs[i], 2) for i in keep]
+    used, lines = set(), []
+    for n, ln in enumerate(out["lines"]):
+        a = ln["asset"]
+        color = a.color if a.color and a.color not in ("#64748b", "#94a3b8", *used) else \
+            next((c for c in POSITION_COLORS if c not in used), POSITION_COLORS[n % len(POSITION_COLORS)])
+        used.add(color)
+        lines.append({"ticker": a.ticker, "name": a.name, "color": color, "gain": pick(ln["gain"]),
+                      "value": pick(ln["value"]), "total": round(ln["total"], 2),
+                      "pct": None if ln["pct"] is None else round(ln["pct"], 4)})
+    o = out["others"]
+    if o:
+        lines.append({"ticker": "", "name": f"Outras ({o['count']})", "color": "#94a3b8", "gain": pick(o["gain"]),
+                      "value": pick(o["value"]), "total": round(o["total"], 2),
+                      "pct": None if o["pct"] is None else round(o["pct"], 4), "others": True})
+    return {"lines": lines}
+
+
 @bp.route("/")
 def overview():
     c = ctx.build("overview", "Visão Geral")

@@ -125,8 +125,11 @@
       <div class="d-flex align-items-center gap-2 flex-wrap small mb-2">
         <span class="text-secondary">Comparar com:</span>
         {% for b in benchmarks %}<button class="pm-chip bench" data-t="{{ b.ticker }}" style="--chip: {{ b.color }}"><span class="sw" style="background: {{ b.color }}"></span>{{ b.name }}</button>{% endfor %}
+        <span class="vr mx-1"></span>
+        <button class="pm-chip" id="posToggle" title="Mostra o contributo das posições com maior ganho ou perda no período"><i class="bi bi-graph-up"></i> As minhas posições</button>
       </div>
       <div style="height: 320px"><canvas id="perfChart"></canvas></div>
+      <div id="posLegend" class="d-flex flex-wrap gap-2 justify-content-center mt-2"></div>
     </div>
   </div>
 
@@ -171,7 +174,11 @@
   const spark = {{ hero_spark|safe }};
   let perf = {{ perf|safe }};
   let mode = "gain";
+  let period = "MAX";
   const active = new Set();
+  let pos = null, showPos = false;  // "As minhas posições": linhas por posição (carregadas a pedido)
+  const hiddenPos = new Set();
+  const loadPositions = async () => { pos = showPos ? await pm.call("positions", { period }) : null; };
 
   document.addEventListener("DOMContentLoaded", () => {
     const c = document.getElementById("heroSpark");
@@ -192,16 +199,53 @@
     }));
     document.querySelectorAll("#periods button").forEach((b) => b.addEventListener("click", async () => {
       document.querySelectorAll("#periods button").forEach((x) => x.classList.toggle("active", x === b));
-      perf = await pm.call("performance", { period: b.dataset.p }); draw();
+      period = b.dataset.p;
+      perf = await pm.call("performance", { period });
+      await loadPositions();
+      draw();
     }));
     document.querySelectorAll(".pm-chip.bench").forEach((b) => b.addEventListener("click", () => {
       b.classList.toggle("active");
       active.has(b.dataset.t) ? active.delete(b.dataset.t) : active.add(b.dataset.t);
       draw();
     }));
+    document.getElementById("posToggle").addEventListener("click", async (e) => {
+      showPos = !showPos;
+      e.currentTarget.classList.toggle("active", showPos);
+      await loadPositions();
+      draw();
+    });
     document.addEventListener("pm:theme", draw);
     draw();
   });
+
+  // legenda das posições: cor, nome e ganho no período; um clique esconde/mostra a linha
+  function drawLegend() {
+    const box = document.getElementById("posLegend");
+    box.replaceChildren();
+    if (!showPos || !pos) return;
+    const chip = (name, color, total, pct, key) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "pm-chip flex-column align-items-start px-3 py-1";
+      el.style.borderColor = color;
+      if (key && hiddenPos.has(key)) el.style.opacity = ".4";
+      const top = document.createElement("span");
+      top.className = "small fw-semibold d-flex align-items-center gap-1";
+      const sw = document.createElement("span");
+      sw.className = "sw";
+      sw.style.background = color;
+      top.append(sw, document.createTextNode(name));
+      const val = document.createElement("span");
+      val.className = "small money " + (total >= 0 ? "text-up" : "text-down");
+      val.textContent = pm.money(total, 0, true) + (pct == null ? "" : " " + pm.pct(pct, 0));
+      el.append(top, val);
+      if (key) el.addEventListener("click", () => { hiddenPos.has(key) ? hiddenPos.delete(key) : hiddenPos.add(key); draw(); });
+      box.append(el);
+    };
+    chip("Carteira", pm.css("--pm-accent"), perf.gain[perf.gain.length - 1], null, null);
+    pos.lines.forEach((l) => chip(l.others ? l.name : l.ticker, l.color, l.total, l.pct, l.name));
+  }
 
   function draw() {
     if (!perf) return;
@@ -217,12 +261,19 @@
       const data = b.twr.map((x, i) => mode === "gain" ? x * (perf.value[0] || 1) : base * (1 + x));
       datasets.push({ label: b.name, data, borderColor: b.color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .2 });
     });
+    if (showPos && pos) {
+      pos.lines.filter((l) => !hiddenPos.has(l.name)).forEach((l) => {
+        datasets.push({ label: l.others ? l.name : l.ticker, data: mode === "gain" ? l.gain : l.value, borderColor: l.color,
+                        borderWidth: 1.5, pointRadius: 0, fill: false, tension: .2, borderDash: l.others ? [3, 3] : [] });
+      });
+    }
+    drawLegend();
     pm.chart("perfChart", {
       type: "line",
       data: { labels: perf.dates, datasets },
       options: {
         maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
-        plugins: { legend: { display: datasets.length > 1, position: "bottom" },
+        plugins: { legend: { display: datasets.length > 1 && !showPos, position: "bottom" },
           tooltip: { callbacks: { title: (it) => fmt(it[0].label), label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0, mode === "gain")}` } } },
         scales: { x: { ticks: { maxTicksLimit: 8, callback: (v, i) => perf.dates[i].slice(0, 7) }, grid: { display: false } },
                   y: { position: "right", ticks: { callback: (v) => pm.money(v, 0, mode === "gain") } } },

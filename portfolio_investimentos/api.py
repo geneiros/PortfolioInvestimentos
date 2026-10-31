@@ -122,6 +122,13 @@ def performance(period="MAX", benchmarks=None):
     return perf_payload(data.load_portfolio(data.selected_broker()), (period or "MAX").upper(), benchmarks)
 
 
+@action
+def positions(period="MAX"):
+    """Linhas das principais posições para o gráfico da Visão Geral ("As minhas posições")."""
+    from .views import positions_payload
+    return positions_payload(data.load_portfolio(data.selected_broker()), (period or "MAX").upper())
+
+
 # --------------------------------------------------------------- transações
 def _held(ticker, broker, on):
     """Unidades de um ativo detidas numa data (numa corretora, ou em todas se `broker` for None)."""

@@ -678,6 +678,19 @@ def test_background_refresh_retries_when_database_is_locked(app, monkeypatch):
         assert len(calls) == 1 and Setting.get("refresh_status") == "error:falha qualquer"
 
 
+def test_overview_positions_lines(app, client):
+    token = csrf(client)
+    post(client, "load_demo", token)
+    perf = post(client, "performance", token, period="3A").get_json()["message"]
+    out = post(client, "positions", token, period="3A").get_json()["message"]
+    lines = out["lines"]
+    assert 1 <= len([ln for ln in lines if not ln.get("others")]) <= 5
+    assert all(len(ln["gain"]) == len(ln["value"]) == len(perf["dates"]) for ln in lines)  # alinhadas com o gráfico
+    assert abs(lines[0]["total"]) >= abs(lines[1]["total"])  # maior contributo primeiro
+    assert len({ln["color"] for ln in lines}) == len(lines)
+    assert "As minhas posições" in client.get("/").get_data(as_text=True)
+
+
 def test_merge_instruments_manually(app, client):
     from portfolio_investimentos.models import Instrument, Price
     with app.app_context():
