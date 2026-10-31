@@ -176,7 +176,10 @@
   let mode = "gain";
   let period = "MAX";
   const active = new Set();
-  let pos = null, showPos = false;  // "As minhas posições": linhas por posição (carregadas a pedido)
+  // "As minhas posições": ligado por omissão; se o desligares, a página lembra-se neste dispositivo
+  let showPos = true;
+  try { showPos = localStorage.getItem("pm-show-positions") !== "0"; } catch (e) { /* sem armazenamento */ }
+  let pos = null;
   const hiddenPos = new Set();
   const loadPositions = async () => { pos = showPos ? await pm.call("positions", { period }) : null; };
 
@@ -209,14 +212,18 @@
       active.has(b.dataset.t) ? active.delete(b.dataset.t) : active.add(b.dataset.t);
       draw();
     }));
-    document.getElementById("posToggle").addEventListener("click", async (e) => {
+    const posToggle = document.getElementById("posToggle");
+    posToggle.classList.toggle("active", showPos);
+    posToggle.addEventListener("click", async () => {
       showPos = !showPos;
-      e.currentTarget.classList.toggle("active", showPos);
+      posToggle.classList.toggle("active", showPos);
+      try { localStorage.setItem("pm-show-positions", showPos ? "1" : "0"); } catch (e) { /* sem armazenamento */ }
       await loadPositions();
       draw();
     });
     document.addEventListener("pm:theme", draw);
-    draw();
+    draw();  // a carteira primeiro; as posições juntam-se quando chegarem
+    if (showPos) loadPositions().then(draw).catch(() => {});
   });
 
   // legenda das posições: cor, nome e ganho no período; um clique esconde/mostra a linha
