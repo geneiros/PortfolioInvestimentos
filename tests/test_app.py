@@ -691,6 +691,22 @@ def test_overview_positions_lines(app, client):
     assert "As minhas posições" in client.get("/").get_data(as_text=True)
 
 
+def test_calendar_event_moves_instead_of_duplicating(app):
+    from portfolio_investimentos.models import Event, Instrument
+    from portfolio_investimentos.services import market
+    today = date(2026, 11, 1)
+    with app.app_context():
+        db.session.add(Instrument(ticker="CLDI", currency="USD"))
+        db.session.commit()
+        # o Yahoo começa por estimar um intervalo; depois anuncia a data
+        market._store_calendar("CLDI", {"Earnings Date": [date(2026, 11, 12), date(2026, 11, 17)]}, today=today)
+        ev = Event.query.filter_by(instrument="CLDI").one()
+        assert ev.date == date(2026, 11, 12) and ev.timing == "estimado: 12/11–17/11"
+        market._store_calendar("CLDI", {"Earnings Date": [date(2026, 11, 13)]}, today=today)
+        ev = Event.query.filter_by(instrument="CLDI").one()  # substituído, não duplicado
+        assert ev.date == date(2026, 11, 13) and ev.timing is None
+
+
 def test_merge_instruments_manually(app, client):
     from portfolio_investimentos.models import Instrument, Price
     with app.app_context():

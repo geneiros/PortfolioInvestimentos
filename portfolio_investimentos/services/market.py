@@ -690,21 +690,36 @@ def _store_dividends(yf, inst):
     return len(found)
 
 
-def _store_calendar(ticker, cal):
+def _store_calendar(ticker, cal, today=None):
+    """Guarda os próximos eventos do calendário do Yahoo (yfinance): resultados, data ex-dividendo e pagamento.
+
+    Uma data que mudou (ex.: resultados estimados para 12/11 e depois anunciados para 13/11) substitui a anterior,
+    em vez de ficarem as duas.
+    """
+    today = today or date.today()
+
+    def as_date(d):
+        return d.date() if isinstance(d, datetime) else d if isinstance(d, date) else None
+
     def upsert(d, kind, **kw):
-        if isinstance(d, datetime):
-            d = d.date()
-        if not isinstance(d, date):
+        d = as_date(d)
+        if d is None:
             return
+        for old in Event.query.filter(Event.instrument == ticker, Event.kind == kind, Event.date >= today,
+                                      Event.date != d):
+            db.session.delete(old)
         ev = Event.query.filter_by(instrument=ticker, kind=kind, date=d).first() or \
             Event(instrument=ticker, kind=kind, date=d)
         for k, v in kw.items():
             setattr(ev, k, v)
         db.session.add(ev)
 
-    earnings = cal.get("Earnings Date") or []
+    earnings = [d for d in (as_date(x) for x in (cal.get("Earnings Date") or [])) if d]
     if earnings:
-        upsert(earnings[0], "earnings", title="Resultados",
+        # duas datas = o Yahoo ainda só tem uma estimativa (um intervalo); uma = a data anunciada
+        ranged = len(earnings) > 1 and earnings[-1] != earnings[0]
+        upsert(earnings[0], "earnings", title=None,
+               timing=f"estimado: {earnings[0]:%d/%m}–{earnings[-1]:%d/%m}" if ranged else None,
                eps_estimate=cal.get("Earnings Average"), revenue_estimate=cal.get("Revenue Average"))
     if cal.get("Ex-Dividend Date"):
         upsert(cal["Ex-Dividend Date"], "ex_dividend", title="Ex-dividendo")
