@@ -57,6 +57,12 @@
     <div class="small text-secondary">{% if with_pension.earliest and with_pension.latest %}Entre {{ with_pension.earliest.year }} e {{ with_pension.latest.year }}{% elif with_pension.earliest %}A partir de {{ with_pension.earliest.year }}{% else %}Não chega com estes valores{% endif %}</div>
   </div></div>
 </div>
+{% if with_pension.after == 0 %}
+<div class="alert alert-info small d-flex gap-2 align-items-start mb-3" id="pensionCovers"><i class="bi bi-info-circle"></i>
+  <div>A pensão (<span class="money">{{ (cfg.pension * 14)|money }}</span>/ano, 14 meses) cobre as despesas (<span class="money">{{ cfg.expenses|money }}</span>/ano):
+    a partir dos {{ life.pension_age|int }} anos não precisas de levantar nada. Por isso, o capital só tem de pagar a ponte até à pensão{% if life %} e os números «para sempre, com a pensão» e «até aos {{ life.until_age|int }} anos» são iguais{% endif %}.</div>
+</div>
+{% endif %}
 {% endif %}
 {% if life %}
 <div class="pm-label mb-2 d-flex align-items-center gap-2 flex-wrap" style="color: #ec4899"><span class="pm-fire-line" style="border-top: 2px dashed #ec4899"></span>Até aos {{ life.until_age|int }} anos{% if life.pension %}, com a pensão a partir dos {{ life.pension_age|int }}{% endif %}

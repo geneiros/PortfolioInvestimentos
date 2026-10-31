@@ -744,6 +744,11 @@ def test_planning_fire_page_and_settings(app, client):
     assert [tg["label"] for tg in chart["targets"]] == ["Para sempre", "Para sempre, com a pensão aos 67",
                                                         "Até aos 90 anos, com a pensão aos 67"]
     assert len({tg["color"] for tg in chart["targets"]}) == 3
+    assert 'id="pensionCovers"' not in html
+    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45", until="90",
+                pension="2000", pension_age="67").status_code == 200
+    html = client.get("/planeamento").get_data(as_text=True)
+    assert 'id="pensionCovers"' in html and "são iguais" in html  # 2 000 € × 14 cobre os 24 000 €
     assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="0", age="95",
                 until="90").status_code == 400
     assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45",
