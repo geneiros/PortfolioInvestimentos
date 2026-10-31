@@ -37,7 +37,7 @@ No **Chrome** ou no **Edge**, com a aplicação aberta em `http://127.0.0.1:5000
 
 #### Disponível offline
 
-Para consultar os últimos dados com a aplicação parada (por exemplo, com o Termux ou o computador desligados), liga **Definições → Disponível offline**. A partir daí, as páginas de consulta (Visão Geral, Carteira, Desempenho, Dividendos, Fiscal, Radar, Notícias e Transações) ficam guardadas no browser tal como estavam da última vez que as abriste. A cópia é renovada de 30 em 30 minutos enquanto a aplicação está aberta, ou quando carregas em **Guardar cópia agora**.
+Para consultar os últimos dados com a aplicação parada (por exemplo, com o Termux ou o computador desligados), liga **Definições → Disponível offline**. A partir daí, as páginas de consulta (Visão Geral, Carteira, Desempenho, Dividendos, Fiscal, Radar e Transações) ficam guardadas no browser tal como estavam da última vez que as abriste. A cópia é renovada de 30 em 30 minutos enquanto a aplicação está aberta, ou quando carregas em **Guardar cópia agora**.
 
 - Sem a aplicação a correr, aparece a faixa "Modo offline", com a data dos dados. A página recarrega sozinha quando a aplicação voltar.
 - Funciona só para consulta. Importar, editar, atualizar cotações e mudar de corretora precisam da aplicação a correr.
@@ -67,7 +67,7 @@ A corretora é detetada pelo conteúdo do ficheiro (XTB, Trading 212, Trade Repu
 
 O script abre a aplicação no browser do telemóvel. No Chrome, **menu ⋮ → Adicionar ao ecrã principal** para a abrires como uma aplicação. Enquanto está aberta, o Termux fica acordado (`termux-wake-lock`). Para terminar, carrega em Ctrl+C no Termux.
 
-- O `yfinance` não instala no Android (a dependência `curl_cffi` não suporta estes processadores). Sem ele, **Definições → Atualizar cotações agora** vai buscar as cotações, os câmbios e as notícias diretamente ao Yahoo Finance, só com a biblioteca padrão do Python. Os eventos (datas de resultados e de dividendos) e o setor dos ativos só vêm com o `yfinance`.
+- O `yfinance` não instala no Android (a dependência `curl_cffi` não suporta estes processadores). Sem ele, **Definições → Atualizar cotações agora** vai buscar as cotações e os câmbios diretamente ao Yahoo Finance, só com a biblioteca padrão do Python. Os eventos (datas de resultados e de dividendos) e o setor dos ativos só vêm com o `yfinance`.
 - Se aparecer "Sem cotações do Yahoo Finance", vê o motivo em **Definições → Resultado por ativo**, ou testa a ligação no Termux com `bash iniciar-android.sh --testar-yahoo`.
 - Os dados do telemóvel e do computador são independentes. Se preferires uma só cópia, corre a aplicação no computador com `--host 0.0.0.0` e palavra-passe, e abre-a no telemóvel.
 
@@ -148,22 +148,21 @@ O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro o
 
 | Página | O que mostra |
 | --- | --- |
-| **Visão Geral** | Valor da carteira, variação diária, retorno total e do ano corrente; máximo histórico (carteira ou retorno); principais movers com notícias; resultados (não realizado, realizado, dividendos, comissões) e conta (custo base, depositado, caixa, juros); gráfico de evolução com períodos (1M a Máx) e comparação com S&P 500, Nasdaq 100 e MSCI World; próximos eventos (resultados, ex-dividendo, pagamentos estimados). |
+| **Visão Geral** | Valor da carteira, variação diária, retorno total e do ano corrente; máximo histórico (carteira ou retorno); principais movers; resultados (não realizado, realizado, dividendos, comissões) e conta (custo base, depositado, caixa, juros); gráfico de evolução com períodos (1M a Máx) e comparação com S&P 500, Nasdaq 100 e MSCI World; próximos eventos (resultados, ex-dividendo, pagamentos estimados). |
 | **Carteira** | Posições abertas/fechadas, carteira vs mercado no dia, filtros por setor, pesquisa, tabela ordenável (preço, 1D, preço médio, investido, valor, não realizado, dividendos, efeito cambial, comissões, ROI, peso) e alocação por ativo, setor e moeda. |
 | **Desempenho** | Retorno total e IRR, TWR e CAGR vs índice, melhor/pior ano e mês, sequência atual; TWR anual e acumulado; drawdown; mapa de retornos mensais; mérito vs mercado (captura em alta/baixa, beta, % de meses acima do mercado); risco (Sharpe, Sortino, Calmar, volatilidade, max drawdown); alfa de Jensen e distribuição mensal ordenada. |
 | **Dividendos** | Recebido líquido/bruto e retenção na fonte, maior pagador, meses com dividendos, rendimento anualizado, projeção do ano e dos próximos 12 meses, crescimento anual, dividendos por ano, decomposição do crescimento, mapa mensal, yield on cost e histórico. |
 | **Fiscal** | Por ano: mais-valias pelo método FIFO (linha a linha, exportáveis em CSV), dividendos, juros e estimativa de imposto a 28% (Portugal). |
 | **Radar e alertas** | Alertas de preço (acima, abaixo, variação diária) e lista de observação com preço-alvo. |
-| **Notícias** | Notícias dos ativos em carteira. |
 | **Importar** | Extratos da Trading 212 (CSV), XTB (XLSX), Trade Republic (CSV) e CSV genérico, com deduplicação (podes carregar o mesmo ficheiro várias vezes) e histórico de extratos. |
 | **Transações** | Lista filtrável, inserção manual e exportação CSV. |
 | **Definições** | Corretoras, ativos (setor, símbolo de dados, cor), atualização de cotações, cópia de segurança, demonstração e limpeza de dados. |
 
 Também há um seletor de corretora (todas ou uma conta específica) e um botão com um olho que esconde os valores.
 
-### Cotações e notícias
+### Cotações
 
-As cotações, câmbios, notícias e eventos vêm do Yahoo Finance através do pacote `yfinance`, instalado pelos scripts de arranque. Onde o `yfinance` não pode ser instalado (ex.: Android), a aplicação vai buscar as cotações, os câmbios e as notícias diretamente ao Yahoo. Para atualizar, usa **Definições → Atualizar cotações agora**, que precisa de internet. Confirma em **Definições → Ativos** o *símbolo de dados* de cada ativo (código do Yahoo Finance, ex.: `VWCE.DE`, `IWDA.AS`, `AAPL`).
+As cotações, câmbios e eventos vêm do Yahoo Finance através do pacote `yfinance`, instalado pelos scripts de arranque. Onde o `yfinance` não pode ser instalado (ex.: Android), a aplicação vai buscar as cotações, os câmbios diretamente ao Yahoo. Para atualizar, usa **Definições → Atualizar cotações agora**, que precisa de internet. Confirma em **Definições → Ativos** o *símbolo de dados* de cada ativo (código do Yahoo Finance, ex.: `VWCE.DE`, `IWDA.AS`, `AAPL`).
 
 O símbolo é escolhido automaticamente pelo ISIN e pelo ticker. Só é aceite um símbolo cotado na moeda do ativo e com preços perto dos das transações. Assim, uma ação americana comprada em euros (ex.: Apple na Xetra, `APC.DE`) não fica com a cotação em dólares, e as cotações de Londres em pence são convertidas para libras.
 
