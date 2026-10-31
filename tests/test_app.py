@@ -707,6 +707,23 @@ def test_calendar_event_moves_instead_of_duplicating(app):
         assert ev.date == date(2026, 11, 13) and ev.timing is None
 
 
+def test_overview_scores_profiles_and_insights(app, client):
+    import json
+    token = csrf(client)
+    post(client, "load_demo", token)
+    html = client.get("/").get_data(as_text=True)
+    assert "Investor Score" in html and "Portfolio Score" in html and "Concentração" in html
+    data = json.loads(re.search(r'<script type="application/json" id="insightsData">(.*?)</script>', html, re.S).group(1))
+    assert abs(sum(r["weight"] for r in data["wr"]) - 1) < 1e-3
+    assert {"sector", "country", "kind", "broker"} <= set(data["alloc"])
+    assert data["alloc"]["kind"][0]["name"] in ("Ações", "ETF", "Caixa")
+    # mudar de perfil: o Investor Score passa a medir o que o perfil diz
+    assert post(client, "set_profile", token, profile="active").status_code == 200
+    html = client.get("/").get_data(as_text=True)
+    assert "Fator de Lucro" in html and "Corte das Perdas" in html and "Perfil: Active Trader · mudar" in html
+    assert post(client, "set_profile", token, profile="nao-existe").status_code == 400
+
+
 def test_merge_instruments_manually(app, client):
     from portfolio_investimentos.models import Instrument, Price
     with app.app_context():

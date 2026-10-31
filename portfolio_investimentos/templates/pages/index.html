@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}{% autoescape true %}
 {% from "macros.html" import help, logo, signed, empty %}
+{% import "pages/_insights.html" as ins %}
 
 {% if not has_data %}
   {{ empty("Ainda não tens transações", "Importa o extrato da tua corretora ou adiciona transações manualmente.", "/importar", "Importar extrato") }}
@@ -63,6 +64,9 @@
       {% endfor %}
     </div>
   </div>
+
+  <!-- Perfil de investidor: notas -->
+  {{ ins.scores_row(scores) }}
 
   <!-- Movers -->
   <div class="col-xl-8">
@@ -163,12 +167,16 @@
       {% endfor %}
     </div>
   </div>
+
+  {{ ins.charts_row() }}
 </div>
+<script type="application/json" id="insightsData">{{ insights_data|safe }}</script>
 {% endif %}
 {% endautoescape %}{% endblock %}
 
 {% block scripts %}
 {% if has_data %}
+<script src="{{ url_for('static', filename='js/insights.js') }}"></script>
 <script>
 (function () {
   const spark = {{ hero_spark|safe }};

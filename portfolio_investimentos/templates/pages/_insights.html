@@ -1,0 +1,135 @@
+{# Cartões da Visão Geral: notas por perfil de investidor (incluído no topo) e peso vs retorno + alocação (em baixo). #}
+{% from "macros.html" import help %}
+
+{% macro ring(score, color) -%}
+<svg viewBox="0 0 64 64" width="72" height="72" class="flex-shrink-0" aria-hidden="true">
+  <circle cx="32" cy="32" r="27" fill="none" stroke="var(--pm-surface-2)" stroke-width="6"/>
+  <circle cx="32" cy="32" r="27" fill="none" stroke="{{ color }}" stroke-width="6" stroke-linecap="round"
+          stroke-dasharray="{{ (score or 0) / 100 * 169.6 }} 169.6" transform="rotate(-90 32 32)"/>
+  <text x="32" y="33" text-anchor="middle" font-size="17" font-weight="700" fill="var(--pm-text)">{{ score if score is not none else "—" }}</text>
+  <text x="32" y="45" text-anchor="middle" font-size="7" fill="var(--bs-secondary-color)">/ 100</text>
+</svg>
+{%- endmacro %}
+
+{% macro bar_color(s) -%}
+{{ "#94a3b8" if s is none else ("#ef4444" if s < 35 else ("#f97316" if s < 65 else ("#3b82f6" if s < 80 else "#22c55e"))) }}
+{%- endmacro %}
+
+{% macro score_card(title, help_text, block, profile_label=None) -%}
+<div class="pm-card h-100 d-flex flex-column">
+  <div class="d-flex gap-3 align-items-start flex-grow-1">
+    {{ ring(block.score, bar_color(block.score)) }}
+    <div class="flex-grow-1 min-w-0">
+      <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+        <b>{{ title }}</b> {{ help(help_text) }}
+        {% if block.tier %}<span class="badge border" style="color: {{ bar_color(block.score) }}; border-color: {{ bar_color(block.score) }} !important">Tier {{ block.tier }} · {{ block.label }}</span>{% endif %}
+        {% if profile_label %}<span class="small text-secondary ms-auto">{{ profile_label }}</span>{% endif %}
+      </div>
+      {% for m in block.metrics %}
+      <div class="d-flex align-items-center gap-2 small mb-1">
+        <span class="text-truncate" style="width: 11.5rem">{{ m.name }}</span>{{ help(m.help ~ (" Agora: " ~ m.detail ~ "." if m.detail else "")) }}
+        <div class="flex-grow-1 pm-scorebar"><div style="width: {{ m.score or 0 }}%; background: {{ bar_color(m.score) }}"></div></div>
+        <b class="text-end" style="width: 2rem; color: {{ bar_color(m.score) }}">{{ m.score if m.score is not none else "—" }}</b>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro scores_row(sc) -%}
+{% if sc %}
+  {% if sc.suggested != sc.profile %}
+  <div class="col-12">
+    <div class="alert alert-primary d-flex align-items-center gap-3 flex-wrap mb-0 small">
+      <i class="bi bi-person-badge fs-5"></i>
+      <div class="flex-grow-1">A tua carteira parece-se mais com <b>{{ sc.suggested_name }}</b>: {{ sc.why }}</div>
+      <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#profileModal">Ver os perfis</button>
+    </div>
+  </div>
+  {% endif %}
+  <div class="col-xl-6">{{ score_card("Investor Score", "Como investes, medido pelo teu perfil de investidor (escolhe-o em «Perfil»). Notas de 0 a 100, nos últimos 3 anos; uma leitura indicativa, não uma recomendação.", sc.investor, sc.profile_name) }}</div>
+  <div class="col-xl-6">{{ score_card("Portfolio Score", "Como está a tua carteira hoje: concentração, diversificação, volatilidade, custos e proximidade ao índice (igual para todos os perfis).", sc.portfolio) }}</div>
+  <div class="col-12 d-flex justify-content-end mt-n2">
+    <button class="btn btn-link btn-sm p-0" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-person-badge"></i> Perfil: {{ sc.profile_name }}{% if not sc.chosen %} (sugerido){% endif %} · mudar</button>
+  </div>
+
+  <div class="modal fade" id="profileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Perfil de investidor</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+      <div class="modal-body">
+        <span class="badge text-bg-primary bg-opacity-25 text-primary-emphasis mb-2">SUGERIDO PELA TUA CARTEIRA</span>
+        <p class="mb-1"><b>{{ sc.suggested_name }}</b>: {{ sc.why }}</p>
+        <p class="text-secondary small">O perfil decide como medimos o teu sucesso. O Investor Score recalcula-se quando mudas.</p>
+        <div class="row g-3">
+          <div class="col-lg-5 d-flex flex-column gap-2">
+            {% for pr in sc.profiles %}
+            <button type="button" class="btn text-start border rounded-3 p-2 d-flex align-items-center gap-2 pm-profile {{ 'active border-primary' if pr.key == sc.profile }}" data-profile="{{ pr.key }}">
+              <span class="flex-grow-1"><b>{{ pr.name }}</b>
+                {% if pr.key == sc.profile and sc.chosen %}<span class="badge text-bg-success ms-1">O TEU PERFIL</span>{% endif %}
+                {% if pr.key == sc.suggested %}<span class="badge text-bg-primary ms-1">SUGERIDO</span>{% endif %}
+                <br><small class="text-secondary">{{ pr.subtitle }}</small></span>
+              <i class="bi {{ 'bi-record-circle-fill text-primary' if pr.key == sc.profile else 'bi-circle' }}"></i>
+            </button>
+            {% endfor %}
+          </div>
+          <div class="col-lg-7">
+            {% for pr in sc.profiles %}
+            <div class="border rounded-3 p-3 h-100 pm-profile-detail {{ '' if pr.key == sc.profile else 'd-none' }}" data-profile="{{ pr.key }}">
+              <h5 class="mb-0">{{ pr.name }}</h5><small class="text-secondary">{{ pr.subtitle }}</small>
+              <p class="mt-3">{{ pr.description }}</p>
+              <div class="pm-label mb-1">O que as notas medem</div>
+              {% for w in pr.weights %}
+                <div class="d-flex justify-content-between border-bottom py-1 small"><span>{{ w.name }}</span><b>{{ w.weight }}%</b></div>
+              {% endfor %}
+              <div class="mt-3">
+                {% if pr.key == sc.profile and sc.chosen %}<span class="badge text-bg-success p-2">✓ É o teu perfil</span>
+                {% else %}<button class="btn btn-primary btn-sm" data-pm-action="set_profile" data-args='{"profile": "{{ pr.key }}"}'>Usar {{ pr.name }}</button>{% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+{% endif %}
+{%- endmacro %}
+
+{% macro charts_row(wr_count) -%}
+  <!-- Peso vs retorno -->
+  <div class="col-xl-6">
+    <div class="pm-card h-100">
+      <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <span class="pm-label">Peso vs retorno {{ help("Cada posição aberta: a área (ou o eixo horizontal) é o peso na carteira e a cor (ou o eixo vertical) é o retorno total, com dividendos.") }}</span>
+        <span class="badge border text-secondary d-none" id="wrSmall"></span>
+        <div class="btn-group btn-group-sm ms-auto" id="wrMode">
+          <button class="btn btn-outline-secondary" data-mode="bubbles"><i class="bi bi-circle"></i> Bolhas</button>
+          <button class="btn btn-outline-secondary active" data-mode="map"><i class="bi bi-grid-1x2"></i> Mapa</button>
+        </div>
+      </div>
+      <div id="wrMap" class="pm-treemap" style="height: 340px"></div>
+      <div id="wrBubbles" class="d-none" style="height: 340px"><canvas id="wrChart"></canvas></div>
+      <div class="small text-secondary mt-2 d-flex align-items-center gap-2"><span>≤ −25%</span><span class="pm-legend-grad"></span><span>≥ +25%</span><span class="ms-2">área = peso · cor = retorno total</span></div>
+    </div>
+  </div>
+  <!-- Alocação -->
+  <div class="col-xl-6">
+    <div class="pm-card h-100">
+      <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <span class="pm-label">Alocação {{ help("Valor das posições abertas por setor, país, classe e corretora. O país é o do domicílio (pelo ISIN) ou, sem ISIN, o da bolsa.") }}</span>
+        <div class="btn-group btn-group-sm ms-auto" id="allocTabs">
+          <button class="btn btn-outline-secondary active" data-view="sector">Setor</button>
+          <button class="btn btn-outline-secondary" data-view="country">Geografia</button>
+          <button class="btn btn-outline-secondary" data-view="kind">Classe</button>
+          <button class="btn btn-outline-secondary" data-view="broker">Corretora</button>
+        </div>
+      </div>
+      <div class="row g-3 align-items-center">
+        <div class="col-md-5"><div class="position-relative" style="height: 240px"><canvas id="allocChart"></canvas>
+          <div class="position-absolute top-50 start-50 translate-middle text-center pe-none"><div class="fw-bold fs-5 money" id="allocTotal"></div><small class="text-secondary" id="allocCaption"></small></div></div></div>
+        <div class="col-md-7"><div id="allocList" class="small"></div></div>
+      </div>
+    </div>
+  </div>
+{%- endmacro %}

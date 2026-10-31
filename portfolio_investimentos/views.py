@@ -8,7 +8,7 @@ from .engine.portfolio import MERIT_BENCHMARK
 from .models import Alert, Broker, Event, ImportBatch, Instrument, Price, Setting, Transaction, WatchItem, db
 from . import auth
 from .services import context as ctx
-from .services import backups, data
+from .services import backups, data, insights
 from .services.importer import BROKERS, INSTRUCTIONS
 from .services.market import check_alerts, refresh_state, upcoming_events, yfinance_available
 
@@ -117,7 +117,8 @@ def overview():
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
                       ("Mais tarde", [e for e in events if e.date > two][:10])],
         instruments=instruments, fired=check_alerts(p), perf=ctx.js_json(perf_payload(p, "MAX")),
-        benchmarks=p.benchmarks,
+        benchmarks=p.benchmarks, scores=insights.scores(p),
+        insights_data=ctx.js_json({"wr": insights.weight_return(p), "alloc": insights.allocation(p, c["broker"])}),
     )
     return render_template("pages/index.html", **c)
 

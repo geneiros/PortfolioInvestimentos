@@ -174,6 +174,34 @@ def test_position_lines_split_the_portfolio_gain_by_position():
     assert p.position_lines("MAX", top=1)["others"]["count"] == 1
 
 
+def test_scores_metrics_and_profiles():
+    from portfolio_investimentos.engine.scores import PROFILES, Scorer, tier
+    d0, d1 = date(2023, 1, 2), date(2025, 12, 31)
+    prices = book_linear("ACME", d0, d1, 10, 30)
+    prices.update(book_linear("USCO", d0, d1, 100, 60))
+    prices.update(book_linear("^GSPC", d0, d1, 4000, 5000))
+    txs = [Tx(d0, "DEPOSIT", amount=10000), Tx(d0, "BUY", ACME, quantity=100, price=10, fees=1),
+           Tx(d0, "BUY", USCO, quantity=10, price=100, currency="USD", fees=1)]
+    for m in range(1, 12):  # compras todos os meses
+        txs.append(Tx(date(2023, m + 1, 3), "BUY", ACME, quantity=1, price=10 + m, fees=0.5))
+    txs.append(Tx(date(2024, 6, 3), "SELL", USCO, quantity=5, price=80, currency="USD"))
+    p = Portfolio(txs, PriceBook(prices, {"USD": [(d0, 1.0)]}), [SPX], as_of=d1)
+    s = Scorer(p, countries={"ACME": "Alemanha", "USCO": "EUA"}, payers=set())
+    assert s.ok
+    for key in PROFILES:
+        r = s.investor(key)
+        assert r["score"] is None or 0 <= r["score"] <= 100
+        assert [m["key"] for m in r["metrics"]] == list(PROFILES[key][3])
+    pf = s.portfolio()
+    assert 0 <= pf["score"] <= 100 and pf["tier"] in "ABCD"
+    conc = next(m for m in pf["metrics"] if m["key"] == "concentration")
+    assert "posições efetivas" in conc["detail"]
+    pat = s.metric("patience")
+    assert pat["score"] > 50  # poucas vendas: cada euro fica muito tempo investido
+    assert s.suggest()[0] in PROFILES
+    assert tier(85) == ("A", "Excelente") and tier(20) == ("D", "Em construção") and tier(None)[0] is None
+
+
 def test_fiscal_dividend_credit_is_limited_per_dividend():
     """A retenção a mais num dividendo (30% nos EUA) não abate o imposto de outro dividendo do mesmo ano."""
     d0 = date(2024, 1, 2)

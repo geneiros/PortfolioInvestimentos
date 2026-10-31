@@ -132,3 +132,15 @@ body.pm-private .money { filter: blur(7px); }
   body.pm-menu-open .pm-backdrop { display: block; }
   .pm-content { padding: 1rem; }
 }
+
+/* Visão Geral: notas, peso vs retorno e alocação */
+.pm-scorebar { height: 6px; border-radius: 3px; background: var(--pm-surface-2); overflow: hidden; }
+.pm-scorebar > div { height: 100%; border-radius: 3px; }
+.pm-treemap { position: relative; overflow: hidden; border-radius: .5rem; }
+.pm-tile { position: absolute; box-sizing: border-box; border: 2px solid var(--pm-surface, #fff); border-radius: 6px; color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: .75rem; line-height: 1.2;
+  text-align: center; overflow: hidden; cursor: default; }
+.pm-tile b { font-size: .8rem; }
+.pm-legend-grad { display: inline-block; width: 90px; height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, rgb(220, 38, 38), rgb(71, 85, 105), rgb(22, 163, 74)); }
+.pm-profile.active, .pm-profile.border-primary { background: var(--bs-primary-bg-subtle); }

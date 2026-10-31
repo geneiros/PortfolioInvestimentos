@@ -123,6 +123,15 @@ def performance(period="MAX", benchmarks=None):
 
 
 @action
+def set_profile(profile):
+    from .engine.scores import PROFILES
+    if profile not in PROFILES:
+        raise ApiError("Perfil desconhecido.")
+    Setting.set("investor_profile", profile)
+    return f"Perfil: {PROFILES[profile][0]}."
+
+
+@action
 def positions(period="MAX"):
     """Linhas das principais posições para o gráfico da Visão Geral ("As minhas posições")."""
     from .views import positions_payload
