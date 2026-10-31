@@ -61,9 +61,9 @@
     <div style="height: 260px"><canvas id="divYear"></canvas></div>
     <p class="small text-secondary mt-2 mb-0">
       {% if s.forward_by_asset %}Projeção de {{ p.as_of.year + 1 }} (próximos 12 meses), a partir de:
-        {% for t, v in s.forward_by_asset[:6] %}<b>{{ t }}</b> <span class="money">{{ v|money(2) }}</span>{{ " · " if not loop.last }}{% endfor %}{{ "…" if s.forward_by_asset|length > 6 }}
+        {% for t, v, src in s.forward_by_asset[:6] %}<b>{{ t }}</b> <span class="money">{{ v|money(2) }}</span>{% if src == "Yahoo" %} <span class="text-body-tertiary">(Yahoo)</span>{% endif %}{{ " · " if not loop.last }}{% endfor %}{{ "…" if s.forward_by_asset|length > 6 }}
       {% else %}Sem projeção para {{ p.as_of.year + 1 }}: nenhuma das posições abertas{{ " desta corretora" if broker }} pagou dividendos
-        nos últimos 12 meses. A projeção usa os dividendos por ação recebidos nos últimos 12 meses × as quantidades atuais.{% endif %}
+        nos últimos 12 meses, segundo os teus extratos e o Yahoo. Os dividendos por ação do Yahoo são obtidos ao atualizar as cotações.{% endif %}
     </p>
   </div></div>
   <div class="col-xl-5"><div class="pm-card">

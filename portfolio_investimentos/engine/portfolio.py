@@ -646,7 +646,7 @@ class Portfolio:
         return p / prev - 1 if p and prev else None
 
     # ----------------------------------------------------------- dividendos
-    def dividend_summary(self):
+    def dividend_summary(self, announced=None):
         divs = self.dividends
         today = self.as_of
         gross = sum(d.gross_eur for d in divs)
@@ -678,6 +678,19 @@ class Portfolio:
                     eur = self.book.to_eur(g, t.currency, t.date) / qty_then
                     per_share[t.asset.ticker] += eur
                     per_share_month[t.asset.ticker][t.date.month] += eur
+        # dividendos por ação segundo o Yahoo (`announced`: ativo -> [(data ex-dividendo, valor na moeda do ativo)]):
+        # valem para as posições abertas e são o ano inteiro, mesmo para posições compradas há poucos meses
+        source = {t: "recebidos" for t in per_share}
+        for p in self.open_positions:
+            rows = [(d, a) for d, a in (announced or {}).get(p.asset.ticker, []) if ttm_start < d <= today]
+            if rows:
+                per_share[p.asset.ticker] = 0.0
+                per_share_month[p.asset.ticker] = defaultdict(float)
+                for d, a in rows:
+                    eur = self.book.to_eur(a, p.asset.currency, d)
+                    per_share[p.asset.ticker] += eur
+                    per_share_month[p.asset.ticker][d.month] += eur
+                source[p.asset.ticker] = "Yahoo"
         forward_gross = sum(per_share[p.asset.ticker] * p.qty for p in self.open_positions)
         tax_ratio = tax / gross if gross > EPS else 0.0
         forward_net = forward_gross * (1 - tax_ratio)
@@ -687,7 +700,8 @@ class Portfolio:
             for month, eur in per_share_month[p.asset.ticker].items():
                 forward_by_month[month] += eur * p.qty * (1 - tax_ratio)
         # de onde vem a projeção: posições abertas que pagaram dividendos nos últimos 12 meses
-        forward_by_asset = sorted(((p.asset.ticker, per_share[p.asset.ticker] * p.qty * (1 - tax_ratio))
+        forward_by_asset = sorted(((p.asset.ticker, per_share[p.asset.ticker] * p.qty * (1 - tax_ratio),
+                                    source.get(p.asset.ticker, "recebidos"))
                                    for p in self.open_positions if per_share[p.asset.ticker] > EPS),
                                   key=lambda kv: -kv[1])
 

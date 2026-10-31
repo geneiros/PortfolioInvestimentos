@@ -130,6 +130,16 @@ class Alert(NameMixin, db.Model):
     creation = db.Column(db.DateTime, default=utcnow)
 
 
+class DividendHistory(db.Model):
+    """Dividendos por ação de um ativo segundo o Yahoo (data ex-dividendo), para projetar posições recentes."""
+    id = db.Column(db.Integer, primary_key=True)
+    instrument = db.Column(db.String(32), db.ForeignKey("instrument.ticker", ondelete="CASCADE"), nullable=False,
+                           index=True)
+    date = db.Column(db.Date, nullable=False)
+    amount = db.Column(db.Float, nullable=False)  # por ação, na moeda do ativo
+    __table_args__ = (db.UniqueConstraint("instrument", "date"),)
+
+
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     instrument = db.Column(db.String(32), db.ForeignKey("instrument.ticker", ondelete="CASCADE"), nullable=False)

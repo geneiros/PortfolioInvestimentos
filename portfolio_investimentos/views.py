@@ -159,7 +159,7 @@ def desempenho():
 def dividendos():
     c = ctx.build("dividendos", "Dividendos")
     p = c["p"]
-    s = p.dividend_summary() if p.transactions else None
+    s = p.dividend_summary(data.dividend_history()) if p.transactions else None
     c["s"] = s
     if s and s["records"]:
         today, years = p.as_of, s["years"]

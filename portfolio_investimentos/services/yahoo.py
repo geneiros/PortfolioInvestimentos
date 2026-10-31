@@ -111,11 +111,17 @@ def _parse_chart(data):
         if num and den:
             splits[datetime.fromtimestamp(ev["date"], timezone.utc).replace(tzinfo=None) + offset] = num / den
     split_days = {d.date(): r for d, r in splits.items()}
+    dividends = {}
+    for ev in ((res.get("events") or {}).get("dividends") or {}).values():
+        if ev.get("amount") and ev.get("date"):
+            day = (datetime.fromtimestamp(ev["date"], timezone.utc).replace(tzinfo=None) + offset).date()
+            dividends[day] = dividends.get(day, 0.0) + float(ev["amount"])
     rows = []
     for ts, close in zip(stamps, closes):
         day = datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=None) + offset
         rows.append((day, {"Close": float("nan") if close is None else float(close),
-                           "Stock Splits": split_days.get(day.date(), 0.0)}))
+                           "Stock Splits": split_days.get(day.date(), 0.0),
+                           "Dividends": dividends.get(day.date(), 0.0)}))
     return History(rows), {"currency": meta.get("currency")}
 
 
@@ -131,7 +137,7 @@ class Ticker:
         period1 = int(_time.mktime(start.timetuple())) if hasattr(start, "timetuple") else int(start)
         data = _get_json(CHART_URL.format(symbol=urllib.parse.quote(self.symbol)),
                          {"period1": period1, "period2": int(_time.time()) + 86400, "interval": "1d",
-                          "events": "split", "includePrePost": "false"})
+                          "events": "div,split", "includePrePost": "false"})
         hist, self.history_metadata = _parse_chart(data)
         return hist
 

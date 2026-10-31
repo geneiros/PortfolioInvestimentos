@@ -2,7 +2,7 @@
 import io
 import re
 from pathlib import Path
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -809,7 +809,9 @@ def test_refresh_is_incremental_after_first_run(app, monkeypatch):
         report = market.refresh_all()  # seguinte: incremental
         asset_calls = [c for c in calls if c[0] in ("ADB.DE", "NOV.DE")]
         # NOV está vendida e as cotações já passam da última transação: nada a pedir; ADB só desde 18/10
-        assert asset_calls == [("ADB.DE", date(2026, 10, 18))]
+        # (o pedido com 400 dias é o dos dividendos por ação, que se faz para as posições abertas)
+        quotes = [c for c in asset_calls if c[1] != date.today() - timedelta(days=400)]
+        assert quotes == [("ADB.DE", date(2026, 10, 18))]
         assert "1 ativos só com os últimos dias" in report and "1 posições fechadas" in report
         # símbolo alterado à mão: volta a pedir o histórico todo
         calls.clear()
@@ -1062,9 +1064,54 @@ def test_choose_port(monkeypatch):
 YAHOO_CHART = {"chart": {"result": [{
     "meta": {"currency": "EUR", "symbol": "ACME.DE", "gmtoffset": 7200},
     "timestamp": [1760943600, 1761030000, 1761116400],          # 20, 21 e 22/10/2025 às 07:00 UTC
-    "events": {"splits": {"1761116400": {"date": 1761116400, "numerator": 2, "denominator": 1}}},
+    "events": {"splits": {"1761116400": {"date": 1761116400, "numerator": 2, "denominator": 1}},
+               "dividends": {"1760943600": {"date": 1760943600, "amount": 0.4}}},
     "indicators": {"quote": [{"close": [50.0, None, 26.0]}]},
 }], "error": None}}
+
+
+def test_refresh_stores_yahoo_dividends_per_share_for_open_positions(app, client, monkeypatch):
+    """Ao atualizar, guardam-se os dividendos por ação (Yahoo) das posições abertas; a página usa-os na projeção."""
+    import sys
+    import time as _t
+    from portfolio_investimentos.models import DividendHistory, Instrument
+    from portfolio_investimentos.services import market, yahoo
+    monkeypatch.setitem(sys.modules, "yfinance", None)  # acesso direto
+    now = int(_t.time())
+    day = 86400
+    chart = {"chart": {"result": [{
+        "meta": {"currency": "USD", "gmtoffset": 0},
+        "timestamp": [now - 200 * day, now - 110 * day, now - 20 * day, now - 2 * day],
+        "events": {"dividends": {str(now - 200 * day): {"amount": 0.5, "date": now - 200 * day},
+                                 str(now - 20 * day): {"amount": 0.5, "date": now - 20 * day}}},
+        "indicators": {"quote": [{"close": [40.0, 41.0, 42.0, 43.0]}]}}], "error": None}}
+
+    def fake_get(url, params, **kw):
+        if "search" in url:
+            return {"quotes": [], "news": []}
+        return chart if "FINV" in url else {"chart": {"result": None}}
+    monkeypatch.setattr(yahoo, "_get_json", fake_get)
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="FINV", currency="USD", data_symbol="FINV"),
+            Transaction(date=date.today() - timedelta(days=30), type="DEPOSIT", amount=5000.0, currency="EUR"),
+            Transaction(date=date.today() - timedelta(days=30), type="BUY", instrument="FINV", quantity=100, price=40.0,
+                        currency="USD"),
+            # um dividendo antigo de outro ativo, para a página de dividendos existir
+            Instrument(ticker="OLD", currency="EUR"),
+            Transaction(date=date.today() - timedelta(days=400), type="BUY", instrument="OLD", quantity=1, price=10.0,
+                        currency="EUR"),
+            Transaction(date=date.today() - timedelta(days=380), type="DIVIDEND", instrument="OLD", quantity=1, amount=1.0,
+                        currency="EUR"),
+            Transaction(date=date.today() - timedelta(days=370), type="SELL", instrument="OLD", quantity=1, price=10.0,
+                        currency="EUR"),
+        ])
+        db.session.commit()
+        report = market.refresh_all(only_open=True)
+        assert DividendHistory.query.filter_by(instrument="FINV").count() == 2
+        assert "Dividendos por ação (Yahoo, últimos 12 meses): 1 de 1 posições abertas pagam." in report
+    html = client.get("/dividendos").get_data(as_text=True)
+    assert "a partir de:" in html and "<b>FINV</b>" in html and "(Yahoo)" in html
 
 
 def test_yahoo_direct_parse():
@@ -1074,6 +1121,7 @@ def test_yahoo_direct_parse():
     assert meta == {"currency": "EUR"} and not hist.empty
     # dia sem fecho ignorado; antes do desdobramento 2:1 o preço negociado era o dobro do ajustado
     assert _closes(hist) == [(date(2025, 10, 20), 100.0), (date(2025, 10, 22), 26.0)]
+    assert [r[1]["Dividends"] for r in hist.iterrows()] == [0.4, 0.0, 0.0]  # dividendo no dia ex-dividendo
     assert yahoo._parse_chart({"chart": {"result": None, "error": {"code": "Not Found"}}})[0].empty
 
 

@@ -91,6 +91,15 @@ def _with_trade_prices(prices, insts, fx_book):
     return prices
 
 
+def dividend_history():
+    """Dividendos por ação segundo o Yahoo: ativo -> [(data, valor na moeda do ativo)]."""
+    from ..models import DividendHistory
+    out = defaultdict(list)
+    for r in DividendHistory.query.order_by(DividendHistory.date):
+        out[r.instrument].append((r.date, r.amount))
+    return dict(out)
+
+
 def transactions(broker=None):
     q = Transaction.query
     if broker:

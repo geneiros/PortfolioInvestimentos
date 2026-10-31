@@ -99,7 +99,7 @@ def test_dividends_and_fiscal():
     assert s["net"] == pytest.approx(68)
     assert s["months_with"] == 4
     assert s["forward_gross"] == pytest.approx(40)
-    assert [t for t, _ in s["forward_by_asset"]] == ["ACME"]
+    assert [(t, src) for t, _, src in s["forward_by_asset"]] == [("ACME", "recebidos")]
     # mapa do próximo ano: paga em março e setembro, como nos últimos 12 meses (20 por mês, sem a retenção de 15%)
     assert set(s["forward_by_month"]) == {3, 9}
     assert sum(s["forward_by_month"].values()) == pytest.approx(s["forward_net"])
@@ -107,6 +107,24 @@ def test_dividends_and_fiscal():
     assert fiscal[2024]["div_gross"] == pytest.approx(40)
     assert fiscal[2024]["tax_dividends"] == pytest.approx(40 * 0.28 - 6)
     assert fiscal[2024]["interest"] == pytest.approx(10)
+
+
+def test_dividend_projection_uses_yahoo_per_share_for_recent_positions():
+    """Posição comprada há 2 meses, ainda sem dividendos recebidos: a projeção usa os dividendos por ação do Yahoo."""
+    d0 = date(2026, 1, 2)
+    prices = book_linear("ACME", d0, date(2026, 10, 30), 10, 10)
+    prices.update(book_linear("USCO", d0, date(2026, 10, 30), 50, 50))
+    txs = [Tx(d0, "BUY", ACME, quantity=10, price=10),
+           Tx(date(2026, 3, 15), "DIVIDEND", ACME, quantity=10, amount=5),  # um dividendo recebido (para haver página)
+           Tx(date(2026, 9, 1), "BUY", USCO, quantity=100, price=50)]
+    announced = {"USCO": [(date(2025, 11, 20), 0.25), (date(2026, 2, 20), 0.25), (date(2026, 5, 20), 0.25),
+                          (date(2026, 8, 20), 0.25), (date(2025, 6, 1), 9.0)]}  # o último já não está nos 12 meses
+    p = Portfolio(txs, PriceBook(prices, {"USD": [(d0, 1.25)]}), as_of=date(2026, 10, 30))
+    s = p.dividend_summary(announced)
+    yahoo = dict((t, v) for t, v, src in s["forward_by_asset"] if src == "Yahoo")
+    assert yahoo["USCO"] == pytest.approx(100 * 1.0 / 1.25)  # 4 × 0,25 USD por ação, em EUR
+    assert set(s["forward_by_month"]) == {2, 3, 5, 8, 11}
+    assert p.dividend_summary()["forward_net"] < s["forward_net"]  # sem o Yahoo só contava o ACME
 
 
 def test_fiscal_dividend_credit_is_limited_per_dividend():

@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..engine.formatting import WEEKDAYS
-from ..models import Alert, Event, FxRate, Instrument, Price, Setting, Transaction, db
+from ..models import Alert, DividendHistory, Event, FxRate, Instrument, Price, Setting, Transaction, db
 
 log = logging.getLogger(__name__)
 
@@ -377,6 +377,7 @@ def refresh_all(start=None, progress=None, only_open=False):
         # eventos (resultados, dividendos) e setor só interessam para as posições abertas; os ativos vendidos
         # podem já nem existir em bolsa (ex.: empresas compradas ou fundidas)
         open_queue = [i for i in insts if i not in gone and i.kind != "index" and i.ticker in held]
+        payers = 0
         _progress.update(done=0, total=len(open_queue), current="")
         for k, inst in enumerate(open_queue, 1):
             _progress.update(done=k - 1, current=f"eventos de {inst.ticker}")
@@ -395,8 +396,15 @@ def refresh_all(start=None, progress=None, only_open=False):
                 _store_calendar(inst.ticker, t.calendar or {})
             except Exception as exc:
                 note(f"{inst.ticker} calendário: erro ({exc})")
+            try:
+                payers += _store_dividends(yf, inst) > 0
+            except Exception as exc:  # opcional: só serve à projeção de dividendos
+                db.session.rollback()
+                note(f"{inst.ticker} dividendos: erro ({str(exc)[:120]})")
             if progress:
                 progress(f"[eventos {k}/{len(open_queue)}] {inst.ticker} ({_time.monotonic() - step_started:.1f} s)")
+        if open_queue:
+            note(f"Dividendos por ação (Yahoo, últimos 12 meses): {payers} de {len(open_queue)} posições abertas pagam.")
         if closed:
             note(f"Só posições abertas: {closed} ativos fechados não foram atualizados.")
         if quick or skipped:
@@ -654,6 +662,32 @@ def _upsert(model, key_field, key, value_field, hist, scale=1.0):
         n += 1
     db.session.commit()
     return n
+
+
+def _store_dividends(yf, inst):
+    """Guarda os dividendos por ação dos últimos ~13 meses segundo o Yahoo; devolve quantos."""
+    if not inst.data_symbol:
+        return 0
+    t = yf.Ticker(inst.data_symbol)
+    hist = t.history(start=date.today() - timedelta(days=400), auto_adjust=False)
+    cur = (getattr(t, "history_metadata", None) or {}).get("currency")
+    cur, scale = SUBUNITS.get(cur, (cur, 1.0))
+    if cur and cur != inst.currency:
+        return 0
+    found = {}
+    for ts, row in hist.iterrows():
+        try:
+            amount = float(row.get("Dividends", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(amount) and amount > 0:
+            day = ts.date()
+            found[day] = found.get(day, 0.0) + amount * scale
+    DividendHistory.query.filter_by(instrument=inst.ticker).delete()
+    for day, amount in found.items():
+        db.session.add(DividendHistory(instrument=inst.ticker, date=day, amount=amount))
+    db.session.flush()
+    return len(found)
 
 
 def _store_calendar(ticker, cal):
