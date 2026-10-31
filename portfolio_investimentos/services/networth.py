@@ -183,13 +183,7 @@ def history(p):
     """
     sdates, svalues = (p.series.dates, p.series.value) if p.transactions else ([], [])
     items = OtherAsset.query.all()
-    known = {a.id for a in items}
-    per_asset = {}
-    for r in OtherAssetValue.query.order_by(OtherAssetValue.date):
-        if r.asset in known:
-            dates, values = per_asset.setdefault(r.asset, ([], []))
-            dates.append(r.date)
-            values.append(r.value)
+    per_asset = _records(items)
     today = date.today()
     months = {(d.year, d.month) for d in sdates}
     for dates, _ in per_asset.values():
@@ -215,6 +209,91 @@ def history(p):
         out["total"].append(round(imediata + curto + iliquido - loose, 2))
         out["available"].append(round(imediata + curto - loose, 2))
     return out
+
+
+def _records(items):
+    """Registos mensais de cada outro ativo: id → ([datas], [valores]), por ordem de data."""
+    known = {a.id for a in items}
+    per_asset = {}
+    for r in OtherAssetValue.query.order_by(OtherAssetValue.date):
+        if r.asset in known:
+            dates, values = per_asset.setdefault(r.asset, ([], []))
+            dates.append(r.date)
+            values.append(r.value)
+    return per_asset
+
+
+# componentes do crescimento: chave → (nome, cor, explicação)
+GROWTH_PARTS = {
+    "savings": ("Poupança investida", "#22c55e",
+                "Dinheiro novo nas corretoras: depósitos menos levantamentos no ano."),
+    "market": ("Valorização do mercado", "#3b82f6",
+               "Ganho ou perda das corretoras no ano (cotações, dividendos e câmbio), sem o dinheiro novo."),
+    "financial": ("Contas, depósitos, certificados e PPR", "#14b8a6",
+                  "Variação dos outros ativos financeiros: o que lá puseste mais os juros ou a valorização "
+                  "(os valores indicados à mão não separam as duas coisas)."),
+    "property": ("Imóveis", "#f59e0b",
+                 "Variação do valor de mercado estimado dos imóveis (já com o desconto de venda, se o usas)."),
+    "debt": ("Amortização da dívida", "#a855f7",
+             "Quanto as dívidas desceram no ano (se subiram, por um crédito novo, conta a negativo)."),
+}
+
+
+def growth(p):
+    """De onde veio a variação do património líquido total em cada ano civil (o ano corrente até hoje).
+
+    total = corretoras + outros ativos financeiros + imóveis × (1 − desconto) − dívidas, por isso a variação no
+    ano divide-se, sem resto, em: poupança investida (depósitos líquidos nas corretoras), valorização do mercado
+    (o resto da variação das corretoras), outros ativos financeiros, imóveis e amortização da dívida.
+
+    Registar um ativo não é crescimento: antes do primeiro registo, cada outro ativo conta com o primeiro valor
+    conhecido. Devolve a lista dos anos, do mais recente para o mais antigo.
+    """
+    has_series = bool(p.transactions and p.series.dates)
+    sdates = p.series.dates if has_series else []
+    items = OtherAsset.query.all()
+    per_asset = _records(items)
+    if not sdates and not per_asset:
+        return []
+    discount = sale_discount()
+    today = date.today()
+
+    def brokers_at(d):
+        i = bisect_right(sdates, d) - 1
+        return (p.series.value[i], p.series.net_deposits[i]) if i >= 0 else (0.0, 0.0)
+
+    def others_at(d):
+        out = {"financial": 0.0, "property": 0.0, "debt": 0.0}
+        for a in items:
+            if a.id not in per_asset:
+                continue
+            dates, values = per_asset[a.id]
+            j = bisect_right(dates, d) - 1
+            v = values[max(j, 0)]  # antes do primeiro registo: o primeiro valor (registar não é crescer)
+            if a.debt:
+                out["debt"] += v
+            elif a.category == "imovel":
+                out["property"] += v * (1 - discount)
+            else:
+                out["financial"] += v
+        return out
+
+    first = min(sdates[:1] + [ds[0] for ds, _ in per_asset.values()])
+    years = []
+    for year in range(first.year, today.year + 1):
+        start, end = date(year - 1, 12, 31), min(date(year, 12, 31), today)
+        (b0, d0), (b1, d1) = brokers_at(start), brokers_at(end)
+        o0, o1 = others_at(start), others_at(end)
+        parts = {"savings": d1 - d0, "market": (b1 - b0) - (d1 - d0),
+                 "financial": o1["financial"] - o0["financial"], "property": o1["property"] - o0["property"],
+                 "debt": o0["debt"] - o1["debt"]}
+        total0 = b0 + o0["financial"] + o0["property"] - o0["debt"]
+        total1 = b1 + o1["financial"] + o1["property"] - o1["debt"]
+        years.append({"year": year, "partial": end < date(year, 12, 31), "start": round(total0, 2),
+                      "end": round(total1, 2), "change": round(total1 - total0, 2),
+                      "parts": [{"key": k, "name": GROWTH_PARTS[k][0], "color": GROWTH_PARTS[k][1],
+                                 "help": GROWTH_PARTS[k][2], "value": round(v, 2)} for k, v in parts.items()]})
+    return list(reversed(years))
 
 
 def _month_last_day(d):

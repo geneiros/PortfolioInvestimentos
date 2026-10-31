@@ -112,6 +112,37 @@
   <div style="height: 300px"><canvas id="nwChart"></canvas></div>
 </div>
 
+{% if growth %}
+<div class="pm-card mb-3" id="nwGrowth">
+  <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+    <span class="pm-label">De onde veio o crescimento {{ help("Variação do património líquido total em cada ano, dividida em poupança investida, valorização do mercado, outros ativos financeiros, imóveis e amortização da dívida (a soma dá a variação). Registar um ativo novo não conta como crescimento.") }}</span>
+    <select class="form-select form-select-sm w-auto ms-auto" id="growthYear" aria-label="Ano">
+      {% for g in growth %}<option value="{{ g.year }}">{{ g.year }}{% if g.partial %} (até hoje){% endif %}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="row g-3 align-items-center">
+    <div class="col-lg-5">
+      {% for g in growth %}
+      <div class="pm-growth-year {{ '' if loop.first else 'd-none' }}" data-year="{{ g.year }}">
+        <div class="mb-2"><span class="pm-big money {{ g.change|tone }}">{{ g.change|money(sign=True) }}</span>
+          <div class="small text-secondary"><span class="money">{{ g.start|money }}</span> → <span class="money">{{ g.end|money }}</span>
+            {% if g.start > 0 %}({{ (g.change / g.start)|pct(1) }}){% endif %}</div></div>
+        {% set biggest = g.parts|map(attribute="value")|map("abs")|max %}
+        <table class="table pm-table mb-0"><tbody>
+          {% for part in g.parts %}
+          <tr><td class="pm-nw-name"><span class="pm-nw-dot" style="background: {{ part.color }}"></span>{{ part.name }} {{ help(part.help) }}</td>
+            <td class="w-25"><div class="pm-scorebar"><div style="width: {{ (part.value|abs / biggest * 100) if biggest else 0 }}%; background: {{ part.color if part.value >= 0 else 'var(--pm-down)' }}"></div></div></td>
+            <td class="text-end money {{ part.value|tone }}">{{ part.value|money(sign=True) }}</td></tr>
+          {% endfor %}
+        </tbody></table>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="col-lg-7"><div style="height: 280px"><canvas id="growthChart"></canvas></div></div>
+  </div>
+</div>
+{% endif %}
+
 <div class="modal fade" id="assetModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog"><form class="modal-content" data-pm-method="save_other_asset" data-pm-success="Guardado.">
     <div class="modal-header"><h5 class="modal-title" id="assetTitle">Adicionar ativo ou dívida</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
@@ -218,7 +249,25 @@ document.addEventListener("DOMContentLoaded", () => {
         scales: { x: { ticks: { maxTicksLimit: window.innerWidth < 576 ? 4 : 10, maxRotation: 0 }, grid: { display: false } },
                   y: { stacked: true, position: "right", ticks: { callback: (v) => pm.money(v, 0) } } } } });
   };
-  draw(); document.addEventListener("pm:theme", draw);
+  const growthSelect = document.getElementById("growthYear");
+  if (growthSelect) growthSelect.addEventListener("change", () => {
+    document.querySelectorAll(".pm-growth-year").forEach((x) => x.classList.toggle("d-none", x.dataset.year !== growthSelect.value));
+  });
+  const drawGrowth = () => {
+    if (!d.growth || !d.growth.length) return;
+    const years = [...d.growth].reverse();
+    const datasets = years[0].parts.map((part, k) => ({ type: "bar", label: part.name, backgroundColor: part.color, stack: "g",
+      data: years.map((y) => y.parts[k].value) }));
+    datasets.unshift({ type: "line", label: "Variação do total", data: years.map((y) => y.change), borderColor: pm.css("--pm-text"),
+      backgroundColor: pm.css("--pm-text"), pointRadius: 4, borderWidth: 2, order: -1 });
+    pm.chart("growthChart", { data: { labels: years.map((y) => y.partial ? `${y.year}*` : String(y.year)), datasets },
+      options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+        plugins: { legend: { position: "bottom" }, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0, true)}` } } },
+        scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, position: "right", ticks: { callback: (v) => pm.money(v, 0) } } },
+        onClick: (_, els) => { if (els.length && growthSelect) { growthSelect.value = years[els[0].index].year; growthSelect.dispatchEvent(new Event("change")); } } } });
+  };
+  draw(); drawGrowth();
+  document.addEventListener("pm:theme", () => { draw(); drawGrowth(); });
 });
 </script>
 {% endblock %}

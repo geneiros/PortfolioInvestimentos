@@ -1587,3 +1587,45 @@ def test_networth_migration_adds_liquidity_columns(tmp_path, monkeypatch):
 def data_portfolio():
     from portfolio_investimentos.services import data
     return data.load_portfolio(None)
+
+
+def test_networth_growth_by_year(app, client):
+    from portfolio_investimentos.models import OtherAsset, OtherAssetValue, Setting
+    from portfolio_investimentos.services import networth
+    today = date.today()
+    last = today.year - 1
+    with app.app_context():
+        conta = OtherAsset(label="Conta", category="conta", value=8000)
+        casa = OtherAsset(label="Casa", category="imovel", value=210000, home=True)
+        cred = OtherAsset(label="Crédito", category="credito", value=140000)
+        db.session.add_all([conta, casa, cred])
+        db.session.flush()
+        cred.linked = casa.id
+        rows = [(conta, date(last, 3, 28), 5000), (conta, date(last, 12, 28), 6000), (conta, today, 8000),
+                (casa, date(last, 6, 28), 200000), (casa, today, 210000),
+                (cred, date(last, 6, 28), 150000), (cred, date(last, 12, 28), 146000), (cred, today, 140000)]
+        db.session.add_all(OtherAssetValue(asset=a.id, date=d, value=v) for a, d, v in rows)
+        db.session.commit()
+        years = networth.growth(data_portfolio())
+        assert [y["year"] for y in years] == [today.year, last]
+        for y in years:  # as partes somam a variação do total, sem resto
+            assert abs(sum(part["value"] for part in y["parts"]) - y["change"]) < 0.05
+        now = {part["key"]: part["value"] for part in years[0]["parts"]}
+        assert now == {"savings": 0, "market": 0, "financial": 2000, "property": 10000, "debt": 6000}
+        assert years[0]["partial"] and years[0]["end"] == 8000 + 210000 - 140000
+        before = {part["key"]: part["value"] for part in years[1]["parts"]}
+        # registar não é crescer: a conta conta 5000 desde o início do ano, a casa e o crédito desde junho
+        assert before == {"savings": 0, "market": 0, "financial": 1000, "property": 0, "debt": 4000}
+        # o desconto de venda também se aplica à variação dos imóveis
+        Setting.set("networth_sale_discount", 10)
+        now = {part["key"]: part["value"] for part in networth.growth(data_portfolio())[0]["parts"]}
+        assert now["property"] == 9000
+    html = client.get("/patrimonio").get_data(as_text=True)
+    assert 'id="nwGrowth"' in html and "De onde veio o crescimento" in html and "Amortização da dívida" in html
+    # com a demonstração (corretoras com depósitos): poupança + mercado = variação das corretoras
+    token = csrf(client)
+    post(client, "load_demo", token)
+    with app.app_context():
+        years = networth.growth(data_portfolio())
+        assert years and all(abs(sum(p["value"] for p in y["parts"]) - y["change"]) < 0.05 for y in years)
+        assert any(p["key"] == "savings" and p["value"] > 0 for y in years for p in y["parts"])

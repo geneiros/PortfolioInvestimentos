@@ -492,8 +492,10 @@ def patrimonio():
     c = ctx.build("patrimonio", "Património")
     p_all = data.load_portfolio(None)  # o património conta sempre todas as corretoras
     summary = networth.summary(p_all, _saved_expenses())
+    growth = networth.growth(p_all)
     c.update(nw=summary, categories=OTHER_CATEGORIES, liquidity=LIQUIDITY, discounts=networth.SALE_DISCOUNTS,
-             chart=ctx.js_json({"history": networth.history(p_all), "allocation": summary["allocation"]}))
+             growth=growth, chart=ctx.js_json({"history": networth.history(p_all), "allocation": summary["allocation"],
+                                               "growth": growth}))
     return render_template("pages/patrimonio.html", **c)
 
 
