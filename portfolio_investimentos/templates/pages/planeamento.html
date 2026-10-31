@@ -10,6 +10,7 @@
     português, e quando lá chegas com o que tens hoje e o que investes por mês.</p>
 </div>
 
+<div class="pm-label mb-2">Para sempre (regra dos {{ plan.withdrawal_rate|pct(1, sign=False) }})</div>
 <div class="row g-3 mb-3">
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
     <div class="pm-label">O número FIRE {{ help("Despesas anuais ÷ (1 − imposto efetivo sobre os levantamentos) ÷ taxa de levantamento. Ex.: 12 000 € ÷ (1 − 14%) ÷ 4% ≈ 349 000 €.") }}</div>
@@ -34,6 +35,31 @@
   </div></div>
 </div>
 
+{% if life %}
+<div class="pm-label mb-2">Até aos {{ life.until_age|int }} anos{% if life.pension %}, com a pensão a partir dos {{ life.pension_age|int }}{% endif %}
+  {{ help("Capital que paga as despesas (já com o IRS dos levantamentos) desde a data FIRE até à idade indicada, a render a taxa real do cenário, e acaba perto de zero. A pensão, se indicada, abate às despesas. É menos do que o número FIRE «para sempre», sobretudo para quem se reforma tarde.") }}</div>
+<div class="row g-3 mb-3">
+  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
+    <div class="pm-label">Capital necessário</div>
+    <div class="pm-mid money">{{ life.number|money if life.number else "—" }}</div>
+    <div class="small text-secondary">{% if life.age_at %}na data FIRE, aos {{ life.age_at|round|int }} anos (cenário base){% else %}não chega antes dos {{ (life.until_age - 1)|int }} anos{% endif %}</div>
+  </div></div>
+  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
+    <div class="pm-label">Se te reformasses hoje {{ help("Capital necessário para viver desde hoje até à idade indicada, e a parte que já tens.") }}</div>
+    <div class="pm-mid">{{ life.done|pct(2, sign=False) }}</div>
+    <div class="pm-progress mt-2"><div style="width: {{ [[life.done * 100, 0]|max, 100]|min }}%"></div></div>
+    <div class="small text-secondary mt-1"><span class="money">{{ plan.value|money }}</span> de <span class="money">{{ life.now|money }}</span></div>
+  </div></div>
+  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
+    <div class="pm-label">A data FIRE</div>
+    <div class="pm-mid">{{ life.date.year if life.date else "—" }}</div>
+    <div class="small text-secondary">{% if life.earliest and life.latest %}Entre {{ life.earliest.year }} e {{ life.latest.year }}{% elif life.earliest %}A partir de {{ life.earliest.year }}{% else %}Não chega com estes valores{% endif %}</div>
+  </div></div>
+</div>
+{% elif not cfg.age %}
+<p class="small text-secondary">Indica a tua idade em «O teu plano» para ver também o capital necessário até uma certa idade (por exemplo, até aos 90 anos), com a pensão, em vez de um capital que dura para sempre.</p>
+{% endif %}
+
 <div class="row g-3 mb-3">
   <div class="col-xl-8"><div class="pm-card h-100">
     <div class="pm-label mb-2">Evolução e projeção</div>
@@ -52,6 +78,13 @@
         <input name="swr" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.swr }}"></label>
       <label>Imposto efetivo sobre os levantamentos (%) {{ help("Em Portugal, as mais-valias pagam 28%, mas só sobre a parte de ganho de cada venda. Por omissão: 28% × a parte de ganho da carteira (pelo menos metade).") }}
         <input name="tax" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.tax }}"></label>
+      <div class="pm-label mt-2">Até quando tem de durar {{ help("Opcional. Com a tua idade, calcula também o capital que paga as despesas até à idade indicada e pode acabar perto de zero (em vez de durar para sempre).") }}</div>
+      <div class="row g-2">
+        <label class="col-6">A tua idade<input name="age" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.age|int if cfg.age else '' }}" placeholder="ex.: 45"></label>
+        <label class="col-6">Durar até aos<input name="until" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.until|int }}"></label>
+        <label class="col-6">Pensão líquida/mês (€) {{ help("A pensão da Segurança Social que esperas, líquida, por mês (paga 14 vezes por ano). Abate às despesas a partir da idade indicada.") }}<input name="pension" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.pension|round|int }}"></label>
+        <label class="col-6">A partir dos<input name="pension_age" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.pension_age|int }}"></label>
+      </div>
       <button class="btn btn-sm btn-primary align-self-start mt-1" type="submit">Recalcular</button>
       {% if not cfg.custom %}<span class="text-secondary">Valores sugeridos a partir da carteira; ajusta-os aos teus.</span>{% endif %}
     </form>
@@ -96,6 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
       { label: "Carteira (real)", data: d.history, borderColor: pm.css("--pm-text"), borderWidth: 2, pointRadius: 0, tension: .2 },
       ...d.scenarios.map((s) => ({ label: `${s.name} (${Math.round(s.rate * 100)}%)`, data: s.data, borderColor: colors[s.name],
         borderWidth: s.name === "base" ? 2.5 : 1.5, pointRadius: 0, tension: .2, fill: false })),
+      ...(d.life ? [{ label: "Necessário até ao fim", data: d.life, borderColor: "#a855f7", borderDash: [3, 4], borderWidth: 1.5, pointRadius: 0 }] : []),
       { label: "Número FIRE", data: [{ x: d.start, y: d.target }, { x: d.end, y: d.target }], borderColor: "#f59e0b",
         borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0 },
     ];

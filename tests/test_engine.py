@@ -221,6 +221,24 @@ def test_fire_number_dates_and_tracking():
     assert [(r["month"], r["change"]) for r in track] == [((2026, 10), -11.0), ((2026, 9), 10.0)]
 
 
+def test_fire_lifetime_needs_less_than_forever_and_counts_the_pension():
+    from portfolio_investimentos.engine import fire
+    start = date(2026, 11, 1)
+    # sem retorno: 30 anos de 12 000 € = 360 000 € (contas fáceis)
+    need = fire.required_by_month(0.0, 12000, 0.0, 60, 90)
+    assert need[0] == pytest.approx(360000) and need[-1] == 0
+    # pensão de 600 €/mês × 14 a partir dos 67: menos 8 400 € por ano durante 23 anos
+    with_pension = fire.required_by_month(0.0, 12000, 0.0, 60, 90, pension=8400, pension_age=67)
+    assert with_pension[0] == pytest.approx(360000 - 8400 * 23)
+    life = fire.lifetime_plan(100000, 12000, 0.14, 1000, 45, 90, start=start)
+    forever = fire.plan(100000, 12000, 0.04, 0.14, 1000, start=start)
+    assert life["date"] < forever["date"] and life["number"] < forever["number"]
+    assert 45 < life["age_at"] < 90
+    # se já tem o suficiente, é hoje
+    rich = fire.lifetime_plan(10_000_000, 12000, 0.0, 0, 45, 90, start=start)
+    assert rich["date"] == start and rich["done"] > 1
+
+
 def test_fiscal_dividend_credit_is_limited_per_dividend():
     """A retenção a mais num dividendo (30% nos EUA) não abate o imposto de outro dividendo do mesmo ano."""
     d0 = date(2024, 1, 2)

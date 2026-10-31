@@ -733,6 +733,13 @@ def test_planning_fire_page_and_settings(app, client):
     assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500").status_code == 200
     html = client.get("/planeamento").get_data(as_text=True)
     assert "600" in html.replace("\u202f", "").replace(" ", "")  # 24 000 / 4% = 600 000 €
+    assert "Indica a tua idade" in html
+    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45", until="90",
+                pension="800", pension_age="67").status_code == 200
+    html = client.get("/planeamento").get_data(as_text=True)
+    assert "Até aos 90 anos, com a pensão a partir dos 67" in html and "Se te reformasses hoje" in html
+    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="0", age="95",
+                until="90").status_code == 400
     assert post(client, "save_fire", token, expenses="0", swr="4", tax="0", monthly="0").status_code == 400
     assert post(client, "save_fire", token, expenses="1000", swr="50", tax="0", monthly="0").status_code == 400
 

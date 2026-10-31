@@ -68,3 +68,47 @@ def monthly_track(dates, values, target, months=12):
             rows.append({"month": key, "value": v, "done": v / target if target > 0 else 0.0, "change": v - prev})
         prev = v
     return list(reversed(rows))
+
+
+def required_by_month(rate, expenses, tax_rate, age, until_age, pension=0.0, pension_age=None):
+    """Capital necessário em cada mês a partir de hoje para pagar as despesas até `until_age` (e acabar a zero).
+
+    Para trás, desde o último mês: necessário(t) = levantamento(t) + necessário(t + 1) / (1 + g). O levantamento
+    é o que falta às despesas depois da pensão (a partir de `pension_age`), já com o imposto sobre a venda.
+    Devolve uma lista indexada pelo mês a contar de hoje (0 = hoje).
+    """
+    g = (1 + rate) ** (1 / 12) - 1
+    months = max(int(round((until_age - age) * 12)), 0)
+    need = [0.0] * (months + 1)
+    for t in range(months - 1, -1, -1):
+        age_t = age + t / 12
+        income = pension if pension_age is not None and age_t >= pension_age else 0.0
+        withdraw = max(expenses - income, 0.0) / 12 / (1 - tax_rate)
+        need[t] = withdraw + need[t + 1] / (1 + g)
+    return need
+
+
+def lifetime_plan(value, expenses, tax_rate, monthly, age, until_age, pension=0.0, pension_age=None, start=None):
+    """Como `plan`, mas o capital só tem de durar até `until_age`: a data é o primeiro mês em que o valor da
+    carteira chega ao capital necessário para viver dele desde esse mês até ao fim."""
+    start = start or date.today().replace(day=1)
+    scenarios = []
+    for name, rate in SCENARIOS:
+        need = required_by_month(rate, expenses, tax_rate, age, until_age, pension, pension_age)
+        g = (1 + rate) ** (1 / 12) - 1
+        v, reached, number = value, None, None
+        # o último ano não conta: "chegar" aos 89 para viver até aos 90 não é independência financeira
+        for m in range(max(len(need) - 12, 0)):
+            if v >= need[m]:
+                reached, number = _add_months(start, m), need[m]
+                break
+            v = v * (1 + g) + monthly
+        curve = [(_add_months(start, m), need[m]) for m in range(0, len(need), 12)]
+        at = None if reached is None else age + (reached.year - start.year) + (reached.month - start.month) / 12
+        scenarios.append({"name": name, "rate": rate, "date": reached, "number": number,
+                          "now": need[0] if need else 0.0, "age": at, "curve": curve})
+    base = next(s for s in scenarios if s["name"] == "base")
+    return {"scenarios": scenarios, "date": base["date"], "number": base["number"], "now": base["now"],
+            "age_at": base["age"], "done": value / base["now"] if base["now"] else 0.0,
+            "earliest": next((s["date"] for s in reversed(scenarios) if s["date"]), None),
+            "latest": scenarios[0]["date"], "until_age": until_age, "pension": pension, "pension_age": pension_age}

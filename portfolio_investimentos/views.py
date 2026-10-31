@@ -391,7 +391,9 @@ def fire_settings(p):
     gain_share = min(max(gains / p.holdings_value, 0.0), 1.0) if p.holdings_value > 0 else 0.5
     return {"expenses": get("fire_expenses", 12000.0), "swr": get("fire_swr", 4.0),
             "tax": get("fire_tax", round(28 * max(gain_share, 0.5), 1)), "monthly": get("fire_monthly", round(monthly)),
-            "custom": Setting.get("fire_expenses") is not None}
+            "custom": Setting.get("fire_expenses") is not None,
+            "age": get("fire_age", None), "until": get("fire_until", 90.0), "pension": get("fire_pension", 0.0),
+            "pension_age": get("fire_pension_age", 67.0)}
 
 
 @bp.route("/planeamento")
@@ -415,7 +417,14 @@ def planeamento():
                       for sc in plan["scenarios"]],
         "target": round(plan["number"]), "start": year(history[0][0]) if history else date.today().year, "end": end_year,
     }
-    c.update(cfg=cfg, plan=plan, chart=ctx.js_json(chart),
+    life = None
+    if cfg["age"]:
+        # pensão mensal líquida × 14 meses (como em Portugal)
+        life = fire.lifetime_plan(p.total_value, cfg["expenses"], cfg["tax"] / 100, cfg["monthly"], cfg["age"],
+                                  cfg["until"], cfg["pension"] * 14, cfg["pension_age"] if cfg["pension"] else None)
+        base = next(sc for sc in life["scenarios"] if sc["name"] == "base")
+        chart["life"] = [{"x": year(d), "y": round(v)} for d, v in base["curve"] if d.year <= end_year]
+    c.update(cfg=cfg, plan=plan, life=life, chart=ctx.js_json(chart),
              track=fire.monthly_track(s.dates, s.value, plan["number"]))
     return render_template("pages/planeamento.html", **c)
 
