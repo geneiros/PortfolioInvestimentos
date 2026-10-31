@@ -158,3 +158,42 @@ class Event(db.Model):
     revenue_estimate = db.Column(db.Float)
     amount = db.Column(db.Float)
     estimated = False
+
+
+# outros ativos (fora das corretoras): chave → (nome, ícone, cor, conta no FIRE por omissão, é dívida)
+OTHER_CATEGORIES = {
+    "ppr": ("PPR", "bi-piggy-bank", "#a855f7", True, False),
+    "aforro": ("Certificados de aforro / tesouro", "bi-bank", "#14b8a6", True, False),
+    "deposito": ("Depósitos", "bi-safe", "#06b6d4", True, False),
+    "imovel": ("Imóveis", "bi-house", "#f59e0b", False, False),
+    "outro": ("Outros", "bi-box", "#64748b", True, False),
+    "credito": ("Créditos (dívidas)", "bi-credit-card", "#ef4444", False, True),
+}
+
+
+class OtherAsset(NameMixin, db.Model):
+    """Ativo ou dívida fora das corretoras, com o valor indicado à mão (em euros)."""
+    id = db.Column(db.Integer, primary_key=True)
+    label = db.Column(db.String(120), nullable=False)
+    category = db.Column(db.String(16), nullable=False)
+    value = db.Column(db.Float, nullable=False, default=0.0)  # sempre positivo; o sinal vem da categoria
+    fire = db.Column(db.Boolean, default=True)  # soma-se à carteira no Planeamento (FIRE)
+    note = db.Column(db.String(255))
+    updated = db.Column(db.Date)
+    creation = db.Column(db.DateTime, default=utcnow)
+
+    @property
+    def debt(self):
+        return OTHER_CATEGORIES.get(self.category, OTHER_CATEGORIES["outro"])[4]
+
+    @property
+    def signed(self):
+        return -self.value if self.debt else self.value
+
+
+class OtherAssetValue(db.Model):
+    """Valor de um outro ativo em cada mês (o último registado no mês), para a evolução do património."""
+    id = db.Column(db.Integer, primary_key=True)
+    asset = db.Column(db.Integer, db.ForeignKey("other_asset.id", ondelete="CASCADE"), nullable=False, index=True)
+    date = db.Column(db.Date, nullable=False)
+    value = db.Column(db.Float, nullable=False)

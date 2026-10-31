@@ -5,10 +5,11 @@ from types import SimpleNamespace
 from flask import Blueprint, Response, abort, current_app, render_template, request
 
 from .engine.portfolio import MERIT_BENCHMARK
-from .models import Alert, Broker, Event, ImportBatch, Instrument, Price, Setting, Transaction, WatchItem, db
+from .models import (OTHER_CATEGORIES, Alert, Broker, Event, ImportBatch, Instrument, Price, Setting, Transaction,
+                     WatchItem, db)
 from . import auth
 from .services import context as ctx
-from .services import backups, data, insights
+from .services import backups, data, insights, networth
 from .services.importer import BROKERS, INSTRUCTIONS
 from .services.market import check_alerts, refresh_state, upcoming_events, yfinance_available
 
@@ -118,6 +119,7 @@ def overview():
                       ("Mais tarde", [e for e in events if e.date > two][:10])],
         instruments=instruments, fired=check_alerts(p), perf=ctx.js_json(perf_payload(p, "MAX")),
         benchmarks=p.benchmarks, scores=insights.scores(p),
+        networth=networth.summary(data.load_portfolio(None)) if networth.assets() else None,
         insights_data=ctx.js_json({"wr": insights.weight_return(p), "alloc": insights.allocation(p, c["broker"])}),
     )
     return render_template("pages/index.html", **c)
@@ -408,16 +410,18 @@ def planeamento():
     pension = cfg["pension"] * 14 if age and cfg["pension"] else 0.0  # pensão mensal líquida × 14 meses
     pension_age = cfg["pension_age"] if pension else None
     stop_age = cfg["stop_age"] if age and cfg["stop_age"] else None
-    plan = fire.plan(p.total_value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100, cfg["monthly"], age=age,
+    others = networth.fire_extra()  # outros ativos (Património) marcados para o FIRE
+    value = p.total_value + others
+    plan = fire.plan(value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100, cfg["monthly"], age=age,
                      pension=pension, pension_age=pension_age, stop_age=stop_age,
                      horizon_age=cfg["until"] if age else None)
     with_pension = None
     if age and pension:
-        with_pension = fire.pension_plan(p.total_value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100,
+        with_pension = fire.pension_plan(value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100,
                                          cfg["monthly"], age, pension, pension_age, cfg["until"], stop_age=stop_age)
     life = None
     if age:
-        life = fire.lifetime_plan(p.total_value, cfg["expenses"], cfg["tax"] / 100, cfg["monthly"], age,
+        life = fire.lifetime_plan(value, cfg["expenses"], cfg["tax"] / 100, cfg["monthly"], age,
                                   cfg["until"], pension, pension_age, stop_age=stop_age)
     s = p.series
     history = [(d, v) for d, v in zip(s.dates, s.value)]
@@ -470,7 +474,7 @@ def planeamento():
         if not last or not sc["date"] or last <= sc["date"]:  # sem data FIRE, a curva já só acumula
             continue
         months = (last.year - start.year) * 12 + last.month - start.month
-        pts, _, _ = fire.simulate(p.total_value, cfg["monthly"], sc["rate"], start, months, lambda m, v: False,
+        pts, _, _ = fire.simulate(value, cfg["monthly"], sc["rate"], start, months, lambda m, v: False,
                                   cfg["expenses"], cfg["tax"] / 100, age, pension, pension_age, stop_age)
         first = year(sc["date"])
         keep = [(d, v) for i, (d, v) in enumerate(pts)
@@ -478,9 +482,20 @@ def planeamento():
         extra = [{"x": m["x"], "y": m["y"]} for mk in chart["markers"] for m in mk["data"]
                  if m["s"] == sc["name"] and m["x"] > first]
         out["more"] = sorted([{"x": year(d), "y": round(v)} for d, v in keep] + extra, key=lambda q: q["x"])
-    c.update(cfg=cfg, plan=plan, life=life, with_pension=with_pension, chart=ctx.js_json(chart), reach=reach,
+    c.update(fire_extra=others, cfg=cfg, plan=plan, life=life, with_pension=with_pension, chart=ctx.js_json(chart), reach=reach,
              track=fire.monthly_track(s.dates, s.value, plan["number"]))
     return render_template("pages/planeamento.html", **c)
+
+
+@bp.route("/patrimonio")
+def patrimonio():
+    c = ctx.build("patrimonio", "Património")
+    p_all = data.load_portfolio(None)  # o património conta sempre todas as corretoras
+    summary = networth.summary(p_all)
+    hist = networth.history(p_all)
+    c.update(nw=summary, categories=OTHER_CATEGORIES, chart=ctx.js_json({
+        "history": hist, "categories": summary["categories"], "brokers": round(summary["brokers"], 2)}))
+    return render_template("pages/patrimonio.html", **c)
 
 
 @bp.route("/sw.js")

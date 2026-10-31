@@ -4,6 +4,26 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-10-31
 
+- **Património: outros ativos e património líquido**  
+  Nova página Património (menu lateral): a carteira das corretoras mais os ativos e as dívidas fora delas, indicados à mão (PPR, certificados de aforro/tesouro, depósitos, imóveis, outros e créditos), com: - património líquido, corretoras, outros ativos, dívidas e o que conta no FIRE; - composição com o peso de cada um, editar/apagar e um interruptor "FIRE" por ativo (por omissão ligado nos ativos financeiros, desligado em imóveis e créditos); - donut por categoria e evolução mensal (fica um registo por mês sempre que atualizas um valor); - aviso nos valores sem atualizar há mais de 90 dias. No Planeamento, os ativos marcados somam-se ao valor da carteira (com a nota "Inclui € X de outros ativos"); na Visão Geral, o património líquido aparece por baixo do valor da carteira. Tabelas novas OtherAsset e OtherAssetValue (criadas sozinhas), ações save_other_asset, set_other_asset_fire e delete_other_asset, e exemplos na demonstração.
+- **Esconder valores: espaço fino entre o € e os pontos** `7ef5674`  
+  Volta a haver um espaço fino entre o € e os pontos («€ ••••»), sem espaçamento extra entre os pontos.
+- **Esconder valores: pontos juntos ao €** `7bf7486`  
+  O texto que substitui cada valor passa de «€ ••••» a «€••••».
+- **Esconder valores: «€ ••••» em vez do desfoque** `168095c`  
+  Cada valor em euros passa a aparecer como «€ ••••», com os pontos à altura do meio do €. O texto real fica transparente e sem largura, por isso também não se adivinha o número de algarismos.
+- **Esconder valores: sem mostrar os valores por instantes ao mudar de página** `8a49a9d`  
+  A opção passa a ser aplicada logo no início da página (na tag html, como o tema), antes de qualquer valor aparecer.
+- **Esconder valores: desfoque proporcional ao tamanho da letra** `176785d`  
+  Os números grandes, como o valor da carteira, deixavam-se ler com o desfoque fixo de 7 px.
+- **Planeamento: quando cada cenário chega a cada número FIRE** `f59da8e`  
+  Tabela «Quando chegas a cada número FIRE» (mês, idade e capital por número FIRE e cenário) e, no gráfico, um ponto da cor de cada número onde cada cenário lá chega, com a curva pontilhada "se continuasses a investir".
+- **Planeamento: nota quando a pensão cobre as despesas** `dfcf5bb`  
+  Quando a pensão (× 14 meses) paga as despesas, só é preciso capital até à pensão e os números «para sempre, com a pensão» e «até aos N anos» ficam iguais; a página passa a explicá-lo.
+- **Visão Geral: Investor Score e Portfolio Score cabem no ecrã do telemóvel** `d2ff44f`  
+  Os cartões das notas deixam de ficar cortados no telemóvel.
+- **Login: limite de tentativas por visitante atrás de um proxy e guardado na base de dados** `8f3091e`  
+  Com PORTFOLIO_PROXY, o endereço é o do visitante; as tentativas falhadas ficam na base de dados (valem para todos os processos) e a palavra-passe atual é pedida para a mudar ou remover (#28).
 - **Planeamento: cor da linha do gráfico no título de cada número FIRE** `fc31f3d`  
   Os títulos "Para sempre", "Para sempre, com a pensão" e "Até aos N anos" passam a ter a cor e uma amostra da linha tracejada correspondente no gráfico (laranja, roxa e rosa).
 - **Planeamento: números FIRE como linhas tracejadas no gráfico** `cbdbdff`  

@@ -9,8 +9,8 @@ import math
 import random
 from datetime import date, timedelta
 
-from ..models import (Alert, Broker, Event, FxRate, ImportBatch, Instrument, Price, Setting, Transaction,
-                      WatchItem, db)
+from ..models import (Alert, Broker, Event, FxRate, ImportBatch, Instrument, OtherAsset, OtherAssetValue, Price,
+                      Setting, Transaction, WatchItem, db)
 from .market import DEFAULT_BENCHMARKS, ensure_benchmarks
 
 START = date(2021, 6, 1)
@@ -83,7 +83,7 @@ def create_demo(seed=42):
         _insert_series(Price, "instrument", ticker, "close", series)
         prices[ticker] = dict(series)
 
-    for model in (Transaction, ImportBatch, Alert, WatchItem):
+    for model in (Transaction, ImportBatch, Alert, WatchItem, OtherAssetValue, OtherAsset):
         model.query.delete()
     Broker.query.delete()
     db.session.commit()
@@ -165,6 +165,30 @@ def create_demo(seed=42):
                          threshold=round(prices["DEMO-NVTX"][days[-1]] * 0.9, 2), active=True))
     db.session.add(WatchItem(instrument="DEMO-ATLE", target_price=round(prices["DEMO-ATLE"][days[-1]] * 0.95, 2),
                              note="Comprar abaixo do alvo"))
+    _other_assets(rng, today)
     db.session.commit()
     Setting.set("demo", "1")
     return "Dados de demonstração criados."
+
+
+# outros ativos (Património): valor inicial, entrada mensal e rendimento anual, há 36 meses
+OTHER_ASSETS = [
+    ("PPR (fictício)", "ppr", 6000, 100, 0.05, True),
+    ("Certificados de aforro (fictícios)", "aforro", 10000, 0, 0.025, True),
+    ("Conta poupança (fictícia)", "deposito", 4000, 50, 0.015, True),
+]
+
+
+def _other_assets(rng, today):
+    for label, category, v0, monthly, rate, fire in OTHER_ASSETS:
+        asset = OtherAsset(label=label, category=category, value=v0, fire=fire, updated=today)
+        db.session.add(asset)
+        db.session.flush()
+        v = v0
+        for k in range(36, -1, -1):
+            y, m = divmod(today.year * 12 + today.month - 1 - k, 12)
+            d = today if k == 0 else date(y, m + 1, 28)
+            db.session.add(OtherAssetValue(asset=asset.id, date=d, value=round(v, 2)))
+            v = v * (1 + rate) ** (1 / 12) * (1 + rng.gauss(0, 0.002)) + monthly
+        asset.value = db.session.query(OtherAssetValue.value).filter_by(asset=asset.id).order_by(
+            OtherAssetValue.date.desc()).first()[0]

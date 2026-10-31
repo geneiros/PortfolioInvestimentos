@@ -2,6 +2,7 @@
 import inspect
 import io
 import json
+import math
 import os
 import sqlite3
 import tempfile
@@ -9,8 +10,8 @@ from datetime import date
 
 from flask import Blueprint, Response, abort, current_app, jsonify, request, send_file, session
 
-from .models import (Alert, Broker, DividendHistory, Event, FxRate, ImportBatch, Instrument, Price, Setting,
-                     Transaction, WatchItem, db)
+from .models import (OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, FxRate, ImportBatch, Instrument,
+                     OtherAsset, OtherAssetValue, Price, Setting, Transaction, WatchItem, db)
 from . import auth
 from .engine.portfolio import ASSET_TYPES
 from .services import backups, data, importer, market
@@ -329,6 +330,45 @@ def delete_watch(name):
     db.session.commit()
 
 
+# --------------------------------------------------------- património (outros ativos)
+@action
+def save_other_asset(label, category, value, fire="", note="", name=""):
+    from .services import networth
+    label = (label or "").strip()
+    if not label:
+        raise ApiError("Indica o nome.")
+    if category not in OTHER_CATEGORIES:
+        raise ApiError("Categoria desconhecida.")
+    amount = _float(value)
+    if not math.isfinite(amount) or amount < 0:
+        raise ApiError("O valor tem de ser um número positivo (as dívidas também: o sinal vem da categoria).")
+    asset = _get(OtherAsset, name) if name else OtherAsset()
+    asset.label, asset.category, asset.value = label[:120], category, round(amount, 2)
+    asset.fire = str(fire).lower() in ("1", "true", "on", "sim")
+    asset.note = (note or "").strip()[:255] or None
+    asset.updated = date.today()
+    db.session.add(asset)
+    db.session.flush()
+    networth.record(asset)
+    db.session.commit()
+    return "Guardado."
+
+
+@action
+def set_other_asset_fire(name, fire):
+    asset = _get(OtherAsset, name)
+    asset.fire = str(fire).lower() in ("1", "true", "on", "sim")
+    db.session.commit()
+
+
+@action
+def delete_other_asset(name):
+    asset = _get(OtherAsset, name)
+    OtherAssetValue.query.filter_by(asset=asset.id).delete()
+    db.session.delete(asset)
+    db.session.commit()
+
+
 # --------------------------------------------------------- dados e mercado
 @action
 def refresh_market(only_open=""):
@@ -406,7 +446,8 @@ def reset_data(confirm=""):
     if confirm != "APAGAR":
         raise ApiError('Escreve APAGAR para confirmar.')
     _backup("apagar-tudo")
-    for model in (Transaction, ImportBatch, Alert, WatchItem, Event, DividendHistory, Price, FxRate):
+    for model in (Transaction, ImportBatch, Alert, WatchItem, Event, DividendHistory, Price, FxRate,
+                  OtherAssetValue, OtherAsset):
         model.query.delete()
     Broker.query.delete()
     Instrument.query.filter(Instrument.kind != "index").delete()

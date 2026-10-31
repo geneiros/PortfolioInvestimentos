@@ -18,10 +18,11 @@
     <div class="small text-secondary">para <span class="money">{{ plan.expenses|money }}</span> de despesas por ano, a {{ plan.withdrawal_rate|pct(1, sign=False) }} ao ano</div>
   </div></div>
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">Já feito {{ help("Valor atual da carteira (posições + caixa) a dividir pelo número FIRE.") }}</div>
+    <div class="pm-label">Já feito {{ help("Valor atual da carteira (posições + caixa), mais os outros ativos marcados para o FIRE em Património, a dividir pelo número FIRE.") }}</div>
     <div class="pm-mid">{{ plan.done|pct(2, sign=False) }}</div>
     <div class="pm-progress mt-2"><div style="width: {{ [[plan.done * 100, 0]|max, 100]|min }}%"></div></div>
     <div class="small text-secondary mt-1"><span class="money">{{ plan.value|money }}</span> de <span class="money">{{ plan.number|money }}</span></div>
+    {% if fire_extra %}<div class="small text-secondary" id="fireExtra">Inclui <span class="money">{{ fire_extra|money }}</span> de outros ativos · <a href="/patrimonio">Património</a></div>{% endif %}
   </div></div>
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
     <div class="pm-label">A data FIRE {{ help("Mês em que a carteira chega ao número FIRE no cenário base (5% ao ano, real), a investir o valor mensal indicado. O intervalo é o dos cenários otimista (7%) e pessimista (3%).") }}</div>

@@ -91,6 +91,7 @@ body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
 .pm-table td { white-space: nowrap; vertical-align: middle; }
 .pm-table tfoot td { font-weight: 600; background: var(--bs-tertiary-bg); position: sticky; bottom: 0; }
 .pm-table .sub { font-size: .75rem; color: var(--bs-secondary-color); }
+.pm-table td.pm-nw-name { white-space: normal; min-width: 9rem; }  /* Património: o nome e a nota podem partir a linha */
 .pm-table-wrap { border: var(--bs-border-width) solid var(--bs-border-color-translucent); border-radius: var(--bs-border-radius-lg);
   overflow: auto; background: var(--bs-body-bg); max-height: 70vh; }
 .pm-table-wrap thead th { position: sticky; top: 0; z-index: 1; }

@@ -138,6 +138,8 @@ As capturas usam os dados de demonstração (empresas e preços fictícios).
 | ![Radar](docs/screenshots/17-radar.png) | ![Importar](docs/screenshots/18-importar.png) |
 | **Transações** | **Definições** |
 | ![Transações](docs/screenshots/19-transacoes.png) | ![Definições](docs/screenshots/20-definicoes.png) |
+| **Património** | |
+| ![Património](docs/screenshots/21-patrimonio.png) | |
 
 ### Modo escuro
 
@@ -162,6 +164,8 @@ As capturas usam os dados de demonstração (empresas e preços fictícios).
 | ![Radar (escuro)](docs/screenshots/escuro/17-radar.png) | ![Importar (escuro)](docs/screenshots/escuro/18-importar.png) |
 | **Transações** | **Definições** |
 | ![Transações (escuro)](docs/screenshots/escuro/19-transacoes.png) | ![Definições (escuro)](docs/screenshots/escuro/20-definicoes.png) |
+| **Património** | |
+| ![Património (escuro)](docs/screenshots/escuro/21-patrimonio.png) | |
 
 O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro ou Automático.
 
@@ -174,7 +178,8 @@ O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro o
 | **Desempenho** | Retorno total e IRR, TWR e CAGR vs índice, melhor/pior ano e mês, sequência atual; TWR anual e acumulado; drawdown; mapa de retornos mensais; mérito vs mercado (captura em alta/baixa, beta, % de meses acima do mercado); risco (Sharpe, Sortino, Calmar, volatilidade, max drawdown); alfa de Jensen e distribuição mensal ordenada. |
 | **Dividendos** | Recebido líquido/bruto e retenção na fonte, maior pagador, meses com dividendos, rendimento anualizado, crescimento anual. **Projeção** do ano e dos próximos 12 meses com os dividendos recebidos e, para posições recentes, os dividendos por ação do Yahoo, com a origem de cada valor. Dividendos por ano, decomposição do crescimento, **mapa mensal com a linha do próximo ano**, **datas ex-dividendo** (recebido, a receber, sem direito por ter comprado depois, previsto), yield on cost e histórico. |
 | **Fiscal** | Por ano: mais-valias pelo método FIFO resumidas por ativo (as linhas de cada lote abrem a pedido e vão todas no CSV), dividendos com o crédito de imposto estrangeiro limitado a cada dividendo, juros e estimativa de imposto a 28% (Portugal). |
-| **Planeamento** | Independência financeira (FIRE): o número FIRE «para sempre» (regra dos 4%), «para sempre, com a pensão» e «até aos N anos, com a pensão», já depois do IRS dos levantamentos; a parte já feita; a data em três cenários (3%, 5% e 7% reais ao ano), a investir até à data FIRE (ou até uma idade) e a levantar daí em diante; o gráfico da vida inteira com os números FIRE a tracejado; até quando dura o dinheiro em cada cenário; acompanhamento mês a mês. |
+| **Planeamento** | Independência financeira (FIRE): o número FIRE «para sempre» (regra dos 4%), «para sempre, com a pensão» e «até aos N anos, com a pensão», já depois do IRS dos levantamentos; a parte já feita; a data em três cenários (3%, 5% e 7% reais ao ano), a investir até à data FIRE (ou até uma idade) e a levantar daí em diante; o gráfico da vida inteira com os números FIRE a tracejado e quando cada cenário chega a cada um (tabela e pontos no gráfico); nota quando a pensão cobre as despesas; os outros ativos marcados em Património somam-se à carteira; até quando dura o dinheiro em cada cenário; acompanhamento mês a mês. |
+| **Património** | Património líquido: a carteira das corretoras mais os outros ativos e dívidas que indicas à mão (PPR, certificados de aforro, depósitos, imóveis, outros, créditos); composição com o peso de cada um, por categoria e evolução mensal (fica um registo por mês sempre que atualizas um valor); aviso nos valores com mais de 90 dias; cada ativo pode somar-se à carteira no Planeamento (FIRE). Na Visão Geral, o património líquido aparece por baixo do valor da carteira. |
 | **Radar e alertas** | Alertas de preço (acima, abaixo, variação diária) e lista de observação com preço-alvo. |
 | **Importar** | Extratos da Trading 212 (CSV), XTB (XLSX), Trade Republic (CSV) e CSV genérico, com deduplicação (podes carregar o mesmo ficheiro várias vezes) e histórico de extratos. Antes de importar fica uma cópia automática da base de dados. |
 | **Transações** | Lista filtrável, inserção manual (com validação da quantidade detida nas vendas) e exportação CSV. |
