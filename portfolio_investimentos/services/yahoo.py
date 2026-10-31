@@ -62,11 +62,11 @@ def _describe(exc):
     return f"sem ligação ao Yahoo ({reason})"
 
 
-def _get_json(url, params):
+def _get_json(url, params, attempts=4):
     """GET com o servidor alternativo do Yahoo, nova tentativa em 429 e cookie/crumb em 401/403."""
     path = urllib.parse.urlsplit(url).path
     last = None
-    for attempt in range(4):
+    for attempt in range(attempts):
         host = HOSTS[attempt % 2]
         query = dict(params)
         if attempt >= 2 and _state["crumb"] is not False:
@@ -80,7 +80,7 @@ def _get_json(url, params):
             last = exc
             if exc.code == 404:
                 break  # símbolo inexistente: não vale a pena insistir
-            if exc.code == 429:
+            if exc.code == 429 and attempt < attempts - 1:
                 _time.sleep(1.5 * (attempt + 1))
         except (OSError, ValueError) as exc:
             last = exc
@@ -146,7 +146,7 @@ class Ticker:
         """
         self.news_error = None
         try:
-            data = _get_json(SEARCH_URL, {"q": self.symbol, "quotesCount": 0, "newsCount": 10})
+            data = _get_json(SEARCH_URL, {"q": self.symbol, "quotesCount": 0, "newsCount": 10}, attempts=2)
             items = data.get("news") or []
         except (OSError, ValueError) as exc:
             items, self.news_error = [], str(exc)

@@ -799,7 +799,7 @@ def test_direct_news_falls_back_to_rss_when_search_is_empty(app, monkeypatch):
     from portfolio_investimentos.models import News
     from portfolio_investimentos.services import market, yahoo
 
-    def fake_json(url, params):
+    def fake_json(url, params, **kw):
         return {"news": [], "quotes": []}  # a pesquisa não traz notícias
     monkeypatch.setattr(yahoo, "_get_json", fake_json)
     monkeypatch.setattr(yahoo, "_fetch", lambda url: RSS_FINV if "feeds.finance.yahoo.com" in url and "s=FINV" in url
@@ -819,7 +819,7 @@ def test_news_detail_explains_empty_results(app, monkeypatch):
     from portfolio_investimentos.models import Instrument
     from portfolio_investimentos.services import market, yahoo
     monkeypatch.setitem(sys.modules, "yfinance", _FakeYf)
-    monkeypatch.setattr(yahoo, "_get_json", lambda url, params: {"news": [], "quotes": []})
+    monkeypatch.setattr(yahoo, "_get_json", lambda url, params, **kw: {"news": [], "quotes": []})
     monkeypatch.setattr(yahoo, "_fetch", lambda url: (_ for _ in ()).throw(OSError("HTTP 403")))
     with app.app_context():
         db.session.add_all([
@@ -832,6 +832,43 @@ def test_news_detail_explains_empty_results(app, monkeypatch):
         assert "Notícias: 0 novas; sem notícias: ADB" in report
         assert "Notícias, detalhe: ADB: yfinance 0; direto 0 (RSS: HTTP 403)" in report
         assert any(ln.startswith("[notícias 1/1] ADB: yfinance 0; direto 0") and ln.endswith(" s)") for ln in lines)
+
+
+RSS_GOOGLE = """<?xml version="1.0"?><rss version="2.0"><channel><item>
+<title>FinVolution lucra mais no trimestre - Jornal Económico</title><link>https://news.google.com/rss/articles/abc</link>
+<pubDate>Tue, 28 Oct 2026 08:00:00 GMT</pubDate><source url="https://jornaleconomico.pt">Jornal Económico</source></item></channel></rss>""".encode()
+
+
+def test_news_use_google_when_yahoo_limits_and_stop_early_on_429(app, monkeypatch):
+    import sys
+    from portfolio_investimentos.models import Instrument, News
+    from portfolio_investimentos.services import googlenews, market, yahoo
+    monkeypatch.setitem(sys.modules, "yfinance", _FakeYf)
+    yahoo_calls = []
+
+    def limited(url, params, **kw):
+        yahoo_calls.append(params.get("q"))
+        raise yahoo.YahooError("HTTP 429: o Yahoo limitou os pedidos; tenta mais tarde")
+    monkeypatch.setattr(yahoo, "_get_json", limited)
+    monkeypatch.setattr(yahoo, "_fetch", lambda url: (_ for _ in ()).throw(OSError("HTTP 429")))
+    monkeypatch.setattr(googlenews, "_fetch", lambda url: RSS_GOOGLE if "q=Fin+Volution" in url
+                        else b"<rss><channel></channel></rss>")
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="ADB", currency="EUR", instrument_name="Fin Volution", data_symbol="ADB.DE"),
+            Instrument(ticker="NOV", currency="EUR", data_symbol="NOV.DE"),
+            Instrument(ticker="XYZ", currency="EUR", data_symbol="XYZ.DE"),
+            Instrument(ticker="WWW", currency="EUR", data_symbol="WWW.DE"),
+        ])
+        for t in ("ADB", "NOV", "XYZ", "WWW"):
+            db.session.add(Transaction(date=date(2026, 8, 27), type="BUY", instrument=t, quantity=1, price=10.0,
+                                       currency="EUR"))
+        db.session.commit()
+        report = market.refresh_all(start=date(2026, 10, 1))
+        assert News.query.filter_by(instrument="ADB").one().source == "Jornal Económico"  # veio do Google
+        # ADB teve notícias (Google); NOV e XYZ deram 429 seguidos: o último não foi tentado
+        assert "saltei as restantes 1 posições" in report
+        assert set(yahoo_calls) == {"ADB.DE", "NOV.DE", "XYZ.DE"}
 
 
 def test_refresh_reports_progress_with_last_close(app, monkeypatch):

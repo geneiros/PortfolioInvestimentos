@@ -377,7 +377,12 @@ def refresh_all(start=None, progress=None, only_open=False):
         # podem já nem existir em bolsa (ex.: empresas compradas ou fundidas)
         news_queue = [i for i in insts if i not in gone and i.kind != "index" and i.ticker in held]
         _progress.update(done=0, total=len(news_queue), current="")
+        limited = 0  # ativos seguidos em que o Yahoo respondeu 429
         for k, inst in enumerate(news_queue, 1):
+            if limited >= 2:  # não vale a pena esperar pelos restantes: o Yahoo está a limitar este servidor
+                note(f"Notícias: o Yahoo está a limitar os pedidos (429) a partir deste servidor; "
+                     f"saltei as restantes {len(news_queue) - k + 1} posições. Tenta mais tarde.")
+                break
             _progress.update(done=k - 1, current=f"notícias de {inst.ticker}")
             news_started = _time.monotonic()
             t = yf.Ticker(inst.data_symbol or inst.ticker)
@@ -399,6 +404,7 @@ def refresh_all(start=None, progress=None, only_open=False):
                     news_detail.append(f"{inst.ticker}: {detail}")
                 if err and not items:
                     news_errors.setdefault(err, []).append(inst.ticker)
+                limited = limited + 1 if (err and "429" in err and not items) else 0
             except Exception as exc:
                 news_errors.setdefault(str(exc), []).append(inst.ticker)
             try:
@@ -655,6 +661,17 @@ def _news_items(yf, t, inst):
                 detail.append(f"direto erro ({str(exc)[:80]})")
         elif getattr(t, "news_error", None):
             detail.append(f"direto 0 ({t.news_error[:80]})")
+    name = (inst.instrument_name or "").strip()
+    if not items and len(name) > 3 and name.upper() != inst.ticker.upper():
+        # o Yahoo não deu notícias (ex.: 429 a partir de um servidor partilhado): tenta o Google Notícias pelo nome
+        from . import googlenews
+        try:
+            items = googlenews.search(name)
+            detail.append(f"google {len(items)}")
+            if items:
+                err = None
+        except Exception as exc:
+            detail.append(f"google erro ({str(exc)[:80]})")
     return items, err, "; ".join(detail)
 
 
