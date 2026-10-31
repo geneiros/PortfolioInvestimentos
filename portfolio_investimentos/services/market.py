@@ -258,10 +258,11 @@ def _yahoo_client():
         return yahoo
 
 
-def refresh_all(start=None, progress=None):
+def refresh_all(start=None, progress=None, only_open=False):
     """Atualiza cotações, câmbios, notícias e eventos. Devolve um resumo textual.
 
     `progress(linha)` é chamada a cada ativo, à medida que a atualização avança (ex.: para a consola).
+    Com `only_open`, só se atualizam as posições abertas (e os índices de comparação); as fechadas ficam como estão.
     """
     yf = _yahoo_client()
     if not _lock.acquire(blocking=False):
@@ -289,10 +290,13 @@ def refresh_all(start=None, progress=None):
             Transaction.instrument, db.func.min(Transaction.date), db.func.max(Transaction.date)
         ).group_by(Transaction.instrument)}
         price_min = dict(db.session.query(Price.instrument, db.func.min(Price.date)).group_by(Price.instrument))
-        quick = skipped = 0
+        quick = skipped = closed = 0
         _progress.update(done=0, total=len(insts), current="")
         for position, inst in enumerate(insts, 1):
             if inst in gone:
+                continue
+            if only_open and inst.kind != "index" and inst.ticker not in held:
+                closed += 1
                 continue
             where[0] = f"[{position}/{len(insts)}] "
             _progress.update(done=position - 1, current=inst.ticker)
@@ -345,7 +349,10 @@ def refresh_all(start=None, progress=None):
             note(f"{symbol}: {n} cotações{last}")
 
         where[0] = ""
-        currencies = {i.currency for i in insts} | {c for (c,) in db.session.query(Transaction.currency).distinct()}
+        if only_open:  # só os câmbios dos ativos que se atualizaram
+            currencies = {i.currency for i in insts if i.kind == "index" or i.ticker in held}
+        else:
+            currencies = {i.currency for i in insts} | {c for (c,) in db.session.query(Transaction.currency).distinct()}
         for cur in sorted(c for c in currencies if c and c != "EUR"):
             fx_start = start
             if not full:  # só os dias novos, se o histórico guardado já cobre o início
@@ -395,6 +402,8 @@ def refresh_all(start=None, progress=None):
                                                            + ("…" if len(news_empty) > 12 else "") if news_empty else ""))
             for msg, tickers in news_errors.items():
                 note(f"Notícias: erro em {len(tickers)} ativos ({msg[:200]})")
+        if closed:
+            note(f"Só posições abertas: {closed} ativos fechados não foram atualizados.")
         if quick or skipped:
             note(f"Atualização incremental: {quick} ativos só com os últimos dias; "
                           f"{skipped} posições fechadas sem pedidos.")
@@ -532,7 +541,7 @@ def _resolve_symbol(yf, inst, start, problems=None):
     return fallback
 
 
-def refresh_in_background(app):
+def refresh_in_background(app, only_open=False):
     """Corre a atualização numa thread e guarda o estado para as páginas o mostrarem."""
     if _lock.locked():
         return
@@ -542,7 +551,7 @@ def refresh_in_background(app):
         with app.app_context():
             for attempt in range(3):
                 try:
-                    log.info(refresh_all())
+                    log.info(refresh_all(only_open=only_open))
                     Setting.set("refresh_status", "")
                     return
                 except Exception as exc:  # sem isto o erro perdia-se na thread e o aviso nunca saía

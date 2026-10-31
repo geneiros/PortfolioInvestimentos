@@ -15,6 +15,8 @@ def main():
     parser.add_argument("--no-browser", action="store_true", help="não abrir o browser automaticamente")
     parser.add_argument("--demo", action="store_true", help="carregar dados de demonstração e sair")
     parser.add_argument("--refresh", action="store_true", help="atualizar cotações (yfinance) e sair")
+    parser.add_argument("--abertas", action="store_true",
+                        help="com --refresh, atualizar só as posições abertas (e os índices de comparação)")
     parser.add_argument("--importar", nargs="+", metavar="FICHEIRO",
                         help="importar extratos (XTB .xlsx, Trading 212, Trade Republic ou CSV genérico) e sair")
     parser.add_argument("--corretora", choices=["generic", "trading212", "traderepublic", "xtb"],
@@ -44,7 +46,7 @@ def main():
                 print(create_demo())
             if args.refresh:
                 from .services.market import refresh_all
-                result = refresh_all(progress=lambda line: print(line, flush=True))
+                result = refresh_all(progress=lambda line: print(line, flush=True), only_open=args.abertas)
                 print(result if result.startswith("Já existe") else "Concluído.")
         return
 

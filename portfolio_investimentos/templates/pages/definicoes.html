@@ -33,7 +33,10 @@
         {% endif %}
       {% endif %}
       {% if yfinance %}
-        <button class="btn btn-sm btn-primary" data-pm-refresh><i class="bi bi-arrow-repeat"></i> Atualizar cotações agora</button>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-primary" data-pm-refresh><i class="bi bi-arrow-repeat"></i> Atualizar cotações agora</button>
+          <button class="btn btn-sm btn-outline-primary" data-pm-refresh data-only-open="1" title="Só as posições que tens hoje (e os índices de comparação): mais rápido. As posições já vendidas ficam como estão."><i class="bi bi-arrow-repeat"></i> Só posições abertas</button>
+        </div>
       {% else %}
         <div class="alert alert-secondary small mb-0">Para atualizar cotações, instala o pacote opcional: <code>pip install yfinance</code> (os scripts de arranque já o fazem).</div>
       {% endif %}

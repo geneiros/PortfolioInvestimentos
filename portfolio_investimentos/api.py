@@ -315,10 +315,11 @@ def delete_watch(name):
 
 # --------------------------------------------------------- dados e mercado
 @action
-def refresh_market():
+def refresh_market(only_open=""):
     if not market.yfinance_available():
         raise ApiError("Instala o pacote yfinance para obter cotações (pip install yfinance).")
-    market.refresh_in_background(current_app._get_current_object())
+    market.refresh_in_background(current_app._get_current_object(),
+                                 only_open=str(only_open).lower() in ("1", "true", "on", "sim"))
     return "Atualização de cotações em curso. Pode demorar alguns minutos; o aviso na Visão Geral desaparece quando terminar."
 
 

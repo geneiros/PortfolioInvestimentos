@@ -136,10 +136,11 @@
     setTimeout(() => location.reload(), 2500);
   };
   document.addEventListener("click", async (e) => {
-    if (!e.target.closest("[data-pm-refresh]")) return;
+    const btn = e.target.closest("[data-pm-refresh]");
+    if (!btn) return;
     e.preventDefault();
     try {
-      pm.toast(await pm.call("refresh_market"), "info");
+      pm.toast(await pm.call("refresh_market", { only_open: btn.dataset.onlyOpen || "" }), "info");
     } catch (err) { return; /* já mostrado */ }
     pm.watchRefresh();
   });

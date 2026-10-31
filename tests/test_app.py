@@ -640,7 +640,7 @@ def test_background_refresh_retries_when_database_is_locked(app, monkeypatch):
     assert app.config["SQLALCHEMY_ENGINE_OPTIONS"]["connect_args"]["timeout"] == 30
     calls, sleeps = [], []
 
-    def flaky():
+    def flaky(**kwargs):
         calls.append(1)
         if len(calls) < 3:
             raise OperationalError("UPDATE", {}, Exception("database is locked"))
@@ -746,6 +746,38 @@ def test_yfinance_deprecation_warnings_are_silenced(monkeypatch):
         warnings.warn_explicit("inplace obsoleto", DeprecationWarning, "yfinance/utils.py", 568, module="yfinance.utils")
         warnings.warn_explicit("outro aviso", DeprecationWarning, "app.py", 1, module="portfolio_investimentos.x")
     assert [str(w.message) for w in seen] == ["outro aviso"]  # só se cala o do yfinance
+
+
+def test_refresh_only_open_positions(app, monkeypatch):
+    """Com only_open, as posições fechadas não se pedem ao Yahoo (nem os seus câmbios)."""
+    import sys
+    from portfolio_investimentos.models import Instrument
+    from portfolio_investimentos.services import market
+
+    calls = []
+
+    class Yf(_FakeYf):
+        class Ticker(_FakeYf.Ticker):
+            def history(self, start=None, **kw):
+                calls.append(self.symbol)
+                return super().history(start=start, **kw)
+
+    monkeypatch.setitem(sys.modules, "yfinance", Yf)
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="ADB", currency="EUR", isin="US00724F1012", data_symbol="ADB.DE"),
+            Instrument(ticker="NOV", currency="EUR", isin="DK0062498333", data_symbol="NOV.DE"),
+            Transaction(date=date(2026, 8, 27), type="BUY", instrument="ADB", quantity=1, price=240.4, currency="EUR"),
+            Transaction(date=date(2026, 9, 14), type="BUY", instrument="NOV", quantity=1, price=37.5, currency="EUR"),
+            Transaction(date=date(2026, 9, 20), type="SELL", instrument="NOV", quantity=1, price=38.0, currency="EUR"),
+        ])
+        db.session.commit()
+        report = market.refresh_all(only_open=True)
+        assert "ADB.DE" in calls and "NOV.DE" not in calls  # NOV está vendida
+        assert "1 ativos fechados não foram atualizados" in report
+        calls.clear()
+        market.refresh_all()  # sem a opção, pede também a fechada
+        assert "NOV.DE" in calls
 
 
 def test_refresh_reports_progress_with_last_close(app, monkeypatch):
