@@ -140,15 +140,27 @@ As capturas usam os dados de demonstração (empresas e preços fictícios).
 
 ### Modo escuro
 
-| Visão Geral | Peso vs retorno e alocação |
+| Visão Geral | Evolução, as minhas posições e próximos eventos |
 | --- | --- |
-| ![Visão Geral (escuro)](docs/screenshots/escuro/01-visao-geral.png) | ![Peso vs retorno (escuro)](docs/screenshots/escuro/02-visao-geral-peso-alocacao.png) |
-| **Carteira** | **Desempenho** |
-| ![Carteira (escuro)](docs/screenshots/escuro/03-carteira.png) | ![Desempenho (escuro)](docs/screenshots/escuro/04-desempenho.png) |
-| **Retornos mensais** | **Dividendos** |
-| ![Retornos mensais (escuro)](docs/screenshots/escuro/05-desempenho-mensal.png) | ![Dividendos (escuro)](docs/screenshots/escuro/06-dividendos.png) |
-| **Planeamento** | **Importar extrato** |
-| ![Planeamento (escuro)](docs/screenshots/escuro/07-planeamento.png) | ![Importar (escuro)](docs/screenshots/escuro/08-importar.png) |
+| ![Visão Geral (escuro)](docs/screenshots/escuro/01-visao-geral.png) | ![Evolução (escuro)](docs/screenshots/escuro/02-visao-geral-evolucao.png) |
+| **Peso vs retorno e alocação** | **Perfil de investidor** |
+| ![Peso vs retorno e alocação (escuro)](docs/screenshots/escuro/03-visao-geral-peso-alocacao.png) | ![Perfil de investidor (escuro)](docs/screenshots/escuro/04-perfil-investidor.png) |
+| **Carteira** | **Alocação** |
+| ![Carteira (escuro)](docs/screenshots/escuro/05-carteira.png) | ![Alocação (escuro)](docs/screenshots/escuro/06-carteira-alocacao.png) |
+| **Desempenho** | **Como foi a jornada** |
+| ![Desempenho (escuro)](docs/screenshots/escuro/07-desempenho.png) | ![Jornada (escuro)](docs/screenshots/escuro/08-desempenho-jornada.png) |
+| **Retornos mensais** | **Mérito vs mercado** |
+| ![Retornos mensais (escuro)](docs/screenshots/escuro/09-desempenho-mensal.png) | ![Mérito (escuro)](docs/screenshots/escuro/10-desempenho-merito.png) |
+| **Risco e análise avançada** | **Dividendos** |
+| ![Risco (escuro)](docs/screenshots/escuro/11-desempenho-risco.png) | ![Dividendos (escuro)](docs/screenshots/escuro/12-dividendos.png) |
+| **Mapa de rendimento e datas ex-dividendo** | **Fiscal** |
+| ![Mapa de dividendos (escuro)](docs/screenshots/escuro/13-dividendos-mapa.png) | ![Fiscal (escuro)](docs/screenshots/escuro/14-fiscal.png) |
+| **Planeamento (FIRE)** | **Evolução e projeção** |
+| ![Planeamento (escuro)](docs/screenshots/escuro/15-planeamento.png) | ![Projeção (escuro)](docs/screenshots/escuro/16-planeamento-projecao.png) |
+| **Radar e alertas** | **Importar extrato** |
+| ![Radar (escuro)](docs/screenshots/escuro/17-radar.png) | ![Importar (escuro)](docs/screenshots/escuro/18-importar.png) |
+| **Transações** | **Definições** |
+| ![Transações (escuro)](docs/screenshots/escuro/19-transacoes.png) | ![Definições (escuro)](docs/screenshots/escuro/20-definicoes.png) |
 
 O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro ou Automático.
 
