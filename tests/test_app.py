@@ -536,6 +536,12 @@ def test_settings_assets_show_attention_rows_and_quote_status(app, client):
     rows = re.findall(r'data-asset-row data-attention="(\d)" data-ticker="(\w+)"', html)
     assert rows == [("1", "OPEN"), ("0", "SHUT")]  # aberta sem cotações precisa de atenção; a fechada, com cotações, não
     assert "sem cotações" in html and "11,00 EUR · 06/02/2026" in html
+    # uma lista de "sem cotações" desatualizada não leva uma posição vendida, com cotações, para o filtro
+    with app.app_context():
+        from portfolio_investimentos.models import Setting
+        Setting.set("refresh_missing", "SHUT,OPEN")
+    html = client.get("/definicoes").get_data(as_text=True)
+    assert re.findall(r'data-asset-row data-attention="(\d)" data-ticker="(\w+)"', html) == [("1", "OPEN"), ("0", "SHUT")]
 
 
 def test_market_status_holidays_and_us_hours():

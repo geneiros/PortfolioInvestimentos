@@ -328,10 +328,12 @@ def _asset_rows(p, tickers):
     rows = []
     for i in insts:
         date_, close = last.get(i.ticker, (None, None))
-        no_quotes = i.ticker in missing or date_ is None
-        rows.append(SimpleNamespace(i=i, ticker=i.ticker, held=i.ticker in held, no_quotes=no_quotes,
-                                    last_date=date_, last_close=close,
-                                    attention=i.ticker in held or no_quotes))
+        is_held = i.ticker in held
+        # "sem cotações": nenhuma guardada; numa posição aberta conta também o que a última atualização não encontrou
+        # (nas vendidas essa lista pode estar desatualizada, por isso só se olha para as cotações guardadas)
+        no_quotes = date_ is None or (is_held and i.ticker in missing)
+        rows.append(SimpleNamespace(i=i, ticker=i.ticker, held=is_held, no_quotes=no_quotes,
+                                    last_date=date_, last_close=close, attention=is_held or date_ is None))
     return rows
 
 

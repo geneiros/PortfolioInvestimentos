@@ -135,11 +135,12 @@
       <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-intersect"></i> Juntar</button>
     </form>
     {% endif %}
+    {% set n_open = instruments|selectattr('held')|list|length %}
     {% set n_attention = instruments|selectattr('attention')|list|length %}
     <div class="d-flex flex-wrap gap-2 align-items-center mb-2" id="assetFilter">
       <input type="search" id="assetSearch" class="form-control form-control-sm" style="max-width: 270px" placeholder="Pesquisar ticker, nome ou ISIN">
       <div class="btn-group btn-group-sm" role="group">
-        <button type="button" class="btn btn-outline-secondary active" data-asset-group="attention">Posições abertas e sem cotações ({{ n_attention }})</button>
+        <button type="button" class="btn btn-outline-secondary active" data-asset-group="attention" title="{{ n_open }} posições abertas; as restantes são ativos vendidos que não têm nenhuma cotação guardada">Posições abertas e sem cotações ({{ n_attention }})</button>
         <button type="button" class="btn btn-outline-secondary" data-asset-group="all">Todos ({{ instruments|length }})</button>
       </div>
     </div>
@@ -151,8 +152,8 @@
         <input type="hidden" name="ticker" value="{{ i.ticker }}">
         <div style="min-width: 130px"><b class="small">{{ i.ticker }}</b>
           <div class="text-body-secondary" style="font-size: .7rem">
-            {% if r.no_quotes %}<span class="text-warning-emphasis"><i class="bi bi-exclamation-triangle"></i> sem cotações</span>
-            {% else %}{{ r.last_close|number }} {{ i.currency }} · {{ r.last_date|ddmmyyyy }}{% endif %}
+            {% if r.no_quotes %}<span class="text-warning-emphasis"><i class="bi bi-exclamation-triangle"></i> {{ '' if r.held else 'vendido · ' }}sem cotações</span>
+            {% else %}{{ r.last_close|number }} {{ i.currency }} · {{ r.last_date|ddmmyyyy }}{{ ' · aberta' if r.held }}{% endif %}
           </div></div>
         <input name="instrument_name" value="{{ i.instrument_name or '' }}" class="form-control form-control-sm" placeholder="Nome">
         <select name="kind" class="form-select form-select-sm" style="width: 90px"><option value="stock" {{ 'selected' if i.kind == 'stock' }}>Ação</option><option value="etf" {{ 'selected' if i.kind == 'etf' }}>ETF</option></select>
