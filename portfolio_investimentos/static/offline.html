@@ -40,7 +40,7 @@
 <script>
   // páginas guardadas pelo modo "Disponível offline" (Definições)
   const NAMES = { "/": "Visão Geral", "/carteira": "Carteira", "/desempenho": "Desempenho", "/dividendos": "Dividendos",
-                  "/fiscal": "Fiscal", "/radar": "Radar e alertas", "/noticias": "Notícias", "/transacoes": "Transações" };
+                  "/fiscal": "Fiscal", "/radar": "Radar e alertas", "/transacoes": "Transações" };
   if (window.caches) caches.open("pi-pages").then((c) => c.keys()).then((keys) => {
     const list = document.querySelector("#saved .list-group");
     keys.map((k) => new URL(k.url)).filter((u) => u.pathname in NAMES && !u.search).forEach((u) => {

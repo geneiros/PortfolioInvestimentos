@@ -124,9 +124,9 @@ _ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 
 def _rename_instrument(old, new):
     """Passa todas as referências de um ativo para outro ticker (ex.: ISIN -> ticker real)."""
-    from ..models import Alert, Event, News, WatchItem
+    from ..models import Alert, Event, WatchItem
     for model, col in ((Transaction, "instrument"), (Price, "instrument"), (Event, "instrument"),
-                       (News, "instrument"), (Alert, "instrument"), (WatchItem, "instrument")):
+                       (Alert, "instrument"), (WatchItem, "instrument")):
         model.query.filter(getattr(model, col) == old.ticker).update({col: new.ticker}, synchronize_session=False)
     db.session.delete(old)
     db.session.flush()
@@ -135,11 +135,11 @@ def _rename_instrument(old, new):
 def merge_instruments(old, new):
     """Junta o ativo `old` no ativo `new` (o mesmo título com dois tickers): transações e alertas passam para `new`.
 
-    As cotações, eventos e notícias de `old` descartam-se (`new` tem as suas, únicas por data/endereço) e voltam
+    As cotações e eventos de `old` descartam-se (`new` tem as suas, únicas por data/endereço) e voltam
     a obter-se na próxima atualização.
     """
-    from ..models import Event, News, WatchItem
-    for model in (Price, Event, News, WatchItem):
+    from ..models import Event, WatchItem
+    for model in (Price, Event, WatchItem):
         model.query.filter(model.instrument == old.ticker).delete(synchronize_session=False)
     new.isin = new.isin or old.isin
     if old.sector and not new.sector:

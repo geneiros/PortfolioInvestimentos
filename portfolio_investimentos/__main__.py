@@ -154,23 +154,6 @@ def _test_yahoo():
         except Exception as exc:
             ok = False
             print(f"  {symbol:9} ERRO: {exc}")
-    for symbol in ("AAPL", "FINV"):  # notícias: o que devolve o yfinance (se instalado) e o acesso direto
-        for name, client in (("yfinance", yf), ("direto", None)):
-            try:
-                if client is None:
-                    from .services import yahoo
-                    t = yahoo.Ticker(symbol)
-                    items = list(t.news or [])
-                    extra = f" ({t.news_error})" if t.news_error else ""
-                elif client.__name__ == "yfinance":
-                    items, extra = list(client.Ticker(symbol).news or []), ""
-                else:
-                    continue
-                first = (items[0].get("content", items[0]).get("title") or "")[:60] if items else ""
-                print(f"  notícias {symbol:5} {name:8} {len(items)}{extra} {first}")
-            except Exception as exc:
-                ok = False
-                print(f"  notícias {symbol:5} {name:8} ERRO: {exc}")
     try:
         quotes = yf.Search("US00724F1012", max_results=5).quotes or []
         print("  pesquisa ISIN US00724F1012:", ", ".join(q.get("symbol", "?") for q in quotes) or "(vazio)")

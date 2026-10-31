@@ -49,7 +49,7 @@ mimetypes.add_type("application/manifest+json", ".webmanifest")  # manifesto da 
 
 # páginas de consulta que o modo "Disponível offline" pode guardar (não Importar nem Definições)
 OFFLINE_PAGES = {"pages.overview", "pages.carteira", "pages.desempenho", "pages.dividendos", "pages.fiscal",
-                 "pages.radar", "pages.noticias", "pages.transacoes"}
+                 "pages.radar", "pages.transacoes"}
 
 
 def create_app(config=None):

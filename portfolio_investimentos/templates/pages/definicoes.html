@@ -24,7 +24,7 @@
     <div class="pm-card mb-3">
       <div class="pm-label mb-2">Dados de mercado</div>
       <p class="small text-body-secondary">Última cotação guardada: <b>{{ last_price|ddmmyyyy }}</b>.
-        As cotações, câmbios, notícias e eventos vêm do Yahoo Finance, através do pacote <code>yfinance</code> ou, onde ele não pode ser instalado (ex.: Android), diretamente.</p>
+        As cotações, câmbios e eventos vêm do Yahoo Finance, através do pacote <code>yfinance</code> ou, onde ele não pode ser instalado (ex.: Android), diretamente.</p>
       {% if last_refresh %}
         <p class="small text-body-secondary">Última atualização: <b>{{ last_refresh|replace("T", " ") }}</b>.</p>
         {% if refresh_report %}
@@ -55,7 +55,7 @@
     <div class="pm-card mb-3">
       <div class="pm-label mb-2">Disponível offline {% if offline_enabled %}<span class="badge text-bg-success ms-1">Ligado</span>{% endif %}</div>
       <p class="small text-body-secondary">Guarda neste dispositivo uma cópia das páginas de consulta (Visão Geral, Carteira,
-        Desempenho, Dividendos, Fiscal, Radar, Notícias e Transações). Com a aplicação parada, a aplicação instalada (PWA)
+        Desempenho, Dividendos, Fiscal, Radar e Transações). Com a aplicação parada, a aplicação instalada (PWA)
         abre essa cópia, só para consulta.</p>
       {% if offline_enabled %}
         <p class="small mb-2">Última cópia: <b id="offlineSaved">—</b></p>

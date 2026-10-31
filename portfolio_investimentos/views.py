@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from flask import Blueprint, Response, abort, current_app, render_template, request
 
 from .engine.portfolio import MERIT_BENCHMARK
-from .models import Alert, Broker, ImportBatch, Instrument, News, Price, Setting, Transaction, WatchItem, db
+from .models import Alert, Broker, ImportBatch, Instrument, Price, Setting, Transaction, WatchItem, db
 from . import auth
 from .services import context as ctx
 from .services import backups, data
@@ -74,8 +74,6 @@ def overview():
     if not p.transactions:
         return render_template("pages/index.html", **c)
     movers = p.movers(5)
-    news = {m.asset.ticker: News.query.filter_by(instrument=m.asset.ticker).order_by(News.published_on.desc()).first()
-            for m in movers}
     held = [pos.asset.ticker for pos in p.open_positions]
     events = upcoming_events(held)
     today = date.today()
@@ -84,7 +82,7 @@ def overview():
     c.update(
         hero_spark=ctx.js_json(p.series.holdings[-120:]), ytd=p.year_to_date(),
         ath={"value": p.all_time_high("value"), "return": p.all_time_high("return")},
-        movers=movers, mover_news=news, events_total=len(events),
+        movers=movers, events_total=len(events),
         event_groups=[("Próxima semana", [e for e in events if e.date <= week]),
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
                       ("Mais tarde", [e for e in events if e.date > two][:4])],
@@ -263,18 +261,6 @@ def radar():
              alerts=Alert.query.order_by(Alert.active.desc(), Alert.creation.desc()).all(),
              instruments=Instrument.query.filter(Instrument.kind != "index").order_by(Instrument.ticker).all())
     return render_template("pages/radar.html", **c)
-
-
-@bp.route("/noticias")
-def noticias():
-    c = ctx.build("noticias", "Notícias")
-    held = [pos.asset.ticker for pos in c["p"].open_positions]
-    ticker = request.args.get("ticker")
-    ticker = ticker if ticker in held else None
-    tickers = [ticker] if ticker else held
-    news = (News.query.filter(News.instrument.in_(tickers or [""])).order_by(News.published_on.desc()).limit(100).all())
-    c.update(held=held, ticker=ticker, news=news, yfinance=yfinance_available(), last_refresh=Setting.get("last_refresh"))
-    return render_template("pages/noticias.html", **c)
 
 
 @bp.route("/importar")

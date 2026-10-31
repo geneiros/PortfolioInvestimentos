@@ -10,7 +10,7 @@ from portfolio_investimentos import create_app
 from portfolio_investimentos.models import ImportBatch, Transaction, db
 
 PAGES = ["/", "/carteira", "/desempenho", "/desempenho?periodo=1A&bench=%5EGSPC", "/dividendos", "/fiscal",
-         "/radar", "/noticias", "/importar", "/transacoes", "/transacoes?tipo=BUY", "/definicoes"]
+         "/radar", "/importar", "/transacoes", "/transacoes?tipo=BUY", "/definicoes"]
 
 T212 = """Action,Time,ISIN,Ticker,Name,No. of shares,Price / share,Currency (Price / share),Exchange rate,Total,Currency (Total),Withholding tax,Currency (Withholding tax),ID
 Deposit,2024-01-02 10:00:00,,,,,,,,1000.00,EUR,,,DEP1
@@ -670,48 +670,6 @@ def test_background_refresh_retries_when_database_is_locked(app, monkeypatch):
         assert len(calls) == 1 and Setting.get("refresh_status") == "error:falha qualquer"
 
 
-def test_news_fall_back_to_direct_client_and_are_reported(app, client, monkeypatch):
-    import sys
-    from portfolio_investimentos.models import Instrument, News
-    from portfolio_investimentos.services import market, yahoo
-
-    class YfNoNews(_FakeYf):
-        class Ticker(_FakeYf.Ticker):
-            @property
-            def news(self):
-                raise RuntimeError("Too Many Requests")
-
-            @news.setter
-            def news(self, v):
-                pass
-    monkeypatch.setitem(sys.modules, "yfinance", YfNoNews)
-
-    class Direct:
-        def __init__(self, symbol):
-            self.news = [{"title": f"Notícia de {symbol}", "link": f"https://exemplo.pt/{symbol}", "publisher": "X",
-                          "providerPublishTime": 1_790_000_000}] if symbol == "ADB.DE" else []
-    monkeypatch.setattr(yahoo, "Ticker", Direct)
-    with app.app_context():
-        db.session.add_all([
-            Instrument(ticker="ADB", currency="EUR", isin="US00724F1012", data_symbol="ADB.DE"),
-            Instrument(ticker="NOV", currency="EUR", isin="DK0062498333", data_symbol="NOV.DE"),
-            Transaction(date=date(2026, 8, 27), type="BUY", instrument="ADB", quantity=1, price=240.4, currency="EUR"),
-            Transaction(date=date(2026, 9, 14), type="BUY", instrument="NOV", quantity=1, price=37.5, currency="EUR"),
-        ])
-        db.session.commit()
-        report = market.refresh_all(start=date(2026, 10, 1))
-        assert [n.instrument for n in News.query] == ["ADB"]  # as do acesso direto, quando o yfinance falha
-        assert "Notícias: 1 novas; sem notícias: NOV" in report
-    html = client.get("/noticias").get_data(as_text=True)
-    assert "Notícia de ADB.DE" in html
-    # sem notícias: a mensagem explica onde ver o motivo (e já não diz que precisa do yfinance)
-    with app.app_context():
-        News.query.delete()
-        db.session.commit()
-    html = client.get("/noticias").get_data(as_text=True)
-    assert "A última atualização" in html and "Resultado por ativo" in html and "requer o pacote" not in html
-
-
 def test_merge_instruments_manually(app, client):
     from portfolio_investimentos.models import Instrument, Price
     with app.app_context():
@@ -778,97 +736,11 @@ def test_refresh_only_open_positions(app, monkeypatch):
         # o contador só conta o que se atualiza: ADB e os 3 índices de comparação (não a posição vendida)
         assert any(ln.startswith("[1/4] ") for ln in lines) and not any("/5]" in ln for ln in lines)
         assert any(ln.startswith("[1/4] ") and ln.endswith(" s)") for ln in lines)  # com o tempo de cada ativo
-        assert any(ln.startswith("[notícias 1/1] ADB") for ln in lines)
+        assert any(ln.startswith("[eventos 1/1] ADB") for ln in lines)
         assert "1 ativos fechados não foram atualizados" in report
         calls.clear()
         market.refresh_all()  # sem a opção, pede também a fechada
         assert "NOV.DE" in calls
-
-
-RSS_FINV = b"""<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Yahoo! Finance: FINV News</title>
-<item><title>FinVolution Joins 2026 IWF World Championships as Official Partner</title>
-<link>https://finance.yahoo.com/news/finvolution-joins-iwf-123.html</link><pubDate>Mon, 27 Oct 2026 14:05:00 +0000</pubDate></item>
-<item><title></title><link>https://finance.yahoo.com/news/sem-titulo.html</link></item>
-<item><title>FinVolution and NUS Business School share project findings</title>
-<link>https://finance.yahoo.com/news/finvolution-nus-456.html</link><pubDate>Thu, 02 Oct 2026 09:00:00 +0000</pubDate></item>
-</channel></rss>"""
-
-
-def test_direct_news_falls_back_to_rss_when_search_is_empty(app, monkeypatch):
-    """O Yahoo tem notícias do FINV na página do ativo mesmo quando a pesquisa não devolve nenhuma."""
-    from portfolio_investimentos.models import News
-    from portfolio_investimentos.services import market, yahoo
-
-    def fake_json(url, params, **kw):
-        return {"news": [], "quotes": []}  # a pesquisa não traz notícias
-    monkeypatch.setattr(yahoo, "_get_json", fake_json)
-    monkeypatch.setattr(yahoo, "_fetch", lambda url: RSS_FINV if "feeds.finance.yahoo.com" in url and "s=FINV" in url
-                        else (_ for _ in ()).throw(OSError("inesperado " + url)))
-    t = yahoo.Ticker("FINV")
-    items = t.news
-    assert [i["title"][:20] for i in items] == ["FinVolution Joins 20", "FinVolution and NUS "]  # sem a do título vazio
-    assert t.news_error is None and items[0]["providerPublishTime"] > 1_700_000_000
-    with app.app_context():
-        assert market._store_news("FINV", items) == 2
-        row = News.query.filter_by(instrument="FINV").order_by(News.published_on.desc()).first()
-        assert row.url.endswith("iwf-123.html") and row.source == "Yahoo Finance"
-
-
-def test_news_detail_explains_empty_results(app, monkeypatch):
-    import sys
-    from portfolio_investimentos.models import Instrument
-    from portfolio_investimentos.services import market, yahoo
-    monkeypatch.setitem(sys.modules, "yfinance", _FakeYf)
-    monkeypatch.setattr(yahoo, "_get_json", lambda url, params, **kw: {"news": [], "quotes": []})
-    monkeypatch.setattr(yahoo, "_fetch", lambda url: (_ for _ in ()).throw(OSError("HTTP 403")))
-    with app.app_context():
-        db.session.add_all([
-            Instrument(ticker="ADB", currency="EUR", isin="US00724F1012", data_symbol="ADB.DE"),
-            Transaction(date=date(2026, 8, 27), type="BUY", instrument="ADB", quantity=1, price=240.4, currency="EUR"),
-        ])
-        db.session.commit()
-        lines = []
-        report = market.refresh_all(start=date(2026, 10, 1), progress=lines.append)
-        assert "Notícias: 0 novas; sem notícias: ADB" in report
-        assert "Notícias, detalhe: ADB: yfinance 0; direto 0 (RSS: HTTP 403)" in report
-        assert any(ln.startswith("[notícias 1/1] ADB: yfinance 0; direto 0") and ln.endswith(" s)") for ln in lines)
-
-
-RSS_GOOGLE = """<?xml version="1.0"?><rss version="2.0"><channel><item>
-<title>FinVolution lucra mais no trimestre - Jornal Económico</title><link>https://news.google.com/rss/articles/abc</link>
-<pubDate>Tue, 28 Oct 2026 08:00:00 GMT</pubDate><source url="https://jornaleconomico.pt">Jornal Económico</source></item></channel></rss>""".encode()
-
-
-def test_news_use_google_when_yahoo_limits_and_stop_early_on_429(app, monkeypatch):
-    import sys
-    from portfolio_investimentos.models import Instrument, News
-    from portfolio_investimentos.services import googlenews, market, yahoo
-    monkeypatch.setitem(sys.modules, "yfinance", _FakeYf)
-    yahoo_calls = []
-
-    def limited(url, params, **kw):
-        yahoo_calls.append(params.get("q"))
-        raise yahoo.YahooError("HTTP 429: o Yahoo limitou os pedidos; tenta mais tarde")
-    monkeypatch.setattr(yahoo, "_get_json", limited)
-    monkeypatch.setattr(yahoo, "_fetch", lambda url: (_ for _ in ()).throw(OSError("HTTP 429")))
-    monkeypatch.setattr(googlenews, "_fetch", lambda url: RSS_GOOGLE if "q=Fin+Volution" in url
-                        else b"<rss><channel></channel></rss>")
-    with app.app_context():
-        db.session.add_all([
-            Instrument(ticker="ADB", currency="EUR", instrument_name="Fin Volution", data_symbol="ADB.DE"),
-            Instrument(ticker="NOV", currency="EUR", data_symbol="NOV.DE"),
-            Instrument(ticker="XYZ", currency="EUR", data_symbol="XYZ.DE"),
-            Instrument(ticker="WWW", currency="EUR", data_symbol="WWW.DE"),
-        ])
-        for t in ("ADB", "NOV", "XYZ", "WWW"):
-            db.session.add(Transaction(date=date(2026, 8, 27), type="BUY", instrument=t, quantity=1, price=10.0,
-                                       currency="EUR"))
-        db.session.commit()
-        report = market.refresh_all(start=date(2026, 10, 1))
-        assert News.query.filter_by(instrument="ADB").one().source == "Jornal Económico"  # veio do Google
-        # ADB teve notícias (Google); NOV e XYZ deram 429 seguidos: o último não foi tentado
-        assert "saltei as restantes 1 posições" in report
-        assert set(yahoo_calls) == {"ADB.DE", "NOV.DE", "XYZ.DE"}
 
 
 def test_refresh_reports_progress_with_last_close(app, monkeypatch):
@@ -948,8 +820,36 @@ def test_refresh_state(app):
         assert refresh_state()[0] is True
         Setting.set("refresh_status", "running:" + (datetime.now() - timedelta(hours=2)).isoformat())
         assert refresh_state()[0] is False  # a aplicação foi fechada a meio
+        Setting.set("refresh_status", "running:" + (datetime.now() - timedelta(minutes=2)).isoformat())
+        assert refresh_state()[0] is True
+        Setting.set("refresh_status", "running:" + (datetime.now() - timedelta(minutes=6)).isoformat())
+        assert refresh_state()[0] is False  # sem sinal de vida há mais de 5 minutos: o botão deixa de rodar
         Setting.set("refresh_status", "error:sem rede")
         assert refresh_state()[1] == "sem rede"
+
+
+def test_refresh_status_is_cleared_even_if_the_database_is_busy_once(app, monkeypatch):
+    from portfolio_investimentos.models import Setting
+    from portfolio_investimentos.services import market
+    monkeypatch.setattr(market._time, "sleep", lambda s: None)
+    real, fails = Setting.set, []
+
+    def busy_once(key, value):
+        if not fails:
+            fails.append(1)
+            raise RuntimeError("database is locked")
+        return real(key, value)
+    with app.app_context():
+        real("refresh_status", "running:" + __import__("datetime").datetime.now().isoformat())
+        monkeypatch.setattr(Setting, "set", staticmethod(busy_once))
+        assert market._set_status("") is True  # repete e consegue
+        assert Setting.get("refresh_status") == ""
+        market._background["on"] = True
+        try:
+            market._beat()  # sinal de vida renova a hora
+        finally:
+            market._background["on"] = False
+        assert Setting.get("refresh_status").startswith("running:")
 
 
 REMOTE = {"REMOTE_ADDR": "203.0.113.7"}
@@ -1296,7 +1196,7 @@ def test_old_database_is_migrated_with_backup(tmp_path, monkeypatch):
     assert "last_quote" in {r[1] for r in conn.execute("PRAGMA table_info(instrument)")}
     assert conn.execute('SELECT count(*) FROM "transaction"').fetchone()[0] == 1  # os dados seguem lá
     conn.close()
-    copies = list((tmp_path / "copias").glob("portfolio-*-migracao-v0-v2.db"))
+    copies = list((tmp_path / "copias").glob("portfolio-*-migracao-v0-v3.db"))
     assert len(copies) == 1  # a cópia é da base antes de migrar (sem as colunas novas)
     old = sqlite3.connect(copies[0])
     assert "result" not in {r[1] for r in old.execute('PRAGMA table_info("transaction")')}

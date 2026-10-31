@@ -64,11 +64,11 @@
     </div>
   </div>
 
-  <!-- Movers + notícias -->
+  <!-- Movers -->
   <div class="col-xl-8">
     <div class="pm-card">
       <div class="row">
-        <div class="col-lg-5">
+        <div class="col-12">
           <div class="d-flex align-items-center gap-2 mb-2">
             <span class="pm-label">Principais movers · {{ p.as_of|ddmm }}</span>
             <a class="btn btn-pm btn-icon btn-sm ms-auto" href="/radar" title="Alertas"><i class="bi bi-bell"></i></a>
@@ -81,21 +81,6 @@
             <small class="{{ m.day_change_eur|tone }} money" style="min-width:4.5rem;text-align:right">· {{ m.day_change_eur|money(sign=True) }}</small>
           </div>
           {% else %}<p class="text-secondary small">Sem cotações recentes.</p>{% endfor %}
-        </div>
-        <div class="col-lg-7 mt-3 mt-lg-0">
-          <div class="pm-label mb-2">Notícias em destaque</div>
-          {% for m in movers %}
-            {% set n = mover_news[m.asset.ticker] %}
-            <div class="pm-row small">
-              {% if n %}
-                <a class="fst-italic text-truncate flex-grow-1" style="color:var(--pm-text)" href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
-                <span class="text-secondary text-nowrap">{{ n.source }} · {{ n.published_on|ago }}</span>
-              {% else %}
-                <span class="text-secondary flex-grow-1">{{ m.asset.ticker }} — sem notícias recentes</span>
-              {% endif %}
-              <a class="btn btn-pm btn-icon btn-sm" href="/noticias?ticker={{ m.asset.ticker|urlencode }}"><i class="bi bi-list"></i></a>
-            </div>
-          {% endfor %}
         </div>
       </div>
     </div>

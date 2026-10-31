@@ -141,12 +141,3 @@ class Event(db.Model):
     revenue_estimate = db.Column(db.Float)
     amount = db.Column(db.Float)
     estimated = False
-
-
-class News(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    instrument = db.Column(db.String(32), db.ForeignKey("instrument.ticker", ondelete="CASCADE"), index=True)
-    title = db.Column(db.String(500), nullable=False)
-    url = db.Column(db.String(1000), unique=True)
-    source = db.Column(db.String(120))
-    published_on = db.Column(db.DateTime, index=True)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Atualiza as cotações, câmbios e notícias e sai (para uma consola Bash ou uma tarefa agendada, ex.: PythonAnywhere).
+# Atualiza as cotações e câmbios e sai (para uma consola Bash ou uma tarefa agendada, ex.: PythonAnywhere).
 #   bash atualizar-cotacoes.sh            (todos os ativos)
 #   bash atualizar-cotacoes.sh --abertas  (só as posições abertas)
 # Variáveis (opcionais):

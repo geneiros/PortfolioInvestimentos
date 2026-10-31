@@ -9,7 +9,7 @@ from datetime import date
 
 from flask import Blueprint, Response, abort, current_app, jsonify, request, send_file, session
 
-from .models import (Alert, Broker, Event, FxRate, ImportBatch, Instrument, News, Price, Setting, Transaction,
+from .models import (Alert, Broker, Event, FxRate, ImportBatch, Instrument, Price, Setting, Transaction,
                      WatchItem, db)
 from . import auth
 from .engine.portfolio import ASSET_TYPES
@@ -360,7 +360,7 @@ def reset_data(confirm=""):
     if confirm != "APAGAR":
         raise ApiError('Escreve APAGAR para confirmar.')
     _backup("apagar-tudo")
-    for model in (Transaction, ImportBatch, Alert, WatchItem, Event, News, Price, FxRate):
+    for model in (Transaction, ImportBatch, Alert, WatchItem, Event, Price, FxRate):
         model.query.delete()
     Broker.query.delete()
     Instrument.query.filter(Instrument.kind != "index").delete()

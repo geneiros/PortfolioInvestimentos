@@ -32,10 +32,15 @@ def _m002_instrument_last_quote(conn):
     _add_column(conn, "instrument", "last_quote", "DATE")
 
 
+def _m003_drop_news(conn):
+    conn.execute("DROP TABLE IF EXISTS news")
+
+
 # (versão, descrição, função)
 MIGRATIONS = [
     (1, "Resultado indicado pela corretora em cada venda", _m001_transaction_result),
     (2, "Data da última cotação obtida de cada ativo", _m002_instrument_last_quote),
+    (3, "Notícias retiradas da aplicação", _m003_drop_news),
 ]
 LATEST = MIGRATIONS[-1][0]
 

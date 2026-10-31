@@ -1,4 +1,4 @@
-"""Estado do mercado e atualização de dados (cotações, câmbios, notícias, eventos).
+"""Estado do mercado e atualização de dados (cotações, câmbios, eventos).
 
 A atualização usa o pacote opcional `yfinance` (pip install yfinance). Sem ele, ou sem
 rede, a aplicação continua a funcionar com as cotações já guardadas.
@@ -8,13 +8,13 @@ import math
 import threading
 import warnings
 import time as _time
-from datetime import date, datetime, time, timedelta, timezone, tzinfo
+from datetime import date, datetime, time, timedelta, tzinfo
 from statistics import median
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..engine.formatting import WEEKDAYS
-from ..models import Alert, Event, FxRate, Instrument, News, Price, Setting, Transaction, db
+from ..models import Alert, Event, FxRate, Instrument, Price, Setting, Transaction, db
 
 log = logging.getLogger(__name__)
 
@@ -237,6 +237,7 @@ def check_alerts(p):
 
 # --------------------------------------------------------------------- yfinance
 _lock = threading.Lock()
+_background = {"on": False}  # atualização lançada pela página (só essa deixa sinal de vida no estado)
 _progress = {"done": 0, "total": 0, "current": ""}  # ativo em curso da atualização (para a página mostrar)
 
 
@@ -259,7 +260,7 @@ def _yahoo_client():
 
 
 def refresh_all(start=None, progress=None, only_open=False):
-    """Atualiza cotações, câmbios, notícias e eventos. Devolve um resumo textual.
+    """Atualiza cotações, câmbios e eventos. Devolve um resumo textual.
 
     `progress(linha)` é chamada a cada ativo, à medida que a atualização avança (ex.: para a consola).
     Com `only_open`, só se atualizam as posições abertas (e os índices de comparação); as fechadas ficam como estão.
@@ -304,6 +305,7 @@ def refresh_all(start=None, progress=None, only_open=False):
             where[0] = f"[{position}/{len(queue)}] "
             started[0] = _time.monotonic()
             _progress.update(done=position - 1, current=inst.ticker)
+            _beat()
             problems = []
             mode = _plan(inst, held, tx_span, price_min, full)
             if mode == "skip":  # posição fechada com as cotações já completas
@@ -371,20 +373,15 @@ def refresh_all(start=None, progress=None, only_open=False):
                 db.session.rollback()
                 note(f"EUR/{cur}: erro ({exc})")
 
-        news_new, news_empty, news_errors, news_detail = 0, [], {}, []
         where[0] = ""
-        # notícias, eventos e setor só interessam para as posições abertas; os ativos vendidos
+        # eventos (resultados, dividendos) e setor só interessam para as posições abertas; os ativos vendidos
         # podem já nem existir em bolsa (ex.: empresas compradas ou fundidas)
-        news_queue = [i for i in insts if i not in gone and i.kind != "index" and i.ticker in held]
-        _progress.update(done=0, total=len(news_queue), current="")
-        limited = 0  # ativos seguidos em que o Yahoo respondeu 429
-        for k, inst in enumerate(news_queue, 1):
-            if limited >= 2:  # não vale a pena esperar pelos restantes: o Yahoo está a limitar este servidor
-                note(f"Notícias: o Yahoo está a limitar os pedidos (429) a partir deste servidor; "
-                     f"saltei as restantes {len(news_queue) - k + 1} posições. Tenta mais tarde.")
-                break
-            _progress.update(done=k - 1, current=f"notícias de {inst.ticker}")
-            news_started = _time.monotonic()
+        open_queue = [i for i in insts if i not in gone and i.kind != "index" and i.ticker in held]
+        _progress.update(done=0, total=len(open_queue), current="")
+        for k, inst in enumerate(open_queue, 1):
+            _progress.update(done=k - 1, current=f"eventos de {inst.ticker}")
+            _beat()
+            step_started = _time.monotonic()
             t = yf.Ticker(inst.data_symbol or inst.ticker)
             if not inst.sector and inst.kind == "etf":
                 inst.sector = "ETF"  # o Yahoo não tem "dados fundamentais" de ETF: o pedido só dava erro
@@ -394,33 +391,12 @@ def refresh_all(start=None, progress=None, only_open=False):
                     inst.sector = info.get("sector") or ("ETF" if info.get("quoteType") == "ETF" else None)
                 except Exception:  # informação opcional
                     pass
-            detail = ""
-            try:
-                items, err, detail = _news_items(yf, t, inst)
-                added = _store_news(inst.ticker, items)
-                news_new += added
-                if not items:
-                    news_empty.append(inst.ticker)
-                    news_detail.append(f"{inst.ticker}: {detail}")
-                if err and not items:
-                    news_errors.setdefault(err, []).append(inst.ticker)
-                limited = limited + 1 if (err and "429" in err and not items) else 0
-            except Exception as exc:
-                news_errors.setdefault(str(exc), []).append(inst.ticker)
             try:
                 _store_calendar(inst.ticker, t.calendar or {})
             except Exception as exc:
                 note(f"{inst.ticker} calendário: erro ({exc})")
             if progress:
-                progress(f"[notícias {k}/{len(news_queue)}] {inst.ticker}: {detail or 'sem detalhe'} "
-                         f"({_time.monotonic() - news_started:.1f} s)")
-        if news_new or news_empty or news_errors:
-            note(f"Notícias: {news_new} novas" + (f"; sem notícias: {', '.join(news_empty[:12])}"
-                                                           + ("…" if len(news_empty) > 12 else "") if news_empty else ""))
-            for msg, tickers in news_errors.items():
-                note(f"Notícias: erro em {len(tickers)} ativos ({msg[:200]})")
-            if news_detail:  # o que cada via devolveu nos primeiros ativos sem notícias
-                note("Notícias, detalhe: " + " | ".join(news_detail[:3]))
+                progress(f"[eventos {k}/{len(open_queue)}] {inst.ticker} ({_time.monotonic() - step_started:.1f} s)")
         if closed:
             note(f"Só posições abertas: {closed} ativos fechados não foram atualizados.")
         if quick or skipped:
@@ -560,6 +536,27 @@ def _resolve_symbol(yf, inst, start, problems=None):
     return fallback
 
 
+def _set_status(value):
+    """Grava o estado da atualização; uma base ocupada não pode deixar a página a rodar para sempre."""
+    for _ in range(3):
+        try:
+            Setting.set("refresh_status", value)
+            return True
+        except Exception:
+            db.session.rollback()
+            _time.sleep(2)
+    return False
+
+
+def _beat():
+    """Sinal de vida da atualização lançada pela página: sem ele, o estado "a atualizar" caduca em 5 minutos."""
+    if _background["on"]:
+        try:
+            Setting.set("refresh_status", "running:" + datetime.now().isoformat(timespec="seconds"))
+        except Exception:  # só um sinal de vida: se a base estiver ocupada, o do ativo seguinte chega
+            db.session.rollback()
+
+
 def refresh_in_background(app, only_open=False):
     """Corre a atualização numa thread e guarda o estado para as páginas o mostrarem."""
     if _lock.locked():
@@ -568,22 +565,26 @@ def refresh_in_background(app, only_open=False):
 
     def run():
         with app.app_context():
-            for attempt in range(3):
-                try:
-                    log.info(refresh_all(only_open=only_open))
-                    Setting.set("refresh_status", "")
-                    return
-                except Exception as exc:  # sem isto o erro perdia-se na thread e o aviso nunca saía
-                    db.session.rollback()
-                    if "database is locked" in str(exc) and attempt < 2:
-                        # outra escrita (ex.: uma atualização na consola) segurava a base de dados: a
-                        # atualização é idempotente, por isso espera-se e repete-se
-                        log.warning("Base de dados ocupada; nova tentativa em 15 s")
-                        _time.sleep(15)
-                        continue
-                    log.exception("Falha na atualização de cotações")
-                    Setting.set("refresh_status", f"error:{exc}")
-                    return
+            _background["on"] = True
+            try:
+                for attempt in range(3):
+                    try:
+                        log.info(refresh_all(only_open=only_open))
+                        _set_status("")
+                        return
+                    except Exception as exc:  # sem isto o erro perdia-se na thread e o aviso nunca saía
+                        db.session.rollback()
+                        if "database is locked" in str(exc) and attempt < 2:
+                            # outra escrita (ex.: uma atualização na consola) segurava a base de dados: a
+                            # atualização é idempotente, por isso espera-se e repete-se
+                            log.warning("Base de dados ocupada; nova tentativa em 15 s")
+                            _time.sleep(15)
+                            continue
+                        log.exception("Falha na atualização de cotações")
+                        _set_status(f"error:{exc}")
+                        return
+            finally:
+                _background["on"] = False
     threading.Thread(target=run, daemon=True).start()
 
 
@@ -593,8 +594,9 @@ def refresh_state():
     error = status[len("error:"):] if status.startswith("error:") else None
     running = False
     if status.startswith("running:"):
-        # se a aplicação foi fechada a meio, o estado fica para trás: ignora-o ao fim de 30 minutos
-        running = datetime.now() - datetime.fromisoformat(status[len("running:"):]) < timedelta(minutes=30)
+        # a atualização renova este estado a cada ativo; se a aplicação foi fechada a meio (ex.: o servidor
+        # recarregou), o estado fica para trás e ignora-se ao fim de 5 minutos sem sinal de vida
+        running = datetime.now() - datetime.fromisoformat(status[len("running:"):]) < timedelta(minutes=5)
     missing = [t for t in (Setting.get("refresh_missing") or "").split(",") if t]
     return running, error, missing
 
@@ -634,64 +636,6 @@ def _upsert(model, key_field, key, value_field, hist, scale=1.0):
         n += 1
     db.session.commit()
     return n
-
-
-def _news_items(yf, t, inst):
-    """Notícias de um ativo: as do yfinance e, se falhar ou vier vazio, as do acesso direto ao Yahoo.
-
-    Devolve (notícias, erro, detalhe); o detalhe diz o que cada via devolveu, para o resumo da atualização.
-    """
-    items, err, detail = [], None, []
-    try:
-        items = list(t.news or [])
-        detail.append(f"yfinance {len(items)}")
-    except Exception as exc:
-        err = str(exc)
-        detail.append(f"yfinance erro ({err[:80]})")
-    if not items:
-        from . import yahoo
-        if yf is not yahoo:
-            try:
-                direct = yahoo.Ticker(inst.data_symbol or inst.ticker)
-                items = list(direct.news or [])
-                detail.append(f"direto {len(items)}" + (f" ({direct.news_error[:80]})" if direct.news_error else ""))
-                err = err or (direct.news_error if not items else None)
-            except Exception as exc:
-                err = err or str(exc)
-                detail.append(f"direto erro ({str(exc)[:80]})")
-        elif getattr(t, "news_error", None):
-            detail.append(f"direto 0 ({t.news_error[:80]})")
-    name = (inst.instrument_name or "").strip()
-    if not items and len(name) > 3 and name.upper() != inst.ticker.upper():
-        # o Yahoo não deu notícias (ex.: 429 a partir de um servidor partilhado): tenta o Google Notícias pelo nome
-        from . import googlenews
-        try:
-            items = googlenews.search(name)
-            detail.append(f"google {len(items)}")
-            if items:
-                err = None
-        except Exception as exc:
-            detail.append(f"google erro ({str(exc)[:80]})")
-    return items, err, "; ".join(detail)
-
-
-def _store_news(ticker, items):
-    added = 0
-    for item in items[:10]:
-        content = item.get("content", item)
-        url = (content.get("canonicalUrl") or {}).get("url") or content.get("link")
-        title = content.get("title")
-        if not url or not title or News.query.filter_by(url=url).first():
-            continue
-        published = content.get("pubDate") or content.get("providerPublishTime")
-        if isinstance(published, (int, float)):
-            published = datetime.fromtimestamp(published, timezone.utc).replace(tzinfo=None)
-        elif isinstance(published, str):
-            published = datetime.fromisoformat(published.replace("Z", "+00:00")).replace(tzinfo=None)
-        source = (content.get("provider") or {}).get("displayName") or content.get("publisher")
-        db.session.add(News(instrument=ticker, title=title[:500], url=url, source=source, published_on=published))
-        added += 1
-    return added
 
 
 def _store_calendar(ticker, cal):

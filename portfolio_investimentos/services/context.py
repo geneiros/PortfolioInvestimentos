@@ -12,7 +12,6 @@ NAV = [
     ("carteira", "Carteira", "/carteira", "bi-wallet2"),
     ("radar", "Radar e alertas", "/radar", "bi-bullseye"),
     ("desempenho", "Desempenho", "/desempenho", "bi-graph-up-arrow"),
-    ("noticias", "Notícias", "/noticias", "bi-newspaper"),
     ("dividendos", "Dividendos", "/dividendos", "bi-coin"),
     ("fiscal", "Fiscal", "/fiscal", "bi-receipt"),
 ]
