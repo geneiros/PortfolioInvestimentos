@@ -62,6 +62,9 @@ def create_app(config=None):
     app.config.update(
         SECRET_KEY=_secret_key(folder),
         SQLALCHEMY_DATABASE_URI=f"sqlite:///{db_path}",
+        # o SQLite espera até 30 s por uma escrita de outro processo/thread (por omissão 5 s: a atualização de
+        # cotações e as páginas escrevem ao mesmo tempo, e em servidores lentos "database is locked" saía logo)
+        SQLALCHEMY_ENGINE_OPTIONS={"connect_args": {"timeout": 30}},
         DB_PATH=db_path,
         MAX_CONTENT_LENGTH=20 * 1024 * 1024,
         SESSION_COOKIE_SAMESITE="Strict",

@@ -6,6 +6,7 @@ rede, a aplicação continua a funcionar com as cotações já guardadas.
 import logging
 import math
 import threading
+import time as _time
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from statistics import median
 from types import SimpleNamespace
@@ -340,6 +341,7 @@ def refresh_all(start=None):
                 db.session.rollback()
                 report.append(f"EUR/{cur}: erro ({exc})")
 
+        news_new, news_empty, news_errors = 0, [], {}
         for inst in insts:
             # notícias, eventos e setor só interessam para as posições abertas; os ativos vendidos
             # podem já nem existir em bolsa (ex.: empresas compradas ou fundidas)
@@ -355,13 +357,24 @@ def refresh_all(start=None):
                 except Exception:  # informação opcional
                     pass
             try:
-                _store_news(inst.ticker, t.news or [])
+                items, err = _news_items(yf, t, inst)
+                added = _store_news(inst.ticker, items)
+                news_new += added
+                if not items:
+                    news_empty.append(inst.ticker)
+                if err and not items:
+                    news_errors.setdefault(err, []).append(inst.ticker)
             except Exception as exc:
-                report.append(f"{inst.ticker} notícias: erro ({exc})")
+                news_errors.setdefault(str(exc), []).append(inst.ticker)
             try:
                 _store_calendar(inst.ticker, t.calendar or {})
             except Exception as exc:
                 report.append(f"{inst.ticker} calendário: erro ({exc})")
+        if news_new or news_empty or news_errors:
+            report.append(f"Notícias: {news_new} novas" + (f"; sem notícias: {', '.join(news_empty[:12])}"
+                                                           + ("…" if len(news_empty) > 12 else "") if news_empty else ""))
+            for msg, tickers in news_errors.items():
+                report.append(f"Notícias: erro em {len(tickers)} ativos ({msg[:200]})")
         if quick or skipped:
             report.append(f"Atualização incremental: {quick} ativos só com os últimos dias; "
                           f"{skipped} posições fechadas sem pedidos.")
@@ -506,13 +519,22 @@ def refresh_in_background(app):
 
     def run():
         with app.app_context():
-            try:
-                log.info(refresh_all())
-                Setting.set("refresh_status", "")
-            except Exception as exc:  # sem isto o erro perdia-se na thread e o aviso nunca saía
-                log.exception("Falha na atualização de cotações")
-                db.session.rollback()
-                Setting.set("refresh_status", f"error:{exc}")
+            for attempt in range(3):
+                try:
+                    log.info(refresh_all())
+                    Setting.set("refresh_status", "")
+                    return
+                except Exception as exc:  # sem isto o erro perdia-se na thread e o aviso nunca saía
+                    db.session.rollback()
+                    if "database is locked" in str(exc) and attempt < 2:
+                        # outra escrita (ex.: uma atualização na consola) segurava a base de dados: a
+                        # atualização é idempotente, por isso espera-se e repete-se
+                        log.warning("Base de dados ocupada; nova tentativa em 15 s")
+                        _time.sleep(15)
+                        continue
+                    log.exception("Falha na atualização de cotações")
+                    Setting.set("refresh_status", f"error:{exc}")
+                    return
     threading.Thread(target=run, daemon=True).start()
 
 
@@ -565,7 +587,25 @@ def _upsert(model, key_field, key, value_field, hist, scale=1.0):
     return n
 
 
+def _news_items(yf, t, inst):
+    """Notícias de um ativo: as do yfinance e, se falhar ou vier vazio, as do acesso direto ao Yahoo."""
+    items, err = [], None
+    try:
+        items = list(t.news or [])
+    except Exception as exc:
+        err = str(exc)
+    if not items:
+        from . import yahoo
+        if yf is not yahoo:
+            try:
+                items = list(yahoo.Ticker(inst.data_symbol or inst.ticker).news or [])
+            except Exception as exc:
+                err = err or str(exc)
+    return items, err
+
+
 def _store_news(ticker, items):
+    added = 0
     for item in items[:10]:
         content = item.get("content", item)
         url = (content.get("canonicalUrl") or {}).get("url") or content.get("link")
@@ -579,6 +619,8 @@ def _store_news(ticker, items):
             published = datetime.fromisoformat(published.replace("Z", "+00:00")).replace(tzinfo=None)
         source = (content.get("provider") or {}).get("displayName") or content.get("publisher")
         db.session.add(News(instrument=ticker, title=title[:500], url=url, source=source, published_on=published))
+        added += 1
+    return added
 
 
 def _store_calendar(ticker, cal):

@@ -632,6 +632,86 @@ def test_fiscal_groups_by_asset_with_lots_on_demand_and_full_csv(app, client):
     assert lines[1].split(";")[:2] == ["2024-06-01", '"AAA"'] and lines[1].split(";")[4] == "12.0"
 
 
+def test_background_refresh_retries_when_database_is_locked(app, monkeypatch):
+    from sqlalchemy.exc import OperationalError
+    from portfolio_investimentos.models import Setting
+    from portfolio_investimentos.services import market
+
+    assert app.config["SQLALCHEMY_ENGINE_OPTIONS"]["connect_args"]["timeout"] == 30
+    calls, sleeps = [], []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) < 3:
+            raise OperationalError("UPDATE", {}, Exception("database is locked"))
+        return "ok"
+    monkeypatch.setattr(market, "refresh_all", flaky)
+    monkeypatch.setattr(market._time, "sleep", sleeps.append)
+
+    class Inline:  # corre a thread já, para o teste esperar pelo resultado
+        def __init__(self, target, daemon=None):
+            self.target = target
+
+        def start(self):
+            self.target()
+    monkeypatch.setattr(market.threading, "Thread", Inline)
+    with app.app_context():
+        market.refresh_in_background(app)
+        assert len(calls) == 3 and sleeps == [15, 15] and Setting.get("refresh_status") == ""
+    # um erro que não é de bloqueio não se repete
+    calls.clear()
+
+    def broken():
+        calls.append(1)
+        raise RuntimeError("falha qualquer")
+    monkeypatch.setattr(market, "refresh_all", broken)
+    with app.app_context():
+        market.refresh_in_background(app)
+        assert len(calls) == 1 and Setting.get("refresh_status") == "error:falha qualquer"
+
+
+def test_news_fall_back_to_direct_client_and_are_reported(app, client, monkeypatch):
+    import sys
+    from portfolio_investimentos.models import Instrument, News
+    from portfolio_investimentos.services import market, yahoo
+
+    class YfNoNews(_FakeYf):
+        class Ticker(_FakeYf.Ticker):
+            @property
+            def news(self):
+                raise RuntimeError("Too Many Requests")
+
+            @news.setter
+            def news(self, v):
+                pass
+    monkeypatch.setitem(sys.modules, "yfinance", YfNoNews)
+
+    class Direct:
+        def __init__(self, symbol):
+            self.news = [{"title": f"Notícia de {symbol}", "link": f"https://exemplo.pt/{symbol}", "publisher": "X",
+                          "providerPublishTime": 1_790_000_000}] if symbol == "ADB.DE" else []
+    monkeypatch.setattr(yahoo, "Ticker", Direct)
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="ADB", currency="EUR", isin="US00724F1012", data_symbol="ADB.DE"),
+            Instrument(ticker="NOV", currency="EUR", isin="DK0062498333", data_symbol="NOV.DE"),
+            Transaction(date=date(2026, 8, 27), type="BUY", instrument="ADB", quantity=1, price=240.4, currency="EUR"),
+            Transaction(date=date(2026, 9, 14), type="BUY", instrument="NOV", quantity=1, price=37.5, currency="EUR"),
+        ])
+        db.session.commit()
+        report = market.refresh_all(start=date(2026, 10, 1))
+        assert [n.instrument for n in News.query] == ["ADB"]  # as do acesso direto, quando o yfinance falha
+        assert "Notícias: 1 novas; sem notícias: NOV" in report
+    html = client.get("/noticias").get_data(as_text=True)
+    assert "Notícia de ADB.DE" in html
+    # sem notícias: a mensagem explica onde ver o motivo (e já não diz que precisa do yfinance)
+    with app.app_context():
+        News.query.delete()
+        db.session.commit()
+    html = client.get("/noticias").get_data(as_text=True)
+    assert "A última atualização" in html and "Resultado por ativo" in html and "requer o pacote" not in html
+
+
 def test_merge_instruments_manually(app, client):
     from portfolio_investimentos.models import Instrument, Price
     with app.app_context():

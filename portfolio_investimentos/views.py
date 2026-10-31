@@ -273,7 +273,7 @@ def noticias():
     ticker = ticker if ticker in held else None
     tickers = [ticker] if ticker else held
     news = (News.query.filter(News.instrument.in_(tickers or [""])).order_by(News.published_on.desc()).limit(100).all())
-    c.update(held=held, ticker=ticker, news=news, yfinance=yfinance_available())
+    c.update(held=held, ticker=ticker, news=news, yfinance=yfinance_available(), last_refresh=Setting.get("last_refresh"))
     return render_template("pages/noticias.html", **c)
 
 
