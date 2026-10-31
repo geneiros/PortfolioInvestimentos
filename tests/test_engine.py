@@ -202,6 +202,25 @@ def test_scores_metrics_and_profiles():
     assert tier(85) == ("A", "Excelente") and tier(20) == ("D", "Em construção") and tier(None)[0] is None
 
 
+def test_fire_number_dates_and_tracking():
+    from portfolio_investimentos.engine import fire
+    # 12 000 €/ano, 4%, 14% de imposto efetivo: 12 000 / 0,86 / 0,04
+    assert fire.fire_number(12000, 0.04, 0.14) == pytest.approx(348837.2, rel=1e-6)
+    plan = fire.plan(100000, 12000, 0.04, 0.0, 1000, start=date(2026, 11, 1))
+    assert plan["number"] == pytest.approx(300000) and plan["done"] == pytest.approx(1 / 3)
+    by = {s["name"]: s["date"] for s in plan["scenarios"]}
+    assert by["otimista"] < by["base"] < by["pessimista"]  # mais retorno, mais cedo
+    assert plan["earliest"] == by["otimista"] and plan["latest"] == by["pessimista"]
+    # conferir o cenário base à mão: o mês em que passa os 300 000 €
+    g, v, m = 1.05 ** (1 / 12) - 1, 100000.0, 0
+    while v < 300000:
+        v, m = v * (1 + g) + 1000, m + 1
+    assert by["base"] == fire._add_months(date(2026, 11, 1), m)
+    assert fire.plan(400000, 12000, 0.04, 0.0, 0, start=date(2026, 11, 1))["date"] == date(2026, 11, 1)  # já lá está
+    track = fire.monthly_track([date(2026, 8, 31), date(2026, 9, 30), date(2026, 10, 30)], [100.0, 110.0, 99.0], 1000)
+    assert [(r["month"], r["change"]) for r in track] == [((2026, 10), -11.0), ((2026, 9), 10.0)]
+
+
 def test_fiscal_dividend_credit_is_limited_per_dividend():
     """A retenção a mais num dividendo (30% nos EUA) não abate o imposto de outro dividendo do mesmo ano."""
     d0 = date(2024, 1, 2)

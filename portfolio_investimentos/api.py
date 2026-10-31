@@ -357,6 +357,23 @@ def set_risk_free(rate):
 
 
 @action
+def save_fire(expenses, swr, tax, monthly):
+    values = {"fire_expenses": _float(expenses), "fire_swr": _float(swr), "fire_tax": _float(tax),
+              "fire_monthly": _float(monthly)}
+    if values["fire_expenses"] <= 0:
+        raise ApiError("Indica as despesas anuais.")
+    if not 0.5 <= values["fire_swr"] <= 10:
+        raise ApiError("A taxa de levantamento deve estar entre 0,5% e 10%.")
+    if not 0 <= values["fire_tax"] < 60:
+        raise ApiError("O imposto deve estar entre 0% e 60%.")
+    if values["fire_monthly"] < 0:
+        raise ApiError("O investimento mensal não pode ser negativo.")
+    for key, value in values.items():
+        Setting.set(key, value)
+    return "Plano guardado."
+
+
+@action
 def refresh_status():
     running, error, missing = market.refresh_state()
     indices = {t for (t,) in db.session.query(Instrument.ticker).filter_by(kind="index")}

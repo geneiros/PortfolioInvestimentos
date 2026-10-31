@@ -126,6 +126,7 @@ As capturas usam os dados de demonstração.
 | **Risco e análise avançada** | **Dividendos** |
 | ![Risco](docs/screenshots/09-desempenho-risco.png) | ![Dividendos](docs/screenshots/10-dividendos.png) |
 | **Mapa de rendimento** | **Fiscal** |
+| **Planeamento** | Independência financeira (FIRE): o número FIRE já depois do IRS, a parte já feita, a data em três cenários (3%, 5% e 7% reais ao ano) com o investimento mensal, e o acompanhamento mês a mês. |
 | ![Mapa de dividendos](docs/screenshots/11-dividendos-mapa.png) | ![Fiscal](docs/screenshots/12-fiscal.png) |
 | **Radar e alertas** | **Importar extrato** |
 | ![Radar](docs/screenshots/13-radar.png) | ![Importar](docs/screenshots/14-importar.png) |

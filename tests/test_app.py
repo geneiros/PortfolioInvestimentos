@@ -724,6 +724,19 @@ def test_overview_scores_profiles_and_insights(app, client):
     assert post(client, "set_profile", token, profile="nao-existe").status_code == 400
 
 
+def test_planning_fire_page_and_settings(app, client):
+    token = csrf(client)
+    assert client.get("/planeamento").status_code == 200  # sem dados
+    post(client, "load_demo", token)
+    html = client.get("/planeamento").get_data(as_text=True)
+    assert "O número FIRE" in html and "A data FIRE" in html and 'id="fireChart"' in html and "Planeamento" in html
+    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500").status_code == 200
+    html = client.get("/planeamento").get_data(as_text=True)
+    assert "600" in html.replace("\u202f", "").replace(" ", "")  # 24 000 / 4% = 600 000 €
+    assert post(client, "save_fire", token, expenses="0", swr="4", tax="0", monthly="0").status_code == 400
+    assert post(client, "save_fire", token, expenses="1000", swr="50", tax="0", monthly="0").status_code == 400
+
+
 def test_merge_instruments_manually(app, client):
     from portfolio_investimentos.models import Instrument, Price
     with app.app_context():

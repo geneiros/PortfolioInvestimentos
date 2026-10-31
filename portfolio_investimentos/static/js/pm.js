@@ -171,7 +171,7 @@
   // ---------------------------------------------------------------- modo offline (PWA)
   // Com "Disponível offline" ligado (Definições), o service worker guarda as páginas de consulta; se a
   // aplicação estiver parada, a página vem dessa cópia: mostra-se uma faixa e as ações ficam bloqueadas.
-  const OFFLINE_PAGES = ["/", "/carteira", "/desempenho", "/dividendos", "/fiscal", "/radar", "/transacoes"];
+  const OFFLINE_PAGES = ["/", "/carteira", "/desempenho", "/dividendos", "/fiscal", "/radar", "/transacoes", "/planeamento"];
   const BLOCKED = "[data-pm-action],[data-pm-refresh],[data-pm-broker],[data-p],#fileInput,#drop,form[data-pm-method] [type=submit]";
   const toSW = (msg) => {
     if (!("serviceWorker" in navigator)) return;

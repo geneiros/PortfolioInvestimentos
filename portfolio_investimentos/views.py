@@ -374,6 +374,52 @@ def _asset_rows(p, tickers):
     return rows
 
 
+def fire_settings(p):
+    """Parâmetros do plano FIRE: os guardados em Planeamento ou, por omissão, valores a partir da carteira."""
+    def get(key, default):
+        try:
+            return float(Setting.get(key))
+        except (TypeError, ValueError):
+            return default
+    s = p.series
+    monthly = 0.0
+    if s.dates:
+        k = next((i for i, d in enumerate(s.dates) if d >= s.dates[-1] - timedelta(days=365)), 0)
+        span = max((s.dates[-1] - s.dates[k]).days / 30.44, 1)
+        monthly = max((s.net_deposits[-1] - s.net_deposits[k]) / span, 0.0)
+    gains = sum(pos.unrealized_eur for pos in p.open_positions)
+    gain_share = min(max(gains / p.holdings_value, 0.0), 1.0) if p.holdings_value > 0 else 0.5
+    return {"expenses": get("fire_expenses", 12000.0), "swr": get("fire_swr", 4.0),
+            "tax": get("fire_tax", round(28 * max(gain_share, 0.5), 1)), "monthly": get("fire_monthly", round(monthly)),
+            "custom": Setting.get("fire_expenses") is not None}
+
+
+@bp.route("/planeamento")
+def planeamento():
+    from .engine import fire
+    c = ctx.build("planeamento", "Planeamento")
+    p = c["p"]
+    if not p.transactions:
+        return render_template("pages/planeamento.html", **c)
+    cfg = fire_settings(p)
+    plan = fire.plan(p.total_value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100, cfg["monthly"])
+    s = p.series
+    history = [(d, v) for d, v in zip(s.dates, s.value)]
+    last = plan["date"] or plan["latest"] or plan["earliest"]
+    end_year = (last.year + 3) if last else date.today().year + 30
+    year = lambda d: round(d.year + (d.month - 1) / 12 + (d.day - 1) / 365, 3)  # noqa: E731
+    chart = {
+        "history": [{"x": year(d), "y": round(v)} for i, (d, v) in enumerate(history) if i % 5 == 0 or i == len(history) - 1],
+        "scenarios": [{"name": sc["name"], "rate": sc["rate"],
+                       "data": [{"x": year(d), "y": round(v)} for d, v in sc["points"] if d.year <= end_year]}
+                      for sc in plan["scenarios"]],
+        "target": round(plan["number"]), "start": year(history[0][0]) if history else date.today().year, "end": end_year,
+    }
+    c.update(cfg=cfg, plan=plan, chart=ctx.js_json(chart),
+             track=fire.monthly_track(s.dates, s.value, plan["number"]))
+    return render_template("pages/planeamento.html", **c)
+
+
 @bp.route("/sw.js")
 def service_worker():
     # servido na raiz para o service worker controlar todas as páginas da aplicação

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help, empty %}
+{% if not p.transactions %}
+  {{ empty("Sem dados para planear", "Importa as tuas transações para calcular quando a carteira pode pagar as tuas despesas.", "/importar", "Importar extrato") }}
+{% else %}
+<div class="mb-3">
+  <h5 class="fw-bold mb-1">Independência financeira (FIRE)</h5>
+  <p class="text-secondary mb-0">Quanto juntar para os rendimentos da carteira pagarem as despesas de cada ano, já depois do IRS
+    português, e quando lá chegas com o que tens hoje e o que investes por mês.</p>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
+    <div class="pm-label">O número FIRE {{ help("Despesas anuais ÷ (1 − imposto efetivo sobre os levantamentos) ÷ taxa de levantamento. Ex.: 12 000 € ÷ (1 − 14%) ÷ 4% ≈ 349 000 €.") }}</div>
+    <div class="pm-mid money">{{ plan.number|money }}</div>
+    <div class="small text-secondary">para <span class="money">{{ plan.expenses|money }}</span> de despesas por ano, a {{ plan.withdrawal_rate|pct(1, sign=False) }} ao ano</div>
+  </div></div>
+  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
+    <div class="pm-label">Já feito {{ help("Valor atual da carteira (posições + caixa) a dividir pelo número FIRE.") }}</div>
+    <div class="pm-mid">{{ plan.done|pct(2, sign=False) }}</div>
+    <div class="pm-progress mt-2"><div style="width: {{ [[plan.done * 100, 0]|max, 100]|min }}%"></div></div>
+    <div class="small text-secondary mt-1"><span class="money">{{ plan.value|money }}</span> de <span class="money">{{ plan.number|money }}</span></div>
+  </div></div>
+  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
+    <div class="pm-label">A data FIRE {{ help("Mês em que a carteira chega ao número FIRE no cenário base (5% ao ano, real), a investir o valor mensal indicado. O intervalo é o dos cenários otimista (7%) e pessimista (3%).") }}</div>
+    <div class="pm-mid">{{ plan.date.year if plan.date else "—" }}</div>
+    <div class="small text-secondary">
+      {% if plan.done >= 1 %}Já chegaste ao número FIRE.
+      {% elif plan.earliest and plan.latest %}Entre {{ plan.earliest.year }} e {{ plan.latest.year }}
+      {% elif plan.earliest %}A partir de {{ plan.earliest.year }}; com 3% ao ano, não em 60 anos
+      {% else %}Não chega em 60 anos com estes valores{% endif %}
+    </div>
+  </div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-xl-8"><div class="pm-card h-100">
+    <div class="pm-label mb-2">Evolução e projeção</div>
+    <div style="height: 320px"><canvas id="fireChart"></canvas></div>
+    <p class="small text-secondary mt-2 mb-0">A linha tracejada é o número FIRE. Até hoje, o valor real da carteira; daqui em diante, simulações com
+      retornos de 3%, 5% e 7% ao ano acima da inflação (em euros de hoje), não uma promessa.</p>
+  </div></div>
+  <div class="col-xl-4"><div class="pm-card h-100">
+    <div class="pm-label mb-2">O teu plano</div>
+    <form class="d-flex flex-column gap-2 small" data-pm-method="save_fire" data-pm-success="Plano guardado.">
+      <label>Despesas por ano (€) {{ help("O que gastas num ano, em euros de hoje.") }}
+        <input name="expenses" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.expenses|round|int }}"></label>
+      <label>Investimento por mês (€) {{ help("O que juntas à carteira todos os meses. Por omissão, a média dos depósitos líquidos dos últimos 12 meses.") }}
+        <input name="monthly" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.monthly|round|int }}"></label>
+      <label>Taxa de levantamento anual (%) {{ help("Quanto levantas por ano face ao património. 4% é a regra mais usada (estudo Trinity); 3–3,5% é mais prudente para reformas longas.") }}
+        <input name="swr" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.swr }}"></label>
+      <label>Imposto efetivo sobre os levantamentos (%) {{ help("Em Portugal, as mais-valias pagam 28%, mas só sobre a parte de ganho de cada venda. Por omissão: 28% × a parte de ganho da carteira (pelo menos metade).") }}
+        <input name="tax" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.tax }}"></label>
+      <button class="btn btn-sm btn-primary align-self-start mt-1" type="submit">Recalcular</button>
+      {% if not cfg.custom %}<span class="text-secondary">Valores sugeridos a partir da carteira; ajusta-os aos teus.</span>{% endif %}
+    </form>
+  </div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-5"><div class="pm-card h-100">
+    <div class="pm-label mb-2">Os três cenários</div>
+    <div class="table-responsive"><table class="table pm-table mb-0">
+      <thead><tr><th>Cenário</th><th class="text-end">Retorno real</th><th class="text-end">Data FIRE</th><th class="text-end">Anos</th></tr></thead>
+      <tbody>{% for sc in plan.scenarios %}
+        <tr><td class="text-capitalize">{{ sc.name }}</td><td class="text-end">{{ sc.rate|pct(0, sign=False) }}</td>
+          <td class="text-end">{{ sc.date.strftime('%m/%Y') if sc.date else "mais de 60 anos" }}</td>
+          <td class="text-end">{{ ((sc.date - plan.scenarios[0].points[0][0]).days / 365.25)|round(1) if sc.date else "—" }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div></div>
+  <div class="col-xl-7"><div class="pm-card h-100">
+    <div class="pm-label mb-2">Acompanhamento mês a mês {{ help("Valor da carteira no fim de cada mês e a parte do número FIRE (com o número FIRE de hoje). A variação inclui o que investiste nesse mês.") }}</div>
+    <div class="table-responsive" style="max-height: 320px"><table class="table pm-table mb-0">
+      <thead><tr><th>Mês</th><th class="text-end">Valor</th><th class="text-end">Variação</th><th class="text-end">Já feito</th></tr></thead>
+      <tbody>{% for r in track %}
+        <tr><td>{{ MONTHS[r.month[1] - 1] }} {{ r.month[0] }}</td><td class="text-end money">{{ r.value|money }}</td>
+          <td class="text-end money {{ r.change|tone }}">{{ r.change|money(sign=True) }}</td><td class="text-end">{{ r.done|pct(2, sign=False) }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div></div>
+</div>
+{% endif %}
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+{% if chart %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const d = {{ chart|safe }};
+  const draw = () => {
+    const accent = pm.css("--pm-accent"), up = pm.css("--pm-up");
+    const colors = { pessimista: "#94a3b8", base: accent, otimista: up };
+    const datasets = [
+      { label: "Carteira (real)", data: d.history, borderColor: pm.css("--pm-text"), borderWidth: 2, pointRadius: 0, tension: .2 },
+      ...d.scenarios.map((s) => ({ label: `${s.name} (${Math.round(s.rate * 100)}%)`, data: s.data, borderColor: colors[s.name],
+        borderWidth: s.name === "base" ? 2.5 : 1.5, pointRadius: 0, tension: .2, fill: false })),
+      { label: "Número FIRE", data: [{ x: d.start, y: d.target }, { x: d.end, y: d.target }], borderColor: "#f59e0b",
+        borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0 },
+    ];
+    pm.chart("fireChart", { type: "line", data: { datasets },
+      options: { maintainAspectRatio: false, parsing: true, interaction: { mode: "nearest", intersect: false },
+        plugins: { legend: { position: "bottom" },
+          tooltip: { callbacks: { title: (it) => String(Math.floor(it[0].parsed.x)), label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0)}` } } },
+        scales: { x: { type: "linear", min: d.start, max: d.end, ticks: { callback: (v) => Math.floor(v), stepSize: 2 }, grid: { display: false } },
+                  y: { position: "right", ticks: { callback: (v) => pm.money(v, 0) } } } } });
+  };
+  draw(); document.addEventListener("pm:theme", draw);
+});
+</script>
+{% endif %}
+{% endblock %}
