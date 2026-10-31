@@ -236,6 +236,7 @@ def check_alerts(p):
 
 # --------------------------------------------------------------------- yfinance
 _lock = threading.Lock()
+_progress = {"done": 0, "total": 0, "current": ""}  # ativo em curso da atualização (para a página mostrar)
 
 
 def yfinance_available():
@@ -253,8 +254,11 @@ def _yahoo_client():
         return yahoo
 
 
-def refresh_all(start=None):
-    """Atualiza cotações, câmbios, notícias e eventos. Devolve um resumo textual."""
+def refresh_all(start=None, progress=None):
+    """Atualiza cotações, câmbios, notícias e eventos. Devolve um resumo textual.
+
+    `progress(linha)` é chamada a cada ativo, à medida que a atualização avança (ex.: para a consola).
+    """
     yf = _yahoo_client()
     if not _lock.acquire(blocking=False):
         return "Já existe uma atualização em curso."
@@ -264,6 +268,12 @@ def refresh_all(start=None):
         full = start is not None  # com data de início explícita pede-se o histórico todo
         start = start or (first_tx - timedelta(days=7) if first_tx else date.today() - timedelta(days=365))
         report, missing, updated = [], [], 0
+        where = [""]  # "[n/total] " do ativo em curso
+
+        def note(line):
+            report.append(line)
+            if progress:
+                progress(where[0] + line)
         # os erros do yfinance (ex.: "No fundamentals data found") já ficam no resumo por ativo
         logging.getLogger("yfinance").setLevel(logging.CRITICAL)
         from .data import load_portfolio
@@ -276,9 +286,12 @@ def refresh_all(start=None):
         ).group_by(Transaction.instrument)}
         price_min = dict(db.session.query(Price.instrument, db.func.min(Price.date)).group_by(Price.instrument))
         quick = skipped = 0
-        for inst in insts:
+        _progress.update(done=0, total=len(insts), current="")
+        for position, inst in enumerate(insts, 1):
             if inst in gone:
                 continue
+            where[0] = f"[{position}/{len(insts)}] "
+            _progress.update(done=position - 1, current=inst.ticker)
             problems = []
             mode = _plan(inst, held, tx_span, price_min, full)
             if mode == "skip":  # posição fechada com as cotações já completas
@@ -292,18 +305,18 @@ def refresh_all(start=None):
                     found = _resolve_symbol(yf, inst, start, problems)
                 except Exception as exc:  # um símbolo inválido não deve parar o resto
                     missing.append(inst.ticker)
-                    report.append(f"{inst.ticker}: erro ({exc})")
+                    note(f"{inst.ticker}: erro ({exc})")
                     continue
                 if found is None:
                     missing.append(inst.ticker)
                     why = "; ".join(dict.fromkeys(problems)) if problems else "nenhum símbolo encontrado"
-                    report.append(f"{inst.ticker}: sem cotações em {inst.currency} ({why[:300]})")
+                    note(f"{inst.ticker}: sem cotações em {inst.currency} ({why[:300]})")
                     continue
             symbol, hist, scale = found
             twin = _twin(inst, symbol, insts)
             if twin:  # o mesmo título já existe com o ticker da bolsa (ex.: comprado também na XTB)
                 from .importer import merge_instruments
-                report.append(f"{inst.ticker}: é o mesmo título que {twin.ticker}; ativos juntados")
+                note(f"{inst.ticker}: é o mesmo título que {twin.ticker}; ativos juntados")
                 held.add(twin.ticker)
                 gone.append(inst)
                 merge_instruments(inst, twin)
@@ -321,11 +334,13 @@ def refresh_all(start=None):
             except Exception as exc:  # um ativo com dados inválidos não deve parar o resto
                 db.session.rollback()
                 missing.append(inst.ticker)
-                report.append(f"{symbol}: erro ao guardar ({exc})")
+                note(f"{symbol}: erro ao guardar ({exc})")
                 continue
             updated += inst.kind != "index" and n > 0
-            report.append(f"{symbol}: {n} cotações")
+            last = f" · último fecho {closes[-1][1]:.2f} {inst.currency} ({closes[-1][0]:%d/%m/%Y})" if closes else ""
+            note(f"{symbol}: {n} cotações{last}")
 
+        where[0] = ""
         currencies = {i.currency for i in insts} | {c for (c,) in db.session.query(Transaction.currency).distinct()}
         for cur in sorted(c for c in currencies if c and c != "EUR"):
             fx_start = start
@@ -336,10 +351,10 @@ def refresh_all(start=None):
                     fx_start = max(start, hi - timedelta(days=5))
             try:
                 n = _upsert(FxRate, "currency", cur, "rate", yf.Ticker(f"EUR{cur}=X").history(start=fx_start))
-                report.append(f"EUR/{cur}: {n} taxas")
+                note(f"EUR/{cur}: {n} taxas")
             except Exception as exc:
                 db.session.rollback()
-                report.append(f"EUR/{cur}: erro ({exc})")
+                note(f"EUR/{cur}: erro ({exc})")
 
         news_new, news_empty, news_errors = 0, [], {}
         for inst in insts:
@@ -347,6 +362,7 @@ def refresh_all(start=None):
             # podem já nem existir em bolsa (ex.: empresas compradas ou fundidas)
             if inst in gone or inst.kind == "index" or inst.ticker not in held:
                 continue
+            _progress["current"] = f"notícias de {inst.ticker}"
             t = yf.Ticker(inst.data_symbol or inst.ticker)
             if not inst.sector and inst.kind == "etf":
                 inst.sector = "ETF"  # o Yahoo não tem "dados fundamentais" de ETF: o pedido só dava erro
@@ -369,14 +385,14 @@ def refresh_all(start=None):
             try:
                 _store_calendar(inst.ticker, t.calendar or {})
             except Exception as exc:
-                report.append(f"{inst.ticker} calendário: erro ({exc})")
+                note(f"{inst.ticker} calendário: erro ({exc})")
         if news_new or news_empty or news_errors:
-            report.append(f"Notícias: {news_new} novas" + (f"; sem notícias: {', '.join(news_empty[:12])}"
+            note(f"Notícias: {news_new} novas" + (f"; sem notícias: {', '.join(news_empty[:12])}"
                                                            + ("…" if len(news_empty) > 12 else "") if news_empty else ""))
             for msg, tickers in news_errors.items():
-                report.append(f"Notícias: erro em {len(tickers)} ativos ({msg[:200]})")
+                note(f"Notícias: erro em {len(tickers)} ativos ({msg[:200]})")
         if quick or skipped:
-            report.append(f"Atualização incremental: {quick} ativos só com os últimos dias; "
+            note(f"Atualização incremental: {quick} ativos só com os últimos dias; "
                           f"{skipped} posições fechadas sem pedidos.")
         db.session.commit()
         Setting.set("refresh_missing", ",".join(missing))
@@ -385,6 +401,7 @@ def refresh_all(start=None):
         Setting.set("last_refresh", datetime.now().isoformat(timespec="seconds"))
         return "\n".join(report)
     finally:
+        _progress.update(done=0, total=0, current="")
         _lock.release()
 
 

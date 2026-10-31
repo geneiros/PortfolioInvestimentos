@@ -44,7 +44,8 @@ def main():
                 print(create_demo())
             if args.refresh:
                 from .services.market import refresh_all
-                print(refresh_all())
+                result = refresh_all(progress=lambda line: print(line, flush=True))
+                print(result if result.startswith("Já existe") else "Concluído.")
         return
 
     port, running = _choose_port(args.host, args.port)

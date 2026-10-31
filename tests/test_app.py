@@ -736,6 +736,30 @@ def test_merge_instruments_manually(app, client):
     assert client.get("/definicoes").status_code == 200 and client.get("/carteira").status_code == 200
 
 
+def test_refresh_reports_progress_with_last_close(app, monkeypatch):
+    """A atualização conta os ativos à medida que avança e mostra o último fecho de cada um."""
+    import sys
+    from portfolio_investimentos.models import Instrument
+    from portfolio_investimentos.services import market
+    monkeypatch.setitem(sys.modules, "yfinance", _FakeYf)
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="ADB", currency="EUR", isin="US00724F1012", data_symbol="ADB.DE"),
+            Instrument(ticker="NOV", currency="EUR", isin="DK0062498333"),
+            Transaction(date=date(2026, 8, 27), type="BUY", instrument="ADB", quantity=1, price=240.4, currency="EUR"),
+            Transaction(date=date(2026, 9, 14), type="BUY", instrument="NOV", quantity=1, price=37.5, currency="EUR"),
+        ])
+        db.session.commit()
+        lines = []
+        report = market.refresh_all(start=date(2026, 10, 1), progress=lines.append)
+        asset_lines = [ln for ln in lines if ln.startswith("[")]
+        assert any(ln.startswith("[") and "ADB.DE: 2 cotações · último fecho 227.10 EUR (23/10/2026)" in ln
+                   for ln in asset_lines)
+        assert all("/" in ln.split("]")[0] for ln in asset_lines)  # "[n/total]"
+        assert "ADB.DE: 2 cotações · último fecho 227.10 EUR (23/10/2026)" in report  # o resumo guardado não leva o contador
+        assert market._progress == {"done": 0, "total": 0, "current": ""}  # reposto no fim
+
+
 def test_refresh_is_incremental_after_first_run(app, monkeypatch):
     """Depois da primeira atualização, só se pedem os dias novos; posições fechadas já completas não se pedem."""
     import sys

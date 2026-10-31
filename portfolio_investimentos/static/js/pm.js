@@ -103,10 +103,14 @@
   // botão "Atualizar cotações agora": a atualização corre no servidor em segundo plano,
   // por isso consulta o estado até terminar e só então avisa e recarrega a página
   const refreshButtons = () => document.querySelectorAll("[data-pm-refresh]");
-  const setRefreshing = (on) => refreshButtons().forEach((b) => {
+  const setRefreshing = (on, progress) => refreshButtons().forEach((b) => {
     if (!b.dataset.label) b.dataset.label = b.innerHTML;
     b.disabled = on;
+    // com o ativo em curso: "A atualizar cotações… 12/280 · VWCE.DE"
+    const where = on && progress && progress.total ? ` ${progress.done + 1}/${progress.total} · ${progress.current}` : "";
+    b.textContent = "";
     b.innerHTML = on ? '<span class="spinner-border spinner-border-sm me-1"></span> A atualizar cotações…' : b.dataset.label;
+    if (where) b.append(document.createTextNode(where));  // texto (não HTML): o ticker vem dos dados
   });
   pm.watchRefresh = async () => {
     setRefreshing(true);
@@ -115,6 +119,7 @@
       do {
         await new Promise((r) => setTimeout(r, 3000));
         st = await pm.call("refresh_status", {}, { silent: true });
+        if (st.running) setRefreshing(true, st.progress);
       } while (st.running);
     } catch (err) {
       setRefreshing(false);
