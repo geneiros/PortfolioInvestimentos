@@ -182,7 +182,7 @@ def ensure_benchmarks():
     db.session.commit()
 
 
-def upcoming_events(tickers, today=None, days=60):
+def upcoming_events(tickers, today=None, days=90):
     """Eventos guardados + próximos dividendos estimados pelo intervalo habitual."""
     today = today or date.today()
     if not tickers:

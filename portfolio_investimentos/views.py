@@ -115,7 +115,7 @@ def overview():
         movers=movers, events_total=len(events),
         event_groups=[("Próxima semana", [e for e in events if e.date <= week]),
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
-                      ("Mais tarde", [e for e in events if e.date > two][:4])],
+                      ("Mais tarde", [e for e in events if e.date > two][:10])],
         instruments=instruments, fired=check_alerts(p), perf=ctx.js_json(perf_payload(p, "MAX")),
         benchmarks=p.benchmarks,
     )
