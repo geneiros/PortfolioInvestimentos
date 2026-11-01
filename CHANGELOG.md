@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
+- **Aplicação instalada: barra de navegação do Android da cor do topo (modo escuro)**  
+  No Android, a barra de navegação (em baixo) da aplicação instalada usa a cor do manifesto, gravada na instalação, e ficava azul. O manifesto passa a usar #212529 (o fundo do modo escuro) em theme_color e background_color.
 - **Aplicação instalada: barra do sistema da cor do fundo**  
   A cor da barra do sistema (theme-color) deixa de ser o azul fixo e acompanha o tema: branca no modo claro e #212529 no escuro, desde o início de cada página e ao mudar de tema (também na página «Aplicação parada»). O manifesto deixa o azul e a cache do service worker passa a pi-v4.
 
