@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
+- **Menu: nova ordem**  
+  Visão Geral, Carteira, Radar e alertas, Desempenho, Dividendos, Património, Planeamento, Fiscal.
 - **Aplicação instalada: cores do manifesto para o modo claro e escuro do sistema (experimental)**  
   O manifesto ganha user_preferences.color_scheme com uma cor para o modo claro (#ffffff) e outra para o escuro (#212529), um campo experimental que algumas versões do Chrome usam para seguir o modo claro ou escuro do telemóvel. Sem suporte, fica a cor base, escura.
 - **Aplicação instalada: barra de navegação do Android da cor do topo (modo escuro)**  

@@ -13,9 +13,9 @@ NAV = [
     ("radar", "Radar e alertas", "/radar", "bi-bullseye"),
     ("desempenho", "Desempenho", "/desempenho", "bi-graph-up-arrow"),
     ("dividendos", "Dividendos", "/dividendos", "bi-coin"),
-    ("fiscal", "Fiscal", "/fiscal", "bi-receipt"),
-    ("planeamento", "Planeamento", "/planeamento", "bi-flag"),
     ("patrimonio", "Património", "/patrimonio", "bi-bank"),
+    ("planeamento", "Planeamento", "/planeamento", "bi-flag"),
+    ("fiscal", "Fiscal", "/fiscal", "bi-receipt"),
 ]
 NAV_BOTTOM = [
     ("importar", "Importar", "/importar", "bi-file-earmark-arrow-up"),
