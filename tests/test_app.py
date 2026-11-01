@@ -32,6 +32,14 @@ def client(app):
     return app.test_client()
 
 
+@pytest.fixture(autouse=True)
+def no_yahoo_fundamentals(monkeypatch):
+    """Os testes não vão à rede: a segunda fonte dos dados fundamentais (séries do Yahoo) fica desligada.
+    Os testes dela voltam a ligá-la com respostas simuladas (monkeypatch de `_symbols_for` e `yahoo.fundamentals`)."""
+    from portfolio_investimentos.services import market
+    monkeypatch.setattr(market, "_symbols_for", lambda inst, symbol: [])
+
+
 def csrf(client):
     html = client.get("/").get_data(as_text=True)
     return re.search(r'csrf_token = "([0-9a-f]+)"', html).group(1)
@@ -1742,3 +1750,56 @@ def test_direct_yahoo_info_flattens_quote_summary(monkeypatch):
     assert info["financialCurrency"] == "EUR" and info["quoteType"] == "EQUITY"
     assert t.info is info and len(calls) == 1  # um só pedido
     assert "quoteSummary/ASML" in calls[0][0]
+
+
+def test_fundamentals_fall_back_to_financial_statements(app, monkeypatch):
+    from portfolio_investimentos.models import Fundamental, FxRate, Instrument
+    from portfolio_investimentos.services import market, yahoo
+
+    # o parser das séries do Yahoo
+    def fake_get(url, params, attempts=4):
+        assert "fundamentals-timeseries" in url and "trailingDilutedEPS" in params["type"]
+        point = lambda d, v: {"asOfDate": d, "reportedValue": {"raw": v}, "currencyCode": "USD"}  # noqa: E731
+        return {"timeseries": {"result": [
+            {"meta": {"type": ["trailingDilutedEPS"]}, "trailingDilutedEPS": [point("2026-08-31", 16.5)]},
+            {"meta": {"type": ["annualDilutedEPS"]}, "annualDilutedEPS": [
+                point("2022-12-31", 10.0), point("2023-12-31", 11.0), None, point("2024-12-31", 12.1)]},
+            {"meta": {"type": ["annualStockholdersEquity"]}, "annualStockholdersEquity": [point("2025-11-30", 1.1e10)]},
+            {"meta": {"type": ["annualOrdinarySharesNumber"]}, "annualOrdinarySharesNumber": [point("2025-11-30", 4.4e8)]},
+            {"meta": {"type": ["trailingFreeCashFlow"]}, "trailingFreeCashFlow": [point("2026-08-31", 8.8e9)]},
+            {"meta": {"type": ["annualFreeCashFlow"]}}]}}
+    monkeypatch.setattr(yahoo, "_get_json", fake_get)
+    series = yahoo.fundamentals("ADBE")
+    assert series["trailingDilutedEPS"] == [("2026-08-31", 16.5, "USD")] and "annualFreeCashFlow" not in series
+    assert len(series["annualDilutedEPS"]) == 3
+
+    # a cotação europeia (ADB.DE) sem dados, a principal (ADBE) com eles: tudo convertido para EUR
+    calls = []
+
+    def fake_fundamentals(symbol):
+        calls.append(symbol)
+        return series if symbol == "ADBE" else {}
+    monkeypatch.setattr(yahoo, "fundamentals", fake_fundamentals)
+    monkeypatch.setattr(market, "_symbols_for", lambda inst, symbol: [symbol, "ADBE"])
+    with app.app_context():
+        db.session.add(FxRate(currency="USD", date=date.today(), rate=1.10))
+        db.session.add(Instrument(ticker="ADB", instrument_name="Adobe", currency="EUR", data_symbol="ADB.DE"))
+        db.session.commit()
+        inst = db.session.get(Instrument, "ADB")
+        assert market._store_fundamentals(inst, {"trailingPegRatio": None}, "ADB.DE") is True  # info quase vazio
+        db.session.commit()
+        f = db.session.get(Fundamental, "ADB")
+        assert calls == ["ADB.DE", "ADBE"]
+        assert f.eps == pytest.approx(16.5 / 1.10) and f.bvps == pytest.approx(25 / 1.10)
+        assert f.fcf == pytest.approx(20 / 1.10) and f.growth == pytest.approx(0.10)
+        assert f.updated == date.today()
+        # sem dados em lado nenhum: não grava nem marca como atualizado (tenta-se de novo na próxima vez)
+        db.session.add(Instrument(ticker="XYZ", currency="USD"))
+        db.session.commit()
+        monkeypatch.setattr(yahoo, "fundamentals", lambda symbol: {})
+        assert market._store_fundamentals(db.session.get(Instrument, "XYZ"), {}, "XYZ") is False
+        assert db.session.get(Fundamental, "XYZ") is None and market._fundamentals_due("XYZ")
+        # uma tentativa vazia de uma versão anterior (marcada como atualizada, sem dados) volta a ser pedida
+        db.session.add(Fundamental(ticker="XYZ", updated=date.today()))
+        db.session.commit()
+        assert market._fundamentals_due("XYZ") and not market._fundamentals_due("ADB")

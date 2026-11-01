@@ -160,6 +160,21 @@ def _test_yahoo():
     except Exception as exc:
         ok = False
         print("  pesquisa ISIN: ERRO:", exc)
+    # dados fundamentais (valor de cada ação): o info (quoteSummary) e a segunda fonte (séries das demonstrações)
+    from .services import yahoo
+    for symbol in ("ADBE", "ADB.DE"):
+        try:
+            info = yf.Ticker(symbol).info or {}
+            keys = [k for k in ("trailingEps", "forwardEps", "bookValue", "freeCashflow") if info.get(k) is not None]
+            print(f"  {symbol:9} info: " + (", ".join(f"{k}={info[k]}" for k in keys) or f"sem dados ({len(info)} campos)"))
+        except Exception as exc:
+            print(f"  {symbol:9} info: ERRO: {exc}")
+        try:
+            series = yahoo.fundamentals(symbol)
+            eps = (series.get("trailingDilutedEPS") or [None])[-1]
+            print(f"  {symbol:9} demonstrações: {len(series)} séries" + (f", lucro por ação {eps[1]} {eps[2]}" if eps else ""))
+        except Exception as exc:
+            print(f"  {symbol:9} demonstrações: ERRO: {exc}")
     return 0 if ok else 1
 
 

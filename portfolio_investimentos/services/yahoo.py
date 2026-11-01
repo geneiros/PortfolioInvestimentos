@@ -15,6 +15,9 @@ CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search"
 SUMMARY_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}"
 SUMMARY_MODULES = "assetProfile,financialData,defaultKeyStatistics,summaryDetail,quoteType"
+TIMESERIES_URL = "https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{symbol}"
+TIMESERIES_TYPES = ("trailingDilutedEPS", "trailingFreeCashFlow", "annualFreeCashFlow", "annualStockholdersEquity",
+                    "annualOrdinarySharesNumber", "annualShareIssued", "annualDilutedEPS")
 # sem um User-Agent de browser o Yahoo responde muitas vezes com 429/403
 HEADERS = {"User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) "
                          "Chrome/128.0 Mobile Safari/537.36", "Accept": "application/json"}
@@ -155,6 +158,28 @@ class Ticker:
                           "events": "div,split", "includePrePost": "false"})
         hist, self.history_metadata = _parse_chart(data)
         return hist
+
+
+def fundamentals(symbol, years=6):
+    """Séries das demonstrações financeiras (o serviço que o yfinance usa para os balanços; não pede crumb).
+
+    Devolve {tipo: [(data, valor, moeda), ...]} por ordem de data, só com os tipos que vierem.
+    """
+    end = int(_time.time())
+    data = _get_json(TIMESERIES_URL.format(symbol=urllib.parse.quote(symbol)),
+                     {"type": ",".join(TIMESERIES_TYPES), "period1": end - years * 366 * 86400, "period2": end,
+                      "merge": "false", "padTimeSeries": "true", "lang": "en-US", "region": "US"})
+    out = {}
+    for item in ((data.get("timeseries") or {}).get("result") or []):
+        kind = ((item.get("meta") or {}).get("type") or [None])[0]
+        rows = []
+        for point in item.get(kind) or []:
+            value = ((point or {}).get("reportedValue") or {}).get("raw")
+            if value is not None and point.get("asOfDate"):
+                rows.append((point["asOfDate"], float(value), (point.get("currencyCode") or "").upper() or None))
+        if kind and rows:
+            out[kind] = sorted(rows)
+    return out
 
 
 class Search:

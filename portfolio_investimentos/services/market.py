@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..engine.formatting import WEEKDAYS
+from . import yahoo
 from ..models import (Alert, DividendHistory, Event, Fundamental, FxRate, Instrument, Price, Setting, Transaction,
                       db)
 
@@ -390,12 +391,20 @@ def refresh_all(start=None, progress=None, only_open=False):
             elif inst.kind != "etf" and (not inst.sector or _fundamentals_due(inst.ticker)):
                 try:
                     info = t.info or {}
-                    if not inst.sector:
-                        inst.sector = info.get("sector") or ("ETF" if info.get("quoteType") == "ETF" else None)
-                    if info.get("quoteType", "EQUITY") == "EQUITY":
-                        _store_fundamentals(inst, info)
-                except Exception as exc:  # informação opcional (setor e valor justo)
-                    note(f"{inst.ticker} dados fundamentais: erro ({str(exc)[:120]})")
+                except Exception as exc:  # o yfinance falha muitas vezes aqui (crumb, 429): há a segunda fonte
+                    info = {}
+                    note(f"{inst.ticker} info do Yahoo: erro ({str(exc)[:120]})")
+                if not inst.sector:
+                    inst.sector = info.get("sector") or ("ETF" if info.get("quoteType") == "ETF" else None)
+                if info.get("quoteType", "EQUITY") == "EQUITY" and _fundamentals_due(inst.ticker):
+                    try:
+                        got = _store_fundamentals(inst, info, inst.data_symbol or inst.ticker)
+                        if not got:
+                            note(f"{inst.ticker} dados fundamentais: o Yahoo não devolveu dados (tenta-se de novo "
+                                 "na próxima atualização; podes indicá-los à mão na Carteira)")
+                    except Exception as exc:  # informação opcional (valor de cada ação)
+                        db.session.rollback()
+                        note(f"{inst.ticker} dados fundamentais: erro ({str(exc)[:120]})")
             try:
                 _store_calendar(inst.ticker, t.calendar or {})
             except Exception as exc:
@@ -698,8 +707,11 @@ FUNDAMENTALS_DAYS = 7  # os dados fundamentais mudam pouco: no máximo um pedido
 
 
 def _fundamentals_due(ticker):
+    """Pedir de novo: sem dados guardados (nem que tenha havido uma tentativa vazia) ou com mais de uma semana."""
     row = db.session.get(Fundamental, ticker)
-    return row is None or row.updated is None or (date.today() - row.updated).days >= FUNDAMENTALS_DAYS
+    if row is None or row.updated is None or all(v is None for v in (row.eps, row.eps_forward, row.bvps, row.fcf)):
+        return True
+    return (date.today() - row.updated).days >= FUNDAMENTALS_DAYS
 
 
 def _num(v):
@@ -710,36 +722,101 @@ def _num(v):
     return v if math.isfinite(v) else None
 
 
-def _store_fundamentals(inst, info):
-    """Lucro por ação, valor contabilístico, cash flow livre por ação e crescimento, na moeda da cotação.
+def _per_eur(currency):
+    """Unidades de `currency` por 1 EUR (o câmbio mais recente guardado)."""
+    currency = (currency or "EUR").upper()
+    if currency == "EUR":
+        return 1.0
+    row = FxRate.query.filter_by(currency=currency).order_by(FxRate.date.desc()).first()
+    return row.rate if row else None
 
-    Os valores das contas (cash flow livre, valor contabilístico) vêm na moeda dos relatórios
-    (`financialCurrency`); quando é outra, convertem-se ao câmbio mais recente (ex.: ADR em USD de uma empresa
-    que reporta em EUR).
+
+def _convert(value, source, target):
+    """`value` de `source` para `target` (None se faltar o câmbio)."""
+    if value is None:
+        return None
+    source, target = (source or target).upper(), target.upper()
+    if source == target:
+        return value
+    a, b = _per_eur(source), _per_eur(target)
+    return value / a * b if a and b else None
+
+
+def _latest(series, kind):
+    rows = series.get(kind) or []
+    return rows[-1] if rows else None
+
+
+def _from_timeseries(series, target):
+    """Lucro por ação, valor contabilístico, cash flow livre por ação e crescimento a partir das demonstrações."""
+    eps = _latest(series, "trailingDilutedEPS")
+    shares = _latest(series, "annualOrdinarySharesNumber") or _latest(series, "annualShareIssued")
+    equity = _latest(series, "annualStockholdersEquity")
+    fcf = _latest(series, "trailingFreeCashFlow") or _latest(series, "annualFreeCashFlow")
+    out = {"eps": _convert(eps[1], eps[2], target) if eps else None, "bvps": None, "fcf": None, "growth": None}
+    if shares and shares[1] > 0:
+        if equity:
+            out["bvps"] = _convert(equity[1] / shares[1], equity[2], target)
+        if fcf:
+            out["fcf"] = _convert(fcf[1] / shares[1], fcf[2], target)
+    annual = [v for _, v, _ in (series.get("annualDilutedEPS") or [])][-4:]
+    if len(annual) >= 3 and annual[0] > 0 and annual[-1] > 0:  # crescimento médio anual do lucro por ação
+        out["growth"] = (annual[-1] / annual[0]) ** (1 / (len(annual) - 1)) - 1
+    return out
+
+
+def _symbols_for(inst, symbol):
+    """O símbolo da cotação e, pelo ISIN, outras cotações da mesma empresa (ex.: a principal, nos EUA)."""
+    found = [symbol]
+    if inst.isin:
+        try:
+            found += [q["symbol"] for q in (yahoo.Search(inst.isin, max_results=6).quotes or [])
+                      if q.get("symbol") and q.get("quoteType", "EQUITY") == "EQUITY"]
+        except Exception:
+            pass
+    return list(dict.fromkeys(found))[:4]
+
+
+def _store_fundamentals(inst, info, symbol=None):
+    """Lucro por ação (atual e previsto), valor contabilístico, cash flow livre por ação e crescimento, na moeda da
+    cotação guardada (`inst.currency`).
+
+    Primeiro o `info` (quoteSummary); se não trouxer nada, as séries das demonstrações financeiras (outro serviço
+    do Yahoo), do símbolo da cotação ou de outra cotação da mesma empresa (pelo ISIN). Os valores vêm na moeda
+    em que o Yahoo os dá e convertem-se ao câmbio mais recente (ex.: Adobe cotada em EUR com contas em USD).
+    Sem nenhum dado não grava nada e devolve False (tenta-se de novo na próxima atualização).
     """
-    quote = (info.get("currency") or inst.currency or "EUR").upper()
+    target = (inst.currency or "EUR").upper()
+    quote = (info.get("currency") or target).upper()
     report = (info.get("financialCurrency") or quote).upper()
-    factor = 1.0
-    if report != quote:
-        def per_eur(cur):
-            if cur == "EUR":
-                return 1.0
-            row = FxRate.query.filter_by(currency=cur).order_by(FxRate.date.desc()).first()
-            return row.rate if row else None
-        a, b = per_eur(report), per_eur(quote)
-        factor = b / a if a and b else None
     shares = _num(info.get("sharesOutstanding"))
     fcf_total = _num(info.get("freeCashflow"))
-    bvps = _num(info.get("bookValue"))
     growths = [g for g in (_num(info.get("earningsGrowth")), _num(info.get("revenueGrowth"))) if g is not None]
+    values = {"eps": _convert(_num(info.get("trailingEps")), quote, target),
+              "eps_forward": _convert(_num(info.get("forwardEps")), quote, target),
+              "bvps": _convert(_num(info.get("bookValue")), report, target),
+              "fcf": _convert(fcf_total / shares, report, target) if fcf_total is not None and shares else None,
+              "growth": sum(growths) / len(growths) if growths else None}
+    if all(values[k] is None for k in ("eps", "bvps", "fcf")) and symbol:
+        for candidate in _symbols_for(inst, symbol):
+            try:
+                series = yahoo.fundamentals(candidate)
+            except Exception:
+                continue
+            extra = _from_timeseries(series, target)
+            if any(extra[k] is not None for k in ("eps", "bvps", "fcf")):
+                values.update(eps=extra["eps"], bvps=extra["bvps"], fcf=extra["fcf"])
+                if values["growth"] is None:
+                    values["growth"] = extra["growth"]
+                break
+    if all(values[k] is None for k in ("eps", "eps_forward", "bvps", "fcf")):
+        return False
     row = db.session.get(Fundamental, inst.ticker) or Fundamental(ticker=inst.ticker)
-    row.eps = _num(info.get("trailingEps"))
-    row.eps_forward = _num(info.get("forwardEps"))
-    row.bvps = bvps * factor if bvps is not None and factor else None
-    row.fcf = fcf_total / shares * factor if fcf_total is not None and shares and factor else None
-    row.growth = sum(growths) / len(growths) if growths else None
+    for key, value in values.items():
+        setattr(row, key, value)
     row.updated = date.today()
     db.session.add(row)
+    return True
 
 
 def _store_calendar(ticker, cal, today=None):

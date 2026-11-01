@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
-- **Carteira: o valor de cada ação**  
+- **Valor de cada ação: dados fundamentais mais robustos**  
+  O pedido de dados fundamentais do yfinance (quoteSummary) falha muitas vezes e devolvia quase nada sem dar erro, e a aplicação gravava esse vazio como atualizado. Agora: sem dados, tenta as séries das demonstrações financeiras do Yahoo (lucro por ação dos últimos 12 meses, cash flow livre, capital próprio, nº de ações e histórico do lucro por ação para o crescimento), do símbolo da cotação ou de outra cotação da mesma empresa pelo ISIN, tudo convertido para a moeda da cotação; sem nenhum dado não grava e tenta de novo na próxima atualização (também as tentativas vazias já gravadas). `--testar-yahoo` mostra o que cada fonte devolve.
+- **Carteira: o valor de cada ação** `62de5b3`  
   Para cada ação aberta, três métodos sempre em intervalo, numa barra com o preço como traço: DCF (cash flow livre por ação, ou o lucro, a crescer 10 anos e depois 2,5%, desconto de 8% a 10%, crescimento ±2,5 p.p.), número de Graham (lucro atual e previsto) e Bazin (dividendo médio de 3 anos ÷ 6% a 8%); e o crescimento que o preço de hoje já assume (desconto de 9%). Os dados fundamentais vêm do Yahoo na atualização de cotações (uma vez por semana; também sem o yfinance, pelo quoteSummary), convertidos para a moeda da cotação, e podem ser corrigidos à mão. Captura 24.
 - **README: capturas atualizadas e novas** `df711f9`  
   As 21 capturas (claro e escuro) refeitas com o menu na ordem nova e as funcionalidades recentes, mais duas novas: «Carteira: as crises e os custos» (22) e «Património: de onde veio o crescimento» (23). O README passa a descrever o «Esconder valores» e a cor das barras do sistema na aplicação instalada.
