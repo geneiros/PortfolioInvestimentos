@@ -1803,3 +1803,55 @@ def test_fundamentals_fall_back_to_financial_statements(app, monkeypatch):
         db.session.add(Fundamental(ticker="XYZ", updated=date.today()))
         db.session.commit()
         assert market._fundamentals_due("XYZ") and not market._fundamentals_due("ADB")
+
+
+def test_valuation_more_methods_data_and_page(app, client, tmp_path):
+    from portfolio_investimentos.models import Fundamental, Setting
+    from portfolio_investimentos.services import market
+    # owner earnings, NOPAT normalizado e caixa − dívida a partir das demonstrações (em USD, cotação em USD)
+    row = lambda v, c="USD": [("2025-12-31", v, c)]  # noqa: E731
+    series = {"annualOrdinarySharesNumber": row(1e9), "annualNetIncome": row(5e9),
+              "annualDepreciationAndAmortization": row(1e9), "annualCapitalExpenditure": row(-1.5e9),
+              "annualChangeInWorkingCapital": row(-0.2e9),
+              "annualEBIT": [("2023-12-31", 5e9, "USD"), ("2024-12-31", 6e9, "USD"), ("2025-12-31", 7e9, "USD")],
+              "annualTaxRateForCalcs": [("2025-12-31", 0.2, None)],
+              "annualCashAndCashEquivalents": row(3e9), "annualTotalDebt": row(5e9)}
+    with app.app_context():
+        out = market._from_timeseries(series, "USD")
+    # 5 + 1 − min(1,5; 1) − 0,2 = 4,8 por ação; NOPAT = média(5, 6, 7) × 0,8 = 4,8; caixa − dívida = −2
+    assert out["owner"] == pytest.approx(4.8) and out["nopat"] == pytest.approx(4.8)
+    assert out["net_cash"] == pytest.approx(-2.0)
+    token = csrf(client)
+    post(client, "load_demo", token)
+    html = client.get("/carteira").get_data(as_text=True)
+    for text in ("Mais métodos", 'data-method="graham_growth"', 'data-method="gordon"', 'data-method="owner"',
+                 'data-method="epv"', 'data-method="peg"', 'id="aaaYield"', 'name="net_cash"'):
+        assert text in html, text
+    assert post(client, "set_aaa_yield", token, percent="4,5").status_code == 200
+    for bad in ("nan", "0", "50"):
+        assert post(client, "set_aaa_yield", token, percent=bad).status_code == 400
+    assert post(client, "save_fundamentals", token, ticker="DEMO-SOLP", owner="3,2", nopat="2", net_cash="-1").status_code == 200
+    with app.app_context():
+        assert Setting.get("aaa_yield") == "4.5"
+        f = db.session.get(Fundamental, "DEMO-SOLP")
+        assert (f.manual_owner, f.manual_nopat, f.manual_net_cash) == (3.2, 2.0, -1.0)
+
+
+def test_migration_adds_fundamental_columns(tmp_path, monkeypatch):
+    import sqlite3
+    from portfolio_investimentos import migrations
+    from portfolio_investimentos.models import Fundamental
+    _legacy_db(tmp_path, monkeypatch)
+    conn = sqlite3.connect(tmp_path / "portfolio.db")  # a tabela da versão anterior (sem as colunas novas)
+    conn.execute("DROP TABLE fundamental")
+    conn.execute("CREATE TABLE fundamental (ticker VARCHAR(32) PRIMARY KEY, eps FLOAT, eps_forward FLOAT, bvps FLOAT, "
+                 "fcf FLOAT, growth FLOAT, updated DATE, manual_eps FLOAT, manual_bvps FLOAT, manual_fcf FLOAT, "
+                 "manual_growth FLOAT)")
+    conn.execute("INSERT INTO fundamental (ticker, eps) VALUES ('ABC', 2.0)")
+    conn.commit()
+    conn.close()
+    app = create_app({"TESTING": True})
+    assert migrations.schema_version(app.config["DB_PATH"]) == migrations.LATEST
+    with app.app_context():
+        f = db.session.get(Fundamental, "ABC")
+        assert f.eps == 2.0 and f.owner is None and f.manual_net_cash is None

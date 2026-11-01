@@ -356,14 +356,25 @@ def save_ters(**values):
 
 
 @action
-def save_fundamentals(ticker, eps="", bvps="", fcf="", growth=""):
+def set_aaa_yield(percent):
+    """Rendimento das obrigações AAA (Y) da fórmula de crescimento de Graham, em %."""
+    value = _float(percent)
+    if not math.isfinite(value) or not 0.5 <= value <= 15:
+        raise ApiError("O rendimento das obrigações AAA tem de estar entre 0,5% e 15%.")
+    Setting.set("aaa_yield", value)
+    return f"Obrigações AAA a {value:g}%."
+
+
+@action
+def save_fundamentals(ticker, eps="", bvps="", fcf="", growth="", owner="", nopat="", net_cash=""):
     """Correções manuais aos dados fundamentais de uma ação (vazio: volta ao valor do Yahoo). Crescimento em %."""
     from .models import Fundamental
     inst = db.session.get(Instrument, (ticker or "").strip())
     if inst is None:
         raise ApiError("Ativo desconhecido.")
     row = db.session.get(Fundamental, inst.ticker) or Fundamental(ticker=inst.ticker)
-    for field, raw in (("eps", eps), ("bvps", bvps), ("fcf", fcf), ("growth", growth)):
+    for field, raw in (("eps", eps), ("bvps", bvps), ("fcf", fcf), ("growth", growth), ("owner", owner),
+                       ("nopat", nopat), ("net_cash", net_cash)):
         raw = str(raw or "").strip().replace("%", "").replace(" ", "")
         if not raw:
             setattr(row, "manual_" + field, None)

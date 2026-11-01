@@ -17,7 +17,12 @@ SUMMARY_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol
 SUMMARY_MODULES = "assetProfile,financialData,defaultKeyStatistics,summaryDetail,quoteType"
 TIMESERIES_URL = "https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{symbol}"
 TIMESERIES_TYPES = ("trailingDilutedEPS", "trailingFreeCashFlow", "annualFreeCashFlow", "annualStockholdersEquity",
-                    "annualOrdinarySharesNumber", "annualShareIssued", "annualDilutedEPS")
+                    "annualOrdinarySharesNumber", "annualShareIssued", "annualDilutedEPS",
+                    # Owner Earnings (Buffett) e Earnings Power Value (Greenwald)
+                    "annualNetIncome", "annualDepreciationAndAmortization", "annualReconciledDepreciation",
+                    "annualCapitalExpenditure", "annualChangeInWorkingCapital", "annualEBIT",
+                    "annualTaxRateForCalcs", "annualTotalDebt", "annualCashCashEquivalentsAndShortTermInvestments",
+                    "annualCashAndCashEquivalents")
 # sem um User-Agent de browser o Yahoo responde muitas vezes com 429/403
 HEADERS = {"User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) "
                          "Chrome/128.0 Mobile Safari/537.36", "Accept": "application/json"}

@@ -49,8 +49,12 @@ body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
 .pm-card.accent-red { border-color: var(--bs-danger-border-subtle); background: var(--bs-danger-bg-subtle); }
 .pm-card.accent-top.inner, .pm-card .pm-card { box-shadow: none; }
 .pm-label { text-transform: uppercase; letter-spacing: .05em; font-size: .75rem; font-weight: 600; color: var(--bs-secondary-color); }
-.pm-label .help { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%;
-  border: 1px solid var(--bs-secondary-color); font-size: .6rem; margin-left: .2rem; cursor: help; letter-spacing: 0; }
+/* «?» das explicações: um círculo, na cor de ênfase do tema (mais escuro no claro, mais claro no escuro) */
+.help { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px;
+  border-radius: 50%; border: 1.5px solid var(--bs-emphasis-color); color: var(--bs-emphasis-color);
+  font-size: 10px; font-weight: 700; line-height: 1; margin-left: .2rem; cursor: help; letter-spacing: 0;
+  text-transform: none; vertical-align: middle; opacity: .75; transition: opacity .15s, background-color .15s; }
+.help:hover, .help:focus { opacity: 1; background: var(--bs-emphasis-color); color: var(--bs-body-bg); }
 .pm-hero-value { font-size: calc(1.6rem + 2.4vw); font-weight: 600; line-height: 1.1; color: var(--bs-emphasis-color); }
 .pm-big { font-size: 1.75rem; font-weight: 600; }
 .pm-mid { font-size: 1.3rem; font-weight: 600; }
@@ -183,7 +187,8 @@ html.pm-private [data-pm-toggle=private] .bi-eye::before { content: "\f340"; }
 
 /* Carteira · O valor de cada ação: intervalo de cada método numa barra, com o preço como traço */
 .pm-valuation { border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: .75rem 1rem; }
-.pm-val-row { display: grid; grid-template-columns: 5.5rem 1fr 9.5rem; align-items: center; gap: .75rem; padding: .2rem 0; }
+.pm-val-row { display: grid; grid-template-columns: 6.5rem 1fr 9.5rem; align-items: center; gap: .75rem; padding: .2rem 0; }
+.pm-val-more > summary { margin: .25rem 0; }
 .pm-val-track { position: relative; height: 8px; border-radius: 4px; background: var(--pm-surface-2); }
 .pm-val-range { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--pm-accent); }
 .pm-val-price { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--pm-text); }

@@ -557,9 +557,37 @@ def test_valuation_methods_ranges_and_implied_growth():
     assert out["base_kind"] == "cash flow livre" and out["implied"] is not None
     # a fórmula de cada método, com os números usados
     assert "C = cash flow livre por ação = 3,00" in m["dcf"]["formula"] and "g = 5,5%, r = 10,0%" in m["dcf"]["formula"]
-    assert "√(22,5 × lucro por ação × valor contabilístico por ação)" in m["graham"]["formula"]
+    assert "√(22,5 × LPA × VCPA)" in m["graham"]["formula"]
     assert "4,00 (últimos 12 meses) e 5,00 (previsto)" in m["graham"]["formula"] and "25,00" in m["graham"]["formula"]
     assert "2,40" in m["bazin"]["formula"] and "6,0%" in m["bazin"]["formula"]
+    # por ordem de popularidade; os quatro primeiros sempre visíveis, os outros em «Mais métodos»
+    assert [x["key"] for x in out["methods"]] == ["dcf", "graham", "graham_growth", "gordon", "owner", "epv", "bazin"]
+    assert [x["key"] for x in out["methods"] if not x["more"]] == ["dcf", "graham", "graham_growth", "gordon"]
+
+
+def test_valuation_more_methods():
+    from portfolio_investimentos.engine import valuation as val
+    out = val.value_stock(60, eps=4, bvps=25, growth=0.08, dividends=2.4, div_growth=0.04, owner_earnings=3.5,
+                          nopat=3.2, net_cash=-5, aaa_yield=0.05)
+    m = {x["key"]: x for x in out["methods"]}
+    # crescimento de Graham: LPA × (8,5 + 2g) × 4,4 ÷ Y, com g de 5,5% a 10,5% e Y = 5%
+    assert m["graham_growth"]["low"] == pytest.approx(4 * (8.5 + 11) * 4.4 / 5)
+    assert m["graham_growth"]["high"] == pytest.approx(4 * (8.5 + 21) * 4.4 / 5)
+    # Gordon: D₀ × (1 + g) ÷ (Ke − g), g de 3% a 5%, Ke de 10% (baixo) a 8% (alto)
+    assert m["gordon"]["low"] == pytest.approx(2.4 * 1.03 / (0.10 - 0.03))
+    assert m["gordon"]["high"] == pytest.approx(2.4 * 1.05 / (0.08 - 0.05))
+    # Owner Earnings descontados como no DCF; EPV = NOPAT ÷ WACC + caixa − dívida
+    assert m["owner"]["low"] == pytest.approx(val.dcf(3.5, 0.055, 0.10)) and m["owner"]["more"]
+    assert m["epv"]["low"] == pytest.approx(3.2 / 0.10 - 5) and m["epv"]["high"] == pytest.approx(3.2 / 0.08 - 5)
+    # PEG: P/E ÷ crescimento em %; preço com PEG 1 = LPA × crescimento
+    assert out["peg"]["peg"] == pytest.approx(15 / 8) and out["peg"]["fair"] == pytest.approx(32)
+    # crescimento dos dividendos limitado a 6% (o Gordon não explode) e sem dados: motivo
+    capped = {x["key"]: x for x in val.value_stock(60, eps=4, dividends=2, div_growth=0.30)["methods"]}
+    assert capped["gordon"]["high"] == pytest.approx(2 * 1.06 / (0.08 - 0.06))
+    none = {x["key"]: x for x in val.value_stock(10, eps=-1)["methods"]}
+    assert none["owner"]["low"] is None and "demonstrações" in none["owner"]["why"]
+    assert none["epv"]["low"] is None and none["graham_growth"]["why"] == "sem lucro positivo"
+    assert val.value_stock(10, eps=-1)["peg"] is None
     assert out["scale"] >= max(60, m["dcf"]["high"])
     # sem cash flow livre: usa o lucro; sem dividendos nem lucro: métodos vazios com o motivo
     out = val.value_stock(10, eps=-1, bvps=5)

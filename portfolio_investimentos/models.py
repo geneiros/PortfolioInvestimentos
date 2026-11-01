@@ -234,7 +234,13 @@ class Fundamental(db.Model):
     fcf = db.Column(db.Float)          # cash flow livre por ação
     growth = db.Column(db.Float)       # crescimento anual esperado dos lucros (fração)
     updated = db.Column(db.Date)
+    owner = db.Column(db.Float)        # owner earnings por ação (Buffett)
+    nopat = db.Column(db.Float)        # NOPAT normalizado por ação (Greenwald)
+    net_cash = db.Column(db.Float)     # caixa − dívida por ação
     manual_eps = db.Column(db.Float)
     manual_bvps = db.Column(db.Float)
     manual_fcf = db.Column(db.Float)
     manual_growth = db.Column(db.Float)
+    manual_owner = db.Column(db.Float)
+    manual_nopat = db.Column(db.Float)
+    manual_net_cash = db.Column(db.Float)

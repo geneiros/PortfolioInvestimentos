@@ -49,6 +49,13 @@ def _m005_instrument_ter(conn):
     _add_column(conn, "instrument", "ter", "FLOAT")
 
 
+def _m006_fundamental_more(conn):
+    if not _columns(conn, "fundamental"):  # tabela ainda não criada: o create_all cria-a já com as colunas
+        return
+    for column in ("owner", "nopat", "net_cash", "manual_owner", "manual_nopat", "manual_net_cash"):
+        _add_column(conn, "fundamental", column, "FLOAT")
+
+
 # (versão, descrição, função)
 MIGRATIONS = [
     (1, "Resultado indicado pela corretora em cada venda", _m001_transaction_result),
@@ -56,6 +63,7 @@ MIGRATIONS = [
     (3, "Notícias retiradas da aplicação", _m003_drop_news),
     (4, "Património: nível de liquidez, casa própria e crédito ligado ao imóvel", _m004_other_asset_liquidity),
     (5, "Custo anual (TER) de cada ETF", _m005_instrument_ter),
+    (6, "Valor de cada ação: owner earnings, NOPAT e caixa líquida", _m006_fundamental_more),
 ]
 LATEST = MIGRATIONS[-1][0]
 

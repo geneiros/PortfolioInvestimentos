@@ -209,19 +209,22 @@ def _other_assets(rng, today):
 
 
 # dados fundamentais de exemplo (valor de cada ação), como múltiplos do preço final:
-# ticker → (preço/lucro, preço/lucro previsto, preço/valor contabilístico, preço/cash flow livre, crescimento)
+# ticker → (preço/lucro, preço/lucro previsto, preço/valor contabilístico, preço/cash flow livre, crescimento,
+#           preço/owner earnings, preço/NOPAT, caixa − dívida em % do preço)
 DEMO_FUNDAMENTALS = {
-    "DEMO-NVTX": (38, 30, 9, 42, 0.15),
-    "DEMO-SOLP": (17, 15, 4, 19, 0.05),
-    "DEMO-ATLE": (11, 12, 1.3, 9, 0.02),
-    "DEMO-LUSB": (9, 8, 1.1, None, 0.07),
-    "DEMO-AUTO": (-25, 40, 0.8, None, -0.02),
+    "DEMO-NVTX": (38, 30, 9, 42, 0.15, 36, 40, 0.05),
+    "DEMO-SOLP": (17, 15, 4, 19, 0.05, 16, 15, -0.10),
+    "DEMO-ATLE": (11, 12, 1.3, 9, 0.02, 10, 12, -0.40),
+    "DEMO-LUSB": (9, 8, 1.1, None, 0.07, None, None, None),
+    "DEMO-AUTO": (-25, 40, 0.8, None, -0.02, None, 30, -0.60),
 }
 
 
 def _fundamentals(prices, last_day, today):
-    for ticker, (pe, pe_fwd, pb, pfcf, growth) in DEMO_FUNDAMENTALS.items():
+    for ticker, (pe, pe_fwd, pb, pfcf, growth, poe, pnopat, cash) in DEMO_FUNDAMENTALS.items():
         price = prices[ticker][last_day]
         db.session.merge(Fundamental(ticker=ticker, eps=round(price / pe, 4), eps_forward=round(price / pe_fwd, 4),
                                      bvps=round(price / pb, 4), fcf=round(price / pfcf, 4) if pfcf else None,
-                                     growth=growth, updated=today))
+                                     growth=growth, owner=round(price / poe, 4) if poe else None,
+                                     nopat=round(price / pnopat, 4) if pnopat else None,
+                                     net_cash=round(price * cash, 4) if cash is not None else None, updated=today))

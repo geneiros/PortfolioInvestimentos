@@ -709,7 +709,8 @@ FUNDAMENTALS_DAYS = 7  # os dados fundamentais mudam pouco: no máximo um pedido
 def _fundamentals_due(ticker):
     """Pedir de novo: sem dados guardados (nem que tenha havido uma tentativa vazia) ou com mais de uma semana."""
     row = db.session.get(Fundamental, ticker)
-    if row is None or row.updated is None or all(v is None for v in (row.eps, row.eps_forward, row.bvps, row.fcf)):
+    if row is None or row.updated is None or all(v is None for v in (row.eps, row.eps_forward, row.bvps, row.fcf,
+                                                                       row.owner, row.nopat)):
         return True
     return (date.today() - row.updated).days >= FUNDAMENTALS_DAYS
 
@@ -762,6 +763,33 @@ def _from_timeseries(series, target):
     annual = [v for _, v, _ in (series.get("annualDilutedEPS") or [])][-4:]
     if len(annual) >= 3 and annual[0] > 0 and annual[-1] > 0:  # crescimento médio anual do lucro por ação
         out["growth"] = (annual[-1] / annual[0]) ** (1 / (len(annual) - 1)) - 1
+    out.update(owner=None, nopat=None, net_cash=None)
+    if not shares or shares[1] <= 0:
+        return out
+    n = shares[1]
+    # Owner Earnings (Buffett): lucro líquido + amortizações − CAPEX de manutenção ± fundo de maneio. O CAPEX de
+    # manutenção não é publicado: usa-se o menor entre o CAPEX e as amortizações. A variação do fundo de maneio
+    # da demonstração de fluxos de caixa já vem com o sinal do efeito no caixa.
+    income = _latest(series, "annualNetIncome")
+    dep = _latest(series, "annualDepreciationAndAmortization") or _latest(series, "annualReconciledDepreciation")
+    capex = _latest(series, "annualCapitalExpenditure")
+    wc = _latest(series, "annualChangeInWorkingCapital")
+    if income and dep:
+        maintenance = min(abs(capex[1]), dep[1]) if capex else dep[1]
+        owner = income[1] + dep[1] - maintenance + (wc[1] if wc else 0.0)
+        out["owner"] = _convert(owner / n, income[2], target)
+    # Earnings Power Value (Greenwald): NOPAT normalizado = resultado operacional médio (até 5 anos) × (1 − imposto)
+    ebit = [(v, c) for _, v, c in (series.get("annualEBIT") or [])][-5:]
+    if ebit:
+        rates = [v for _, v, _ in (series.get("annualTaxRateForCalcs") or [])][-5:]
+        tax = min(max(sum(rates) / len(rates), 0.0), 0.4) if rates else 0.21
+        out["nopat"] = _convert(sum(v for v, _ in ebit) / len(ebit) * (1 - tax) / n, ebit[-1][1], target)
+    cash = _latest(series, "annualCashCashEquivalentsAndShortTermInvestments") or \
+        _latest(series, "annualCashAndCashEquivalents")
+    debt = _latest(series, "annualTotalDebt")
+    if cash or debt:
+        currency = (cash or debt)[2]
+        out["net_cash"] = _convert(((cash[1] if cash else 0.0) - (debt[1] if debt else 0.0)) / n, currency, target)
     return out
 
 
@@ -781,8 +809,9 @@ def _store_fundamentals(inst, info, symbol=None):
     """Lucro por ação (atual e previsto), valor contabilístico, cash flow livre por ação e crescimento, na moeda da
     cotação guardada (`inst.currency`).
 
-    Primeiro o `info` (quoteSummary); se não trouxer nada, as séries das demonstrações financeiras (outro serviço
-    do Yahoo), do símbolo da cotação ou de outra cotação da mesma empresa (pelo ISIN). Os valores vêm na moeda
+    Primeiro o `info` (quoteSummary); o que faltar vem das séries das demonstrações financeiras (outro serviço do
+    Yahoo, a única fonte de owner earnings, NOPAT e caixa líquida), do símbolo da cotação ou de outra cotação da
+    mesma empresa (pelo ISIN). Os valores vêm na moeda
     em que o Yahoo os dá e convertem-se ao câmbio mais recente (ex.: Adobe cotada em EUR com contas em USD).
     Sem nenhum dado não grava nada e devolve False (tenta-se de novo na próxima atualização).
     """
@@ -796,20 +825,23 @@ def _store_fundamentals(inst, info, symbol=None):
               "eps_forward": _convert(_num(info.get("forwardEps")), quote, target),
               "bvps": _convert(_num(info.get("bookValue")), report, target),
               "fcf": _convert(fcf_total / shares, report, target) if fcf_total is not None and shares else None,
-              "growth": sum(growths) / len(growths) if growths else None}
-    if all(values[k] is None for k in ("eps", "bvps", "fcf")) and symbol:
+              "growth": sum(growths) / len(growths) if growths else None,
+              "owner": None, "nopat": None, "net_cash": None}
+    # as demonstrações completam o que o info não trouxe (e são a única fonte de owner earnings, NOPAT e caixa
+    # líquida): do símbolo da cotação ou, sem dados, de outra cotação da mesma empresa (pelo ISIN)
+    if symbol:
         for candidate in _symbols_for(inst, symbol):
             try:
                 series = yahoo.fundamentals(candidate)
             except Exception:
                 continue
             extra = _from_timeseries(series, target)
-            if any(extra[k] is not None for k in ("eps", "bvps", "fcf")):
-                values.update(eps=extra["eps"], bvps=extra["bvps"], fcf=extra["fcf"])
-                if values["growth"] is None:
-                    values["growth"] = extra["growth"]
+            if any(v is not None for v in extra.values()):
+                for key, value in extra.items():
+                    if values.get(key) is None:
+                        values[key] = value
                 break
-    if all(values[k] is None for k in ("eps", "eps_forward", "bvps", "fcf")):
+    if all(values[k] is None for k in ("eps", "eps_forward", "bvps", "fcf", "owner", "nopat")):
         return False
     row = db.session.get(Fundamental, inst.ticker) or Fundamental(ticker=inst.ticker)
     for key, value in values.items():

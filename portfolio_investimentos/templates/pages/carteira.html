@@ -181,24 +181,39 @@
 
   {% if valuations %}
   <div class="pm-card mt-3" id="valuationCard">
-    <div class="pm-label mb-1">O valor de cada ação {{ help("Três métodos com as hipóteses à vista, sempre em intervalo. DCF: o cash flow livre por ação (ou o lucro) a crescer durante 10 anos e depois 2,5%, descontado a 8%–10%. Graham: √(22,5 × lucro por ação × valor contabilístico por ação). Bazin: dividendo médio de 3 anos ÷ 6%–8%. Os dados vêm do Yahoo (na atualização de cotações, uma vez por semana) e podes corrigi-los. Uma ilustração para pensar, não uma recomendação.") }}</div>
-    <p class="small text-secondary">Três métodos com as hipóteses à vista, sempre em intervalo, e o crescimento que o preço de hoje já assume. O traço é o preço.</p>
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+      <span class="pm-label">O valor de cada ação {{ help("Vários métodos, por ordem de popularidade, com as hipóteses à vista e sempre em intervalo (o «?» de cada um mostra a fórmula e os números). Sempre visíveis: DCF, Número de Graham, fórmula de crescimento de Graham e modelo de Gordon; em «Mais métodos»: Owner Earnings (Buffett), Earnings Power Value (Greenwald), Bazin e o PEG de Peter Lynch. Os dados vêm do Yahoo (na atualização de cotações, uma vez por semana) e podes corrigi-los. Uma ilustração para pensar, não uma recomendação.") }}</span>
+      <form class="ms-auto d-flex align-items-center gap-1 small" data-pm-method="set_aaa_yield" data-pm-success="Guardado.">
+        <label for="aaaYield" class="text-secondary text-nowrap">Obrigações AAA (Y) {{ help("Rendimento das obrigações de empresas com rating AAA, usado na fórmula de crescimento de Graham (V = LPA × (8,5 + 2g) × 4,4 ÷ Y). Por exemplo, o Moody's Seasoned Aaa Corporate Bond Yield.") }}</label>
+        <input id="aaaYield" name="percent" class="form-control form-control-sm text-end" style="width: 4.5rem" inputmode="decimal" value="{{ ('%.2f' % (aaa_yield * 100)).rstrip('0').rstrip('.').replace('.', ',') }}">
+        <span>%</span><button class="btn btn-sm btn-outline-secondary" type="submit">OK</button>
+      </form>
+    </div>
+    <p class="small text-secondary">Vários métodos com as hipóteses à vista, sempre em intervalo, e o crescimento que o preço de hoje já assume. O traço é o preço.</p>
+    {% macro val_row(m, v) -%}
+        <div class="pm-val-row" data-method="{{ m.key }}">
+          <span class="pm-val-name text-nowrap">{{ m.name }} {{ help(m.formula) }}</span>
+          <div class="pm-val-track">
+            {% if m.low is not none and v.scale %}<div class="pm-val-range" style="left: {{ m.low / v.scale * 100 }}%; width: {{ [(m.high - m.low) / v.scale * 100, 1]|max }}%"></div>{% endif %}
+            {% if v.price and v.scale %}<div class="pm-val-price" style="left: {{ v.price / v.scale * 100 }}%"></div>{% endif %}
+          </div>
+          <span class="pm-val-value text-end small">{% if m.low is not none %}<span class="money">{{ m.low|money(0, currency=v.currency) }}</span>–<span class="money">{{ m.high|money(0, currency=v.currency) }}</span>{% else %}<span class="text-secondary">— {{ m.why }}</span>{% endif %}</span>
+        </div>
+    {%- endmacro %}
     <div class="row g-3">
       {% for v in valuations %}
       <div class="col-xl-6"><div class="pm-valuation h-100" data-ticker="{{ v.ticker }}">
         <div class="d-flex align-items-center gap-2 mb-2">{{ logo(v.asset) }}<b class="text-nowrap">{{ v.ticker }}</b>
           <span class="small text-secondary text-truncate">{{ v.name }}</span>
           <span class="ms-auto small text-nowrap">Preço <b>{{ v.price|money(2, currency=v.currency) if v.price else "—" }}</b></span></div>
-        {% for m in v.methods %}
-        <div class="pm-val-row">
-          <span class="pm-val-name text-nowrap">{{ m.name }} {{ help(m.formula) }}</span>
-          <div class="pm-val-track">
-            {% if m.low and v.scale %}<div class="pm-val-range" style="left: {{ m.low / v.scale * 100 }}%; width: {{ [(m.high - m.low) / v.scale * 100, 1]|max }}%"></div>{% endif %}
-            {% if v.price and v.scale %}<div class="pm-val-price" style="left: {{ v.price / v.scale * 100 }}%"></div>{% endif %}
-          </div>
-          <span class="pm-val-value text-end small">{% if m.low %}<span class="money">{{ m.low|money(0, currency=v.currency) }}</span>–<span class="money">{{ m.high|money(0, currency=v.currency) }}</span>{% else %}<span class="text-secondary">— {{ m.why }}</span>{% endif %}</span>
-        </div>
-        {% endfor %}
+        {% for m in v.methods if not m.more %}{{ val_row(m, v) }}{% endfor %}
+        <details class="pm-val-more"><summary class="small text-secondary">Mais métodos (Owner Earnings, EPV, Bazin, PEG)</summary>
+          {% for m in v.methods if m.more %}{{ val_row(m, v) }}{% endfor %}
+          <div class="small mt-1" data-method="peg">PEG de Peter Lynch {{ help(v.peg.formula if v.peg else "PEG = P/E ÷ crescimento dos lucros (em %). PEG 1 sugere preço justo; abaixo de 1, potencialmente subavaliada.") }}:
+            {% if v.peg %}<b class="{{ 'text-up' if v.peg.peg < 1 else ('text-down' if v.peg.peg > 2 else '') }}">{{ v.peg.peg|number(2) }}</b>
+              <span class="text-secondary">(P/E {{ v.peg.pe|number(1) }} ÷ crescimento {{ (v.growth * 100)|number(1) }}) · preço com PEG 1: <span class="money">{{ v.peg.fair|money(2, currency=v.currency) }}</span></span>
+            {% else %}<span class="text-secondary">— sem lucro ou crescimento positivos</span>{% endif %}</div>
+        </details>
         <div class="small text-secondary mt-2">
           {% if v.implied is not none %}Ao preço de hoje, o mercado assume {{ v.base_kind }} a crescer <b class="{{ 'text-down' if v.implied > v.growth + 0.05 else '' }}">{{ v.implied|pct(1, sign=False) if v.implied >= 0 else v.implied|pct(1) }}</b> ao ano durante 10 anos (desconto de 9%);
             a hipótese usada é {{ v.growth|pct(1, sign=False) }}{% if v.growth_default %} (por omissão, sem estimativa){% endif %}.
@@ -207,7 +222,7 @@
         <details class="small mt-1"><summary class="text-secondary">Dados{% if v.updated %} · Yahoo {{ v.updated.strftime('%d/%m/%Y') }}{% else %} · sem dados do Yahoo{% endif %}{% if v.manual.values()|select|list %} · com correções{% endif %}</summary>
           <form class="row g-2 mt-1 align-items-end" data-pm-method="save_fundamentals" data-pm-success="Dados guardados.">
             <input type="hidden" name="ticker" value="{{ v.ticker }}">
-            {% for key, label, scale in [("eps", "Lucro por ação", 1), ("bvps", "Valor contab./ação", 1), ("fcf", "Cash flow livre/ação", 1), ("growth", "Crescimento (%/ano)", 100)] %}
+            {% for key, label, scale in [("eps", "Lucro por ação", 1), ("bvps", "Valor contab./ação", 1), ("fcf", "Cash flow livre/ação", 1), ("growth", "Crescimento (%/ano)", 100), ("owner", "Owner earnings/ação", 1), ("nopat", "NOPAT/ação", 1), ("net_cash", "Caixa − dívida/ação", 1)] %}
             <label class="col-6 col-md-3">{{ label }}{% if v.manual[key] %} <span class="badge text-bg-secondary">manual</span>{% endif %}
               <input name="{{ key }}" class="form-control form-control-sm" inputmode="decimal"
                      value="{{ (('%.4f' % (v.inputs[key] * scale)).rstrip('0').rstrip('.').replace('.', ',')) if v.manual[key] and v.inputs[key] is not none else '' }}"

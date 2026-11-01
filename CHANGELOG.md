@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
-- **Valor de cada ação: a fórmula de cada método no «?»**  
+- **Valor de cada ação: mais quatro métodos e o PEG; «?» com círculo**  
+  Por ordem de popularidade: DCF, Número de Graham, fórmula de crescimento de Graham (LPA × (8,5 + 2g) × 4,4 ÷ Y, com Y, o rendimento das obrigações AAA, configurável no cartão; 5% por omissão) e modelo de Gordon (D₁ ÷ (Ke − g), com o crescimento dos dividendos do histórico, no máximo 6%, e Ke de 8% a 10%) sempre visíveis; em «Mais métodos», Owner Earnings de Buffett (lucro líquido + amortizações − CAPEX de manutenção ± fundo de maneio, descontados como no DCF), Earnings Power Value de Greenwald (NOPAT normalizado ÷ WACC de 8% a 10% + caixa − dívida), Bazin e o PEG de Peter Lynch (com o preço de PEG 1). Owner earnings, NOPAT e caixa líquida vêm das demonstrações financeiras do Yahoo e podem ser corrigidos à mão (migração 6). O «?» das explicações passa a ser um círculo, mais escuro, em toda a aplicação.
+- **Valor de cada ação: a fórmula de cada método no «?»** `5cdc387`  
   A seguir ao nome de cada método (DCF, Graham, Bazin) há um «?» com a fórmula e os números usados nessa ação.
 - **Valor de cada ação: dados fundamentais mais robustos** `26c13b5`  
   O pedido de dados fundamentais do yfinance (quoteSummary) falha muitas vezes e devolvia quase nada sem dar erro, e a aplicação gravava esse vazio como atualizado. Agora: sem dados, tenta as séries das demonstrações financeiras do Yahoo (lucro por ação dos últimos 12 meses, cash flow livre, capital próprio, nº de ações e histórico do lucro por ação para o crescimento), do símbolo da cotação ou de outra cotação da mesma empresa pelo ISIN, tudo convertido para a moeda da cotação; sem nenhum dado não grava e tenta de novo na próxima atualização (também as tentativas vazias já gravadas). `--testar-yahoo` mostra o que cada fonte devolve.

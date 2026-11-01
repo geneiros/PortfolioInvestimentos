@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from flask import Blueprint, Response, abort, current_app, render_template, request
 
-from .engine import costs, stress
+from .engine import costs, stress, valuation
 from .engine.portfolio import MERIT_BENCHMARK
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, Fundamental, ImportBatch,
                      Instrument, Price, Setting, Transaction, WatchItem, db)
@@ -142,6 +142,7 @@ def carteira():
                "roi": sum(x.roi_eur for x in p.open_positions)},
         alloc=ctx.js_json({k: p.allocation(k) for k in ("asset", "sector", "currency")}),
         crisis=stress.crisis_test(p), costs=_costs(p), valuations=_valuations(p),
+        aaa_yield=_aaa_yield() or valuation.AAA_YIELD,
     )
     return render_template("pages/carteira.html", **c)
 
@@ -162,9 +163,29 @@ def _dividend_per_share(p, ticker):
     return sum(a for _, a in rows) / years
 
 
+def _dividend_growth(ticker, as_of):
+    """Crescimento anual dos dividendos por ação (histórico do Yahoo): entre o 1.º e o último de até 6 anos
+    civis completos com pagamentos. None sem 3 anos."""
+    years = {}
+    for r in DividendHistory.query.filter(DividendHistory.instrument == ticker,
+                                          DividendHistory.date >= date(as_of.year - 6, 1, 1),
+                                          DividendHistory.date < date(as_of.year, 1, 1)):
+        years[r.date.year] = years.get(r.date.year, 0.0) + r.amount
+    full = [years[y] for y in sorted(years)]
+    if len(full) < 3 or full[0] <= 0 or full[-1] <= 0:
+        return None
+    return (full[-1] / full[0]) ** (1 / (len(full) - 1)) - 1
+
+
+def _aaa_yield():
+    try:
+        return float(Setting.get("aaa_yield")) / 100
+    except (TypeError, ValueError):
+        return None
+
+
 def _valuations(p):
-    """O valor de cada ação aberta (três métodos e o crescimento implícito)."""
-    from .engine import valuation
+    """O valor de cada ação aberta (os vários métodos e o crescimento implícito)."""
     stocks = [pos for pos in p.open_positions if pos.asset.kind == "stock"]
     funds = {f.ticker: f for f in Fundamental.query.filter(Fundamental.ticker.in_([x.asset.ticker for x in stocks] or [""]))}
     out = []
@@ -178,12 +199,19 @@ def _valuations(p):
         bvps, bvps_manual = pick("bvps")
         fcf, fcf_manual = pick("fcf")
         growth, growth_manual = pick("growth")
+        owner, owner_manual = pick("owner")
+        nopat, nopat_manual = pick("nopat")
+        net_cash, net_cash_manual = pick("net_cash")
         price = p.book.price(pos.asset.ticker, p.as_of)
         v = valuation.value_stock(price, eps=eps, eps_forward=f.eps_forward if f else None, bvps=bvps, fcf=fcf,
-                                  growth=growth, dividends=_dividend_per_share(p, pos.asset.ticker))
+                                  growth=growth, dividends=_dividend_per_share(p, pos.asset.ticker),
+                                  div_growth=_dividend_growth(pos.asset.ticker, p.as_of), owner_earnings=owner,
+                                  nopat=nopat, net_cash=net_cash, aaa_yield=_aaa_yield() or valuation.AAA_YIELD)
         v.update(ticker=pos.asset.ticker, name=pos.asset.name, currency=pos.asset.currency, asset=pos.asset,
-                 inputs={"eps": eps, "bvps": bvps, "fcf": fcf, "growth": growth},
-                 manual={"eps": eps_manual, "bvps": bvps_manual, "fcf": fcf_manual, "growth": growth_manual},
+                 inputs={"eps": eps, "bvps": bvps, "fcf": fcf, "growth": growth, "owner": owner, "nopat": nopat,
+                         "net_cash": net_cash},
+                 manual={"eps": eps_manual, "bvps": bvps_manual, "fcf": fcf_manual, "growth": growth_manual,
+                         "owner": owner_manual, "nopat": nopat_manual, "net_cash": net_cash_manual},
                  updated=f.updated if f else None)
         out.append(v)
     return out
