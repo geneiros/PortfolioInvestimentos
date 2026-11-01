@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
-- **Menu: nova ordem**  
+- **Carteira: as crises e os custos**  
+  Dois cartões novos na Carteira. «As crises»: a queda estimada da carteira de hoje se a crise financeira (2008), a dívida do euro (2011), a pandemia (2020) ou a inflação e juros (2022) se repetissem, = Σ peso × beta × queda do S&P 500 (beta de cada posição pelos retornos semanais dos últimos 3 anos, em euros; beta 1 sem histórico; a caixa não cai), em % e em euros, e o tempo do S&P 500 até recuperar o pico. «Os custos»: comissões dos últimos 12 meses (e nº de operações), custo dos ETF (valor × TER, que indicas no próprio cartão; migração 5) e retenções na fonte acima dos 15% da convenção (sem Portugal nem país desconhecido), por ano e o que representam em 20 anos.
+- **Menu: nova ordem** `eeaddd9`  
   Visão Geral, Carteira, Radar e alertas, Desempenho, Dividendos, Património, Planeamento, Fiscal.
 - **Aplicação instalada: cores do manifesto para o modo claro e escuro do sistema (experimental)**  
   O manifesto ganha user_preferences.color_scheme com uma cor para o modo claro (#ffffff) e outra para o escuro (#212529), um campo experimental que algumas versões do Chrome usam para seguir o modo claro ou escuro do telemóvel. Sem suporte, fica a cor base, escura.

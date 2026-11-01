@@ -115,6 +115,69 @@
     </div></div>
     {% endfor %}
   </div>
+
+  <div class="row g-3 mt-0">
+    {% if crisis %}
+    <div class="col-xl-6"><div class="pm-card h-100" id="crisisCard">
+      <div class="pm-label mb-1">As crises {{ help("Queda estimada = Σ peso × beta × queda do S&P 500 nessa crise. O beta de cada posição mede quanto ela se mexe com o mercado (retornos semanais dos últimos 3 anos, em euros); sem dados suficientes conta como o mercado (beta 1). A caixa não cai. O tempo até recuperar é o do S&P 500, do pico até voltar ao valor do pico. Nas crises as correlações sobem, por isso a queda real pode ser maior.") }}</div>
+      <p class="small text-secondary">Quanto caía a carteira de hoje se 2008, 2011, 2020 ou 2022 voltassem, e quanto tempo levava a recuperar.</p>
+      {% set worst = crisis.crises|map(attribute="drop")|min %}
+      {% for k in crisis.crises %}
+      <div class="pm-crisis-row" title="{{ k.dates }} · S&P 500 {{ k.index_drop|pct(1) }}">
+        <div class="pm-crisis-name"><b>{{ k.name }}</b><div class="small text-secondary">{{ k.year }} · S&P 500 {{ k.index_drop|pct(0) }}</div></div>
+        <div class="pm-scorebar pm-crisis-bar"><div style="width: {{ (k.drop / worst * 100) if worst else 0 }}%; background: var(--pm-down)"></div></div>
+        <div class="text-end text-down fw-semibold pm-crisis-drop">{{ k.drop|pct(0) }}<div class="small fw-normal money">{{ k.loss|money }}</div></div>
+        <div class="text-end small text-secondary pm-crisis-time">{{ k.recovery }}</div>
+      </div>
+      {% endfor %}
+      <div class="small text-secondary mt-2">Beta da carteira <b>{{ crisis.beta|number(2) }}</b> face ao S&P 500
+        {%- if crisis.cash_share > 0.005 %} · {{ crisis.cash_share|pct(0, sign=False) }} em caixa{% endif %}
+        {%- if crisis.estimated %} · {{ crisis.estimated }} {{ 'posição' if crisis.estimated == 1 else 'posições' }} sem histórico suficiente (beta 1){% endif %}.
+        A queda é da carteira de hoje e o tempo é até voltar ao valor de antes.</div>
+      <details class="small mt-2"><summary class="text-secondary">Sensibilidade de cada posição (beta)</summary>
+        <table class="table pm-table mt-1 mb-0"><thead><tr><th>Posição</th><th class="text-end">Peso</th><th class="text-end">Beta</th></tr></thead><tbody>
+        {% for r in crisis.positions %}<tr><td><b>{{ r.ticker }}</b></td><td class="text-end">{{ r.weight|pct(1, sign=False) }}</td>
+          <td class="text-end">{{ r.beta|number(2) }}{% if r.estimated %} <span class="text-secondary" title="Sem 26 semanas de cotações: conta como o mercado">*</span>{% endif %}</td></tr>{% endfor %}
+        </tbody></table></details>
+    </div></div>
+    {% endif %}
+    {% if costs %}
+    <div class="col-xl-6"><div class="pm-card h-100" id="costsCard">
+      <div class="pm-label mb-1">Os custos {{ help("Nos últimos 12 meses. Comissões: as das operações e os movimentos de comissão. Custo dos ETF: valor × TER (o custo anual que o fundo desconta ao valor). Retenções a mais: o que o país do dividendo reteve acima dos 15% da convenção (o IRS só aceita como crédito até essa taxa; o resto só se recupera com um pedido de reembolso nesse país).") }}</div>
+      <p class="small text-secondary">As comissões das operações, o custo dos ETF e as retenções a mais. Por ano e daqui a {{ costs.horizon }} anos.</p>
+      <div class="row g-3">
+        <div class="col-sm-4"><div class="pm-label">Comissões</div><div class="pm-mid money">{{ costs.fees|money }}</div>
+          <div class="small text-secondary">em {{ costs.operations }} {{ 'operação' if costs.operations == 1 else 'operações' }}</div></div>
+        <div class="col-sm-4"><div class="pm-label">Custo dos ETF</div><div class="pm-mid money">{{ costs.etf_cost|money }}</div>
+          <div class="small text-secondary">{% if costs.etf_ter is not none %}{{ costs.etf_ter|pct(2, sign=False) }} ao ano em média{% elif costs.etfs %}indica o TER em baixo{% else %}sem ETF{% endif %}</div></div>
+        <div class="col-sm-4"><div class="pm-label">Retenções a mais</div><div class="pm-mid money">{{ costs.excess|money }}</div>
+          <div class="small text-secondary">{{ 'recuperáveis no país de origem' if costs.excess else 'nada acima dos 15%' }}</div></div>
+      </div>
+      <div class="mt-3">Por ano, cerca de <b class="money">{{ costs.annual|money }}</b>{% if costs.annual_pct is not none %} ({{ costs.annual_pct|pct(2, sign=False) }} da carteira){% endif %}.
+        Em {{ costs.horizon }} anos, ao ritmo de hoje, cerca de <b class="money text-down">{{ costs.future|money }}</b> a menos na carteira
+        {{ help("As comissões e as retenções a mais de hoje, todos os anos, a render " ~ (costs.rate * 100)|round|int ~ "% ao ano; o TER compara os ETF de hoje a crescer com e sem ele.") }}</div>
+      {% if costs.excess_rows %}
+      <details class="small mt-2"><summary class="text-secondary">Retenções a mais por ativo</summary>
+        <table class="table pm-table mt-1 mb-0"><thead><tr><th>Ativo</th><th>País</th><th class="text-end">Retido</th><th class="text-end">A mais</th></tr></thead><tbody>
+        {% for r in costs.excess_rows %}<tr><td><b>{{ r.ticker }}</b></td><td>{{ r.country }}</td><td class="text-end">{{ r.rate|pct(1, sign=False) }}</td>
+          <td class="text-end money">{{ r.excess|money(2) }}</td></tr>{% endfor %}
+        </tbody></table></details>
+      {% endif %}
+      {% if costs.etfs %}
+      <details class="small mt-2" {{ 'open' if costs.missing }}><summary class="text-secondary">TER dos ETF{% if costs.missing %} · <span class="text-warning-emphasis">falta em {{ costs.missing|length }}</span>{% endif %}</summary>
+        <form class="mt-2" data-pm-method="save_ters" data-pm-success="Custos guardados.">
+          <table class="table pm-table mb-2"><thead><tr><th>ETF</th><th class="text-end">Valor</th><th class="text-end">TER (% ao ano)</th></tr></thead><tbody>
+          {% for e in costs.etfs %}<tr><td><b>{{ e.ticker }}</b><div class="sub">{{ e.name }}</div></td><td class="text-end money">{{ e.value|money }}</td>
+            <td class="text-end"><input name="ter_{{ e.ticker }}" class="form-control form-control-sm text-end ms-auto" style="max-width: 6rem" inputmode="decimal" placeholder="ex.: 0,22"
+                value="{{ ('%.4f' % (e.ter * 100)).rstrip('0').rstrip('.').replace('.', ',') if e.ter is not none else '' }}" aria-label="TER de {{ e.ticker }}"></td></tr>{% endfor %}
+          </tbody></table>
+          <button class="btn btn-sm btn-primary" type="submit">Guardar</button>
+          <span class="text-secondary ms-2">O TER está no documento de informação (KID) ou no site do emitente do ETF.</span>
+        </form></details>
+      {% endif %}
+    </div></div>
+    {% endif %}
+  </div>
 </div>
 
 <div class="tab-pane fade" id="tab-closed">

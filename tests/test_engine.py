@@ -475,3 +475,63 @@ def test_incomplete_periods_and_risk_free():
     r0, r2 = perf0["risk"], perf2["risk"]
     assert r2["sharpe"] == pytest.approx((perf2["cagr"] - 0.02) / r2["volatility"])
     assert r2["sharpe"] < r0["sharpe"]
+
+
+def _stress_book(as_of, amp):
+    """S&P 500 a oscilar semana a semana e ACME a mexer-se `amp` vezes mais (beta = amp)."""
+    import math
+    days = list(weekdays(as_of - timedelta(weeks=160), as_of))
+    spx = [(d, 4000 * (1 + 0.03 * math.sin(i / 3))) for i, d in enumerate(days)]
+    acme = [(d, 100 * (1 + amp * 0.03 * math.sin(i / 3))) for i, d in enumerate(days)]
+    return PriceBook({"^GSPC": spx, "ACME": acme})
+
+
+def test_crisis_test_uses_position_beta_and_cash():
+    from portfolio_investimentos.engine import stress
+    as_of = date(2026, 6, 5)
+    txs = [Tx(as_of - timedelta(weeks=150), "DEPOSIT", amount=12000),
+           Tx(as_of - timedelta(weeks=150), "BUY", ACME, quantity=100, price=100)]
+    p = Portfolio(txs, _stress_book(as_of, 1.5), benchmarks=[SPX], as_of=as_of)
+    out = stress.crisis_test(p)
+    acme = out["positions"][0]
+    assert acme["beta"] == pytest.approx(1.5, abs=0.05) and not acme["estimated"]
+    weight = acme["value"] / p.total_value  # o resto é caixa (beta 0)
+    assert out["beta"] == pytest.approx(weight * acme["beta"])
+    crisis = {c["key"]: c for c in out["crises"]}
+    assert crisis["2008"]["drop"] == pytest.approx(out["beta"] * -0.568)
+    assert crisis["2020"]["recovery"] == "6 meses" and crisis["2008"]["recovery"] == "5 anos e 5 meses"
+    assert crisis["2022"]["loss"] == pytest.approx(crisis["2022"]["drop"] * p.total_value)
+    # sem histórico suficiente: beta 1 (como o mercado), assinalado
+    short = Portfolio(txs, PriceBook({"^GSPC": [(as_of, 4000.0)], "ACME": [(as_of, 100.0)]}), benchmarks=[SPX],
+                      as_of=as_of)
+    out = stress.crisis_test(short)
+    assert out["positions"][0]["beta"] == 1.0 and out["estimated"] == 1
+
+
+def test_cost_report_fees_ter_and_excess_withholding():
+    from portfolio_investimentos.engine import costs
+    etf = Instrument("WRLD", "ETF Mundo", kind="etf", currency="EUR")
+    de = Instrument("DECO", "Empresa alemã", currency="EUR")
+    pt = Instrument("PTCO", "Empresa portuguesa", currency="EUR")
+    as_of = date(2026, 6, 1)
+    d = as_of - timedelta(days=100)
+    prices = {"WRLD": [(d, 100.0)], "DECO": [(d, 50.0)], "PTCO": [(d, 10.0)]}
+    txs = [Tx(d - timedelta(days=400), "DEPOSIT", amount=50000),
+           Tx(d - timedelta(days=400), "BUY", etf, quantity=100, price=100, fees=5),  # há mais de 12 meses
+           Tx(d, "BUY", etf, quantity=100, price=100, fees=2),
+           Tx(d, "BUY", de, quantity=100, price=50, fees=3),
+           Tx(d, "BUY", pt, quantity=100, price=10, fees=1),
+           Tx(d, "FEE", amount=-4),
+           Tx(d + timedelta(days=10), "DIVIDEND", de, amount=100, tax=26.375),  # Alemanha: 26,375% retido
+           Tx(d + timedelta(days=10), "DIVIDEND", pt, amount=100, tax=28)]      # Portugal: liberatória, não conta
+    p = Portfolio(txs, PriceBook(prices), as_of=as_of)
+    rep = costs.cost_report(p, {"DECO": "Alemanha", "PTCO": "Portugal"}, {"WRLD": 0.002})
+    assert rep["fees"] == pytest.approx(2 + 3 + 1 + 4) and rep["operations"] == 4
+    assert rep["etf_cost"] == pytest.approx(20000 * 0.002) and rep["etf_ter"] == pytest.approx(0.002)
+    assert rep["excess"] == pytest.approx(26.375 - 15) and [r["ticker"] for r in rep["excess_rows"]] == ["DECO"]
+    annuity = (1.05 ** 20 - 1) / 0.05
+    ter_drag = 20000 * (1.05 ** 20 - 1.048 ** 20)
+    assert rep["future"] == pytest.approx((10 + 11.375) * annuity + ter_drag)
+    # ETF sem TER: fica de fora e listado
+    rep = costs.cost_report(p, {}, {})
+    assert rep["missing"] == ["WRLD"] and rep["etf_cost"] == 0 and rep["etf_ter"] is None and rep["excess"] == 0

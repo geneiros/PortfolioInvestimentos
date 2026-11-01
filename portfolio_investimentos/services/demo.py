@@ -25,6 +25,7 @@ INSTRUMENTS = [
     ("DEMO-WRLD", "ETF Ações Globais (fictício)", "etf", "Ações Globais", "EUR", 75, 0.09, 0.15, 0.0),
     ("DEMO-CASH", "ETF Monetário (fictício)", "etf", "Equivalentes de Caixa", "EUR", 100, 0.025, 0.004, 0.0),
 ]
+DEMO_TER = {"DEMO-WRLD": 0.0020}  # custo anual de um dos ETF de exemplo (o outro fica por indicar)
 BENCH_PARAMS = {"^GSPC": (4200, 0.11, 0.17), "^NDX": (13500, 0.14, 0.23), "URTH": (125, 0.09, 0.16)}
 COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#06b6d4", "#ef4444", "#a855f7", "#94a3b8"]
 
@@ -77,7 +78,8 @@ def create_demo(seed=42):
     for i, (ticker, name, kind, sector, cur, p0, mu, sigma, _div) in enumerate(INSTRUMENTS):
         if not db.session.get(Instrument, ticker):
             db.session.add(Instrument(ticker=ticker, instrument_name=name, kind=kind, sector=sector,
-                                      currency=cur, data_symbol="", color=COLORS[i]))
+                                      currency=cur, data_symbol="", color=COLORS[i],
+                                      ter=DEMO_TER.get(ticker)))
             db.session.commit()
         series = _walk(rng, days, p0, mu, sigma, market)
         _insert_series(Price, "instrument", ticker, "close", series)

@@ -25,21 +25,25 @@ KIND_LABELS = {"stock": "Ações", "etf": "ETF"}
 
 def countries(p):
     """País de cada posição: o do ISIN (domicílio) ou, sem ele, o da bolsa (sufixo do ticker)."""
-    tickers = [pos.asset.ticker for pos in p.open_positions]
-    insts = {i.ticker: i for i in Instrument.query.filter(Instrument.ticker.in_(tickers or [""]))}
+    return countries_of({pos.asset.ticker: pos.asset.currency for pos in p.open_positions})
+
+
+def countries_of(currencies):
+    """País de cada ticker (`currencies`: ticker → moeda), pelo ISIN, pelo sufixo da bolsa ou pela moeda."""
+    insts = {i.ticker: i for i in Instrument.query.filter(Instrument.ticker.in_(list(currencies) or [""]))}
     out = {}
-    for pos in p.open_positions:
-        inst = insts.get(pos.asset.ticker)
+    for ticker, currency in currencies.items():
+        inst = insts.get(ticker)
         isin = (inst.isin if inst else None) or ""
-        symbol = ((inst.data_symbol if inst else None) or pos.asset.ticker).upper()
+        symbol = ((inst.data_symbol if inst else None) or ticker).upper()
         if len(isin) == 12 and isin[:2] in COUNTRY_BY_ISIN:
-            out[pos.asset.ticker] = COUNTRY_BY_ISIN[isin[:2]]
+            out[ticker] = COUNTRY_BY_ISIN[isin[:2]]
         elif "." in symbol:
-            out[pos.asset.ticker] = COUNTRY_BY_SUFFIX.get(symbol.rsplit(".", 1)[1], "Outros")
+            out[ticker] = COUNTRY_BY_SUFFIX.get(symbol.rsplit(".", 1)[1], "Outros")
         elif len(symbol) == 12 and symbol[:2] in COUNTRY_BY_ISIN:
-            out[pos.asset.ticker] = COUNTRY_BY_ISIN[symbol[:2]]
+            out[ticker] = COUNTRY_BY_ISIN[symbol[:2]]
         else:
-            out[pos.asset.ticker] = "EUA" if pos.asset.currency == "USD" else "Outros"
+            out[ticker] = "EUA" if currency == "USD" else "Outros"
     return out
 
 

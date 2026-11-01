@@ -1669,3 +1669,22 @@ def test_networth_monthly_update_and_reminder(app, client):
         rows = OtherAssetValue.query.filter_by(asset=int(ids[0])).order_by(OtherAssetValue.date).all()
         assert rows[-1].value == 6300 and len(rows) == (1 if old.month == today.month else 2)
     assert 'id="monthlyReminder"' not in client.get("/patrimonio").get_data(as_text=True)
+
+
+def test_portfolio_crises_and_costs_cards(app, client):
+    from portfolio_investimentos.models import Instrument
+    token = csrf(client)
+    post(client, "load_demo", token)
+    html = client.get("/carteira").get_data(as_text=True)
+    for text in ('id="crisisCard"', "Crise financeira", "Inflação e juros", 'id="costsCard"', "Custo dos ETF",
+                 'name="ter_DEMO-CASH"'):
+        assert text in html, text
+    # TER em %: guardar, apagar (vazio) e recusar valores fora do intervalo
+    assert post(client, "save_ters", token, **{"ter_DEMO-CASH": "0,10", "ter_DEMO-WRLD": ""}).status_code == 200
+    with app.app_context():
+        assert db.session.get(Instrument, "DEMO-CASH").ter == pytest.approx(0.001)
+        assert db.session.get(Instrument, "DEMO-WRLD").ter is None
+    for bad in ("nan", "-1", "5", "abc"):
+        assert post(client, "save_ters", token, **{"ter_DEMO-CASH": bad}).status_code == 400
+    assert post(client, "save_ters", token, **{"ter_NAOEXISTE": "0,2"}).status_code == 400
+    assert post(client, "save_ters", token).status_code == 400

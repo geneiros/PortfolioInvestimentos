@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from flask import Blueprint, Response, abort, current_app, render_template, request
 
+from .engine import costs, stress
 from .engine.portfolio import MERIT_BENCHMARK
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, Event, ImportBatch, Instrument, Price, Setting, Transaction,
                      WatchItem, db)
@@ -140,8 +141,16 @@ def carteira():
                "fees": sum(x.fees_eur for x in p.open_positions),
                "roi": sum(x.roi_eur for x in p.open_positions)},
         alloc=ctx.js_json({k: p.allocation(k) for k in ("asset", "sector", "currency")}),
+        crisis=stress.crisis_test(p), costs=_costs(p),
     )
     return render_template("pages/carteira.html", **c)
+
+
+def _costs(p):
+    """Os custos da carteira (comissões, TER dos ETF e retenções a mais), com o país de cada dividendo."""
+    tickers = {t.asset.ticker: t.asset.currency for t in p.transactions if t.asset is not None}
+    ters = {i.ticker: i.ter for i in Instrument.query.filter(Instrument.ticker.in_(list(tickers) or [""]))}
+    return costs.cost_report(p, insights.countries_of(tickers), ters)
 
 
 def _rating(value, thresholds, labels):

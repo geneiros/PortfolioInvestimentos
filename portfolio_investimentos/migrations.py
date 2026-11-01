@@ -45,12 +45,17 @@ def _m004_other_asset_liquidity(conn):
     _add_column(conn, "other_asset", "linked", "INTEGER")
 
 
+def _m005_instrument_ter(conn):
+    _add_column(conn, "instrument", "ter", "FLOAT")
+
+
 # (versão, descrição, função)
 MIGRATIONS = [
     (1, "Resultado indicado pela corretora em cada venda", _m001_transaction_result),
     (2, "Data da última cotação obtida de cada ativo", _m002_instrument_last_quote),
     (3, "Notícias retiradas da aplicação", _m003_drop_news),
     (4, "Património: nível de liquidez, casa própria e crédito ligado ao imóvel", _m004_other_asset_liquidity),
+    (5, "Custo anual (TER) de cada ETF", _m005_instrument_ter),
 ]
 LATEST = MIGRATIONS[-1][0]
 

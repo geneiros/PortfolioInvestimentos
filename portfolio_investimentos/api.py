@@ -330,6 +330,31 @@ def delete_watch(name):
     db.session.commit()
 
 
+@action
+def save_ters(**values):
+    """Custo anual (TER) dos ETF, em % (campos ter_<ticker>); vazio apaga o TER."""
+    changed = 0
+    for key, raw in values.items():
+        if not key.startswith("ter_"):
+            continue
+        inst = db.session.get(Instrument, key[4:])
+        if inst is None:
+            raise ApiError(f"Ativo desconhecido: {key[4:]}")
+        raw = str(raw or "").strip().replace("%", "")
+        if not raw:
+            inst.ter = None
+        else:
+            pct = _float(raw)
+            if not math.isfinite(pct) or not 0 <= pct <= 3:
+                raise ApiError(f"{inst.ticker}: o TER tem de estar entre 0% e 3% ao ano.")
+            inst.ter = round(pct / 100, 6)
+        changed += 1
+    if not changed:
+        raise ApiError("Sem valores para guardar.")
+    db.session.commit()
+    return "Custos dos ETF guardados."
+
+
 # --------------------------------------------------------- património (outros ativos)
 def _flag(v):
     return str(v).lower() in ("1", "true", "on", "sim")

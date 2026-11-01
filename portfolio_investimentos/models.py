@@ -52,6 +52,7 @@ class Instrument(db.Model):
     isin = db.Column(db.String(12))
     data_symbol = db.Column(db.String(32))  # símbolo no Yahoo Finance
     last_quote = db.Column(db.Date)  # último fecho obtido do Yahoo com o data_symbol (atualização incremental)
+    ter = db.Column(db.Float)  # ETF: custo anual (TER), em fração (0,0022 = 0,22%), indicado pelo utilizador
     color = db.Column(db.String(9), default="#64748b")
 
     @property

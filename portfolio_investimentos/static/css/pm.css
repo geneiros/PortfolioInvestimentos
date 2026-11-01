@@ -170,3 +170,13 @@ html.pm-private [data-pm-toggle=private] .bi-eye::before { content: "\f340"; }
 
 /* Planeamento: amostra da linha tracejada de cada número FIRE (a mesma cor do gráfico) */
 .pm-fire-line { display: inline-block; width: 28px; height: 0; flex: none; }
+
+/* Carteira · As crises: nome, barra da queda, queda e tempo até recuperar */
+.pm-crisis-row { display: grid; grid-template-columns: 9.5rem minmax(3rem, 1fr) 5.5rem 7.5rem; align-items: center;
+  gap: .75rem; padding: .35rem 0; }
+.pm-crisis-row .pm-crisis-bar { min-width: 0; }
+@media (max-width: 575.98px) {
+  .pm-crisis-row { grid-template-columns: 1fr 5.5rem; row-gap: .25rem; }
+  .pm-crisis-row .pm-crisis-bar { grid-column: 1 / -1; grid-row: 2; }
+  .pm-crisis-row .pm-crisis-time { grid-column: 1 / -1; text-align: left !important; }
+}
