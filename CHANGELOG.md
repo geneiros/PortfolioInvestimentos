@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
-- **Visão Geral: gráfico dos movers com o último ano**  
+- **README: revisão e capturas da Visão Geral**  
+  Capturas 02, 03 e 04 (claro e escuro) refeitas com os gráficos novos dos principais movers. Tabela de funcionalidades pela ordem do menu; secção «Cotações» com o histórico de dividendos, os eventos e os dados fundamentais (fontes, frequência e correção manual); «Próximos passos» sem a exposição geográfica, que já existe; «Estrutura» com os módulos novos.
+- **Visão Geral: gráfico dos movers com o último ano** `2323566`  
   O gráfico de cada ação dos «Principais movers» passa a mostrar o último ano (eram os últimos 30 dias), e a data no valor ao passar o rato inclui o ano.
 - **Visão Geral: gráfico dos movers face ao preço médio, com o valor ao passar o rato** `e8f089e`  
   O gráfico de cada ação dos «Principais movers» ocupa a largura livre da linha e mostra o preço médio de aquisição a tracejado: a linha e o preenchimento ficam verdes acima dele e vermelhos abaixo. Ao passar o rato aparece a data, o preço e a diferença para o preço médio (com «€ ••••» se os valores estiverem escondidos). No telemóvel, o gráfico passa para uma segunda linha, com a largura toda.
