@@ -7,6 +7,7 @@ Gestor de carteira de investimentos local: desempenho, dividendos, fiscalidade (
 - **Sem servidor e sem base de dados para instalar.** Os dados ficam num único ficheiro SQLite no teu computador.
 - **Abre-se com um duplo clique.** O script de arranque prepara tudo na primeira vez e abre o browser.
 - **Interface Bootstrap 5.3 nativa**, com modo claro, escuro ou automático (segue o sistema operativo).
+- **Esconder valores** (botão do olho, no topo): cada valor em euros passa a «€ ••••», na cor do valor, em todas as páginas; o botão fica selecionado enquanto o modo está ligado e a escolha fica guardada no dispositivo.
 
 ## Como usar
 
@@ -32,6 +33,7 @@ No **Chrome** ou no **Edge**, com a aplicação aberta em `http://127.0.0.1:5000
 - A janela instalada é uma porta para a aplicação local, por isso o servidor tem de estar a correr (`iniciar.bat`, `iniciar.command` ou `./iniciar.sh`). Se não estiver, a janela mostra como o iniciar e volta sozinha quando ele arrancar (ver também **Disponível offline**, abaixo).
 - Para o servidor não abrir também um separador no browser, arranca com `python -m portfolio_investimentos --no-browser`.
 - Usa sempre a mesma porta: a aplicação instalada fica associada a `127.0.0.1:5000`.
+- A barra do sistema em cima tem a cor do fundo da aplicação e acompanha o tema (claro ou escuro). No Android, a barra de navegação em baixo usa a cor do manifesto, gravada na instalação: escura (e, nas versões do Chrome que o suportam, clara com o telemóvel em modo claro). Depois de atualizar a aplicação, reinstala-a para a cor nova ser aplicada.
 - Por omissão, só os ficheiros estáticos (Bootstrap, ícones) ficam em cache e os teus dados financeiros não ficam guardados pelo browser.
 - Noutros dispositivos da rede (`--host 0.0.0.0`), o browser só permite instalar através de HTTPS.
 
@@ -138,8 +140,10 @@ As capturas usam os dados de demonstração (empresas e preços fictícios).
 | ![Radar](docs/screenshots/17-radar.png) | ![Importar](docs/screenshots/18-importar.png) |
 | **Transações** | **Definições** |
 | ![Transações](docs/screenshots/19-transacoes.png) | ![Definições](docs/screenshots/20-definicoes.png) |
-| **Património** | |
-| ![Património](docs/screenshots/21-patrimonio.png) | |
+| **Património** | **Carteira: as crises e os custos** |
+| ![Património](docs/screenshots/21-patrimonio.png) | ![Crises e custos](docs/screenshots/22-carteira-crises-custos.png) |
+| **Património: de onde veio o crescimento** | |
+| ![Crescimento](docs/screenshots/23-patrimonio-crescimento.png) | |
 
 ### Modo escuro
 
@@ -164,8 +168,10 @@ As capturas usam os dados de demonstração (empresas e preços fictícios).
 | ![Radar (escuro)](docs/screenshots/escuro/17-radar.png) | ![Importar (escuro)](docs/screenshots/escuro/18-importar.png) |
 | **Transações** | **Definições** |
 | ![Transações (escuro)](docs/screenshots/escuro/19-transacoes.png) | ![Definições (escuro)](docs/screenshots/escuro/20-definicoes.png) |
-| **Património** | |
-| ![Património (escuro)](docs/screenshots/escuro/21-patrimonio.png) | |
+| **Património** | **Carteira: as crises e os custos** |
+| ![Património (escuro)](docs/screenshots/escuro/21-patrimonio.png) | ![Crises e custos (escuro)](docs/screenshots/escuro/22-carteira-crises-custos.png) |
+| **Património: de onde veio o crescimento** | |
+| ![Crescimento (escuro)](docs/screenshots/escuro/23-patrimonio-crescimento.png) | |
 
 O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro ou Automático.
 
