@@ -183,7 +183,7 @@ html.pm-private [data-pm-toggle=private] .bi-eye::before { content: "\f340"; }
 
 /* Carteira · O valor de cada ação: intervalo de cada método numa barra, com o preço como traço */
 .pm-valuation { border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: .75rem 1rem; }
-.pm-val-row { display: grid; grid-template-columns: 4rem 1fr 9.5rem; align-items: center; gap: .75rem; padding: .2rem 0; }
+.pm-val-row { display: grid; grid-template-columns: 5.5rem 1fr 9.5rem; align-items: center; gap: .75rem; padding: .2rem 0; }
 .pm-val-track { position: relative; height: 8px; border-radius: 4px; background: var(--pm-surface-2); }
 .pm-val-range { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--pm-accent); }
 .pm-val-price { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--pm-text); }

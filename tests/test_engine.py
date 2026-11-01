@@ -555,6 +555,11 @@ def test_valuation_methods_ranges_and_implied_growth():
     assert m["graham"]["low"] == pytest.approx(val.graham(4, 25)) and m["graham"]["high"] == pytest.approx(val.graham(5, 25))
     assert m["bazin"]["low"] == pytest.approx(2.4 / 0.08) and m["bazin"]["high"] == pytest.approx(2.4 / 0.06)
     assert out["base_kind"] == "cash flow livre" and out["implied"] is not None
+    # a fórmula de cada método, com os números usados
+    assert "C = cash flow livre por ação = 3,00" in m["dcf"]["formula"] and "g = 5,5%, r = 10,0%" in m["dcf"]["formula"]
+    assert "√(22,5 × lucro por ação × valor contabilístico por ação)" in m["graham"]["formula"]
+    assert "4,00 (últimos 12 meses) e 5,00 (previsto)" in m["graham"]["formula"] and "25,00" in m["graham"]["formula"]
+    assert "2,40" in m["bazin"]["formula"] and "6,0%" in m["bazin"]["formula"]
     assert out["scale"] >= max(60, m["dcf"]["high"])
     # sem cash flow livre: usa o lucro; sem dividendos nem lucro: métodos vazios com o motivo
     out = val.value_stock(10, eps=-1, bvps=5)

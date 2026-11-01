@@ -190,8 +190,8 @@
           <span class="small text-secondary text-truncate">{{ v.name }}</span>
           <span class="ms-auto small text-nowrap">Preço <b>{{ v.price|money(2, currency=v.currency) if v.price else "—" }}</b></span></div>
         {% for m in v.methods %}
-        <div class="pm-val-row" title="{{ m.hypothesis }}">
-          <span class="pm-val-name">{{ m.name }}</span>
+        <div class="pm-val-row">
+          <span class="pm-val-name text-nowrap">{{ m.name }} {{ help(m.formula) }}</span>
           <div class="pm-val-track">
             {% if m.low and v.scale %}<div class="pm-val-range" style="left: {{ m.low / v.scale * 100 }}%; width: {{ [(m.high - m.low) / v.scale * 100, 1]|max }}%"></div>{% endif %}
             {% if v.price and v.scale %}<div class="pm-val-price" style="left: {{ v.price / v.scale * 100 }}%"></div>{% endif %}
