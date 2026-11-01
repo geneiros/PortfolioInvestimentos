@@ -61,10 +61,15 @@ def test_demo_pages_render(client):
         resp = client.get(url)
         assert resp.status_code == 200, url
         assert "Traceback" not in resp.get_data(as_text=True)
-    # Visão Geral: mini-gráfico dos últimos 30 dias em cada ação dos principais movers
-    html = client.get("/").get_data(as_text=True)
-    movers = html.split("Principais movers", 1)[1].split("Próximos eventos", 1)[0]
-    assert movers.count('class="pm-row pm-mover"') == movers.count("data-spark=") >= 1
+    # Visão Geral: gráfico dos últimos 30 dias em cada ação dos principais movers, com o preço médio
+    import html as html_lib
+    import json
+    page = client.get("/").get_data(as_text=True)
+    movers = page.split("Principais movers", 1)[1].split("Próximos eventos", 1)[0]
+    charts = [json.loads(html_lib.unescape(x)) for x in re.findall(r"data-mover='([^']*)'", movers)]
+    assert movers.count('class="pm-row pm-mover"') == len(charts) >= 1
+    assert all(len(c["d"]) == len(c["v"]) == 30 and c["avg"] > 0 and c["cur"] in ("EUR", "USD") for c in charts)
+    assert "js/movers.js" in page
 
 
 def test_csrf_required(client):

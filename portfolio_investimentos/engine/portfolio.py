@@ -104,6 +104,11 @@ class PriceBook:
     def closes(self, ticker, n):
         return self._prices.get(ticker, ([], []))[1][-n:]
 
+    def recent(self, ticker, n):
+        """Os últimos `n` fechos com a data: [(data, fecho), ...]."""
+        dates, values = self._prices.get(ticker, ([], []))
+        return list(zip(dates[-n:], values[-n:]))
+
 
 @dataclass
 class Lot:

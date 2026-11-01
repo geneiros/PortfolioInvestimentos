@@ -4,10 +4,11 @@
 
   // ---------------------------------------------------------------- formatação
   const nf = (d) => new Intl.NumberFormat("pt-PT", { minimumFractionDigits: d, maximumFractionDigits: d });
-  pm.money = (v, d = 0, sign = false) => {
+  const SYMBOLS = { EUR: "€", USD: "$", GBP: "£", CHF: "CHF ", JPY: "¥" };
+  pm.money = (v, d = 0, sign = false, currency = "EUR") => {
     if (v === null || v === undefined || isNaN(v)) return "—";
     const s = nf(d).format(Math.abs(v)).replace(/ /g, " ");
-    return (v < 0 && Math.abs(v) >= Math.pow(10, -d) / 2 ? "−" : sign && v > 0 ? "+" : "") + "€" + s;
+    return (v < 0 && Math.abs(v) >= Math.pow(10, -d) / 2 ? "−" : sign && v > 0 ? "+" : "") + (SYMBOLS[currency] || currency + " ") + s;
   };
   pm.pct = (v, d = 1, sign = true) => {
     if (v === null || v === undefined || isNaN(v)) return "—";

@@ -594,3 +594,11 @@ def test_valuation_more_methods():
     m = {x["key"]: x for x in out["methods"]}
     assert m["dcf"]["low"] is None and m["graham"]["low"] is None and m["bazin"]["why"] == "não paga dividendos"
     assert out["implied"] is None and out["growth"] == val.GROWTH_DEFAULT and out["growth_default"]
+
+
+def test_price_book_recent():
+    d0 = date(2026, 1, 5)
+    book = PriceBook({"ACME": [(d0 + timedelta(days=i), 10.0 + i) for i in range(10)]})
+    assert book.recent("ACME", 3) == [(d0 + timedelta(days=7), 17.0), (d0 + timedelta(days=8), 18.0),
+                                      (d0 + timedelta(days=9), 19.0)]
+    assert book.recent("NADA", 3) == [] and len(book.recent("ACME", 50)) == 10

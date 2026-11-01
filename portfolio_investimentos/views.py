@@ -115,7 +115,7 @@ def overview():
         hero_spark=ctx.js_json(p.series.holdings[-120:]), ytd=p.year_to_date(),
         ath={"value": p.all_time_high("value"), "return": p.all_time_high("return")},
         movers=movers, events_total=len(events),
-        sparks={m.asset.ticker: ctx.js_json(p.sparkline(m.asset.ticker, 30)) for m in movers},
+        mover_charts={m.asset.ticker: ctx.js_json(_mover_chart(p, m)) for m in movers},
         event_groups=[("Próxima semana", [e for e in events if e.date <= week]),
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
                       ("Mais tarde", [e for e in events if e.date > two][:10])],
@@ -126,6 +126,13 @@ def overview():
         insights_data=ctx.js_json({"wr": insights.weight_return(p), "alloc": insights.allocation(p, c["broker"])}),
     )
     return render_template("pages/index.html", **c)
+
+
+def _mover_chart(p, pos, n=30):
+    """Últimos `n` fechos de uma posição, com as datas e o preço médio de aquisição (na moeda do ativo)."""
+    rows = p.book.recent(pos.asset.ticker, n)
+    return {"d": [d.isoformat() for d, _ in rows], "v": [round(v, 4) for _, v in rows],
+            "avg": round(pos.avg_price, 4) if pos.avg_price else None, "cur": pos.asset.currency}
 
 
 @bp.route("/carteira")

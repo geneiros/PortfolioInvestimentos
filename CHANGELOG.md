@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
-- **Visão Geral: mini-gráfico em cada ação dos principais movers**  
+- **Visão Geral: gráfico dos movers face ao preço médio, com o valor ao passar o rato**  
+  O gráfico de cada ação dos «Principais movers» ocupa a largura livre da linha e mostra o preço médio de aquisição a tracejado: a linha e o preenchimento ficam verdes acima dele e vermelhos abaixo. Ao passar o rato aparece a data, o preço e a diferença para o preço médio (com «€ ••••» se os valores estiverem escondidos). No telemóvel, o gráfico passa para uma segunda linha, com a largura toda.
+- **Visão Geral: mini-gráfico em cada ação dos principais movers** `edf0424`  
   Cada ação dos «Principais movers» mostra o nome, um mini-gráfico dos últimos 30 dias (verde se subiu, vermelho se desceu) e o preço; o cartão passa a mostrar até 8 ações. Os mini-gráficos (também os da Carteira) redesenham-se com as cores do tema ao mudar de tema.
 - **Visão Geral: gráfico de evolução no lugar dos principais movers** `9c6f67e`  
   O gráfico «Retorno total / Valor total» sobe para logo a seguir às notas (ao lado de «Resultados / Conta») e os «Principais movers» passam para o lugar dele (ao lado de «Próximos eventos»). Os restantes cartões ficam onde estavam.
