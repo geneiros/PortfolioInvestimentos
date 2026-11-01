@@ -105,7 +105,7 @@ def overview():
     p = c["p"]
     if not p.transactions:
         return render_template("pages/index.html", **c)
-    movers = p.movers(5)
+    movers = p.movers(8)
     held = [pos.asset.ticker for pos in p.open_positions]
     events = upcoming_events(held)
     today = date.today()
@@ -115,6 +115,7 @@ def overview():
         hero_spark=ctx.js_json(p.series.holdings[-120:]), ytd=p.year_to_date(),
         ath={"value": p.all_time_high("value"), "return": p.all_time_high("return")},
         movers=movers, events_total=len(events),
+        sparks={m.asset.ticker: ctx.js_json(p.sparkline(m.asset.ticker, 30)) for m in movers},
         event_groups=[("Próxima semana", [e for e in events if e.date <= week]),
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
                       ("Mais tarde", [e for e in events if e.date > two][:10])],

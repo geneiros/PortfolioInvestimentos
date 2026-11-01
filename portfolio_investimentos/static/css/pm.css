@@ -83,6 +83,10 @@ body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
 
 /* ------------------------------------------------------------------ listas, tabelas, logos */
 .pm-row { display: flex; align-items: center; gap: .75rem; padding: .45rem 0; }
+/* Visão Geral · principais movers: colunas de largura fixa para os mini-gráficos ficarem alinhados */
+.pm-mover-spark { flex: none; width: 96px !important; height: 28px !important; }
+.pm-mover-price { flex: none; width: 5.5rem; }
+.pm-mover-pct { flex: none; width: 4.5rem; }
 .pm-logo, .pm-badge-broker { border-radius: var(--bs-border-radius-sm); display: inline-flex; align-items: center; justify-content: center;
   font-weight: 700; color: #fff; }
 .pm-logo { width: 28px; height: 28px; flex: 0 0 28px; font-size: .62rem; }
@@ -94,7 +98,7 @@ body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
   background: var(--bs-body-bg); cursor: pointer; user-select: none; }
 .pm-table td { white-space: nowrap; vertical-align: middle; }
 .pm-table tfoot td { font-weight: 600; background: var(--bs-tertiary-bg); position: sticky; bottom: 0; }
-.pm-table .sub { font-size: .75rem; color: var(--bs-secondary-color); }
+.pm-table .sub, .pm-row .sub { font-size: .75rem; color: var(--bs-secondary-color); }
 .pm-table td.pm-nw-name { white-space: normal; min-width: 9rem; }  /* Património: o nome e a nota podem partir a linha */
 .pm-table .pm-nw-head td { background: var(--bs-tertiary-bg); white-space: normal; }
 .pm-nw-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: .5rem; }

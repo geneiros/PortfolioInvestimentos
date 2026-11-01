@@ -282,6 +282,7 @@
     }));
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => new bootstrap.Tooltip(el));
     pm.drawSparklines();
+    document.addEventListener("pm:theme", pm.drawSparklines);
     // aplicação instalável (PWA): o browser só a oferece com um service worker registado
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
     // se a página abrir com uma atualização em curso, continua a acompanhá-la
@@ -328,6 +329,8 @@
     document.querySelectorAll("canvas[data-spark]").forEach((c) => {
       const values = JSON.parse(c.dataset.spark || "[]");
       if (values.length < 2) return;
+      const old = Chart.getChart(c);
+      if (old) old.destroy();  // ao mudar de tema: redesenha com as cores novas
       const up = values[values.length - 1] >= values[0];
       const color = up ? pm.css("--pm-up") : pm.css("--pm-down");
       new Chart(c, {

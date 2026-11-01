@@ -61,6 +61,10 @@ def test_demo_pages_render(client):
         resp = client.get(url)
         assert resp.status_code == 200, url
         assert "Traceback" not in resp.get_data(as_text=True)
+    # Visão Geral: mini-gráfico dos últimos 30 dias em cada ação dos principais movers
+    html = client.get("/").get_data(as_text=True)
+    movers = html.split("Principais movers", 1)[1].split("Próximos eventos", 1)[0]
+    assert movers.count('class="pm-row pm-mover"') == movers.count("data-spark=") >= 1
 
 
 def test_csrf_required(client):

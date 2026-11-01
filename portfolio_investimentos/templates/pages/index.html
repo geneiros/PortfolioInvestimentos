@@ -127,9 +127,12 @@
             <a class="btn btn-pm btn-icon btn-sm" href="/carteira" title="Carteira"><i class="bi bi-list"></i></a>
           </div>
           {% for m in movers %}
-          <div class="pm-row">
-            {{ logo(m.asset) }}<b class="flex-grow-1">{{ m.asset.ticker }}</b>
-            <span class="{{ m.day_change_pct|tone }} fw-bold">{{ m.day_change_pct|pct(2) }}</span>
+          <div class="pm-row pm-mover">
+            {{ logo(m.asset) }}
+            <div class="flex-grow-1" style="min-width: 0"><b>{{ m.asset.ticker }}</b><div class="sub text-truncate">{{ m.asset.name }}</div></div>
+            <canvas class="pm-mover-spark d-none d-sm-block" width="96" height="28" data-spark='{{ sparks[m.asset.ticker] }}' title="Últimos 30 dias"></canvas>
+            <span class="pm-mover-price text-end text-nowrap small d-none d-sm-inline">{{ m.price|money(2, currency=m.asset.currency) }}</span>
+            <span class="pm-mover-pct text-end {{ m.day_change_pct|tone }} fw-bold">{{ m.day_change_pct|pct(2) }}</span>
             <small class="{{ m.day_change_eur|tone }} money" style="min-width:4.5rem;text-align:right">· {{ m.day_change_eur|money(sign=True) }}</small>
           </div>
           {% else %}<p class="text-secondary small">Sem cotações recentes.</p>{% endfor %}
