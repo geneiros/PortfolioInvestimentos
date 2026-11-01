@@ -6,7 +6,7 @@
  *   as páginas de consulta com o cabeçalho X-PM-Offline e elas são guardadas, para se poderem consultar
  *   com a aplicação parada. Desligar o modo ou sair (Sair) apaga a cópia (mensagem "clear").
  */
-const VERSION = "pi-v3";
+const VERSION = "pi-v4";
 const PAGES = "pi-pages";
 const PRECACHE = [
   "/static/offline.html",

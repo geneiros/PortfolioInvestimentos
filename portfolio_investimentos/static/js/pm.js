@@ -239,6 +239,9 @@
     const pref = store.get("pm-theme") || "auto";
     const dark = pref === "dark" || (pref === "auto" && prefersDark.matches);
     document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+    // a barra do sistema acompanha o fundo da página (o do tema escolhido)
+    const meta = document.getElementById("themeColor");
+    if (meta) meta.setAttribute("content", dark ? "#212529" : "#ffffff");
     document.querySelectorAll("[data-pm-theme]").forEach((b) => b.classList.toggle("active", b.dataset.pmTheme === pref));
     document.dispatchEvent(new CustomEvent("pm:theme"));
   };

@@ -4,12 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Aplicação parada · Portfolio Investimentos</title>
+  <meta name="theme-color" content="#ffffff" id="themeColor">
   <script>
     (function () {
       let pref = "auto";
       try { pref = localStorage.getItem("pm-theme") || "auto"; } catch (e) {}
       const dark = pref === "dark" || (pref === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+      document.getElementById("themeColor").setAttribute("content", dark ? "#212529" : "#ffffff");
     })();
   </script>
   <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
