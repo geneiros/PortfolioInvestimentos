@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
-- **Valor de cada ação: mais quatro métodos e o PEG; «?» com círculo**  
+- **Menu: Radar e alertas antes de Fiscal**  
+  Nova ordem: Visão Geral, Carteira, Desempenho, Dividendos, Património, Planeamento, Radar e alertas, Fiscal.
+- **Valor de cada ação: mais quatro métodos e o PEG; «?» com círculo** `431b57a`  
   Por ordem de popularidade: DCF, Número de Graham, fórmula de crescimento de Graham (LPA × (8,5 + 2g) × 4,4 ÷ Y, com Y, o rendimento das obrigações AAA, configurável no cartão; 5% por omissão) e modelo de Gordon (D₁ ÷ (Ke − g), com o crescimento dos dividendos do histórico, no máximo 6%, e Ke de 8% a 10%) sempre visíveis; em «Mais métodos», Owner Earnings de Buffett (lucro líquido + amortizações − CAPEX de manutenção ± fundo de maneio, descontados como no DCF), Earnings Power Value de Greenwald (NOPAT normalizado ÷ WACC de 8% a 10% + caixa − dívida), Bazin e o PEG de Peter Lynch (com o preço de PEG 1). Owner earnings, NOPAT e caixa líquida vêm das demonstrações financeiras do Yahoo e podem ser corrigidos à mão (migração 6). O «?» das explicações passa a ser um círculo, mais escuro, em toda a aplicação.
 - **Valor de cada ação: a fórmula de cada método no «?»** `5cdc387`  
   A seguir ao nome de cada método (DCF, Graham, Bazin) há um «?» com a fórmula e os números usados nessa ação.

@@ -10,11 +10,11 @@ from .market import market_status, refresh_state
 NAV = [
     ("overview", "Visão Geral", "/", "bi-grid"),
     ("carteira", "Carteira", "/carteira", "bi-wallet2"),
-    ("radar", "Radar e alertas", "/radar", "bi-bullseye"),
     ("desempenho", "Desempenho", "/desempenho", "bi-graph-up-arrow"),
     ("dividendos", "Dividendos", "/dividendos", "bi-coin"),
     ("patrimonio", "Património", "/patrimonio", "bi-bank"),
     ("planeamento", "Planeamento", "/planeamento", "bi-flag"),
+    ("radar", "Radar e alertas", "/radar", "bi-bullseye"),
     ("fiscal", "Fiscal", "/fiscal", "bi-receipt"),
 ]
 NAV_BOTTOM = [
