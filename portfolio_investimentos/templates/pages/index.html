@@ -69,25 +69,24 @@
   <!-- Perfil de investidor: notas -->
   {{ ins.scores_row(scores) }}
 
-  <!-- Movers -->
+  <!-- Gráfico de desempenho -->
   <div class="col-xl-8">
     <div class="pm-card">
-      <div class="row">
-        <div class="col-12">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="pm-label">Principais movers · {{ p.as_of|ddmm }}</span>
-            <a class="btn btn-pm btn-icon btn-sm ms-auto" href="/radar" title="Alertas"><i class="bi bi-bell"></i></a>
-            <a class="btn btn-pm btn-icon btn-sm" href="/carteira" title="Carteira"><i class="bi bi-list"></i></a>
-          </div>
-          {% for m in movers %}
-          <div class="pm-row">
-            {{ logo(m.asset) }}<b class="flex-grow-1">{{ m.asset.ticker }}</b>
-            <span class="{{ m.day_change_pct|tone }} fw-bold">{{ m.day_change_pct|pct(2) }}</span>
-            <small class="{{ m.day_change_eur|tone }} money" style="min-width:4.5rem;text-align:right">· {{ m.day_change_eur|money(sign=True) }}</small>
-          </div>
-          {% else %}<p class="text-secondary small">Sem cotações recentes.</p>{% endfor %}
-        </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+        <div class="pm-seg" id="modeSeg"><button class="active" data-mode="gain">Retorno total</button><button data-mode="value">Valor total</button></div>
+        <div class="ms-auto text-end"><div class="pm-label">Período</div><b id="periodLabel" class="small"></b></div>
       </div>
+      <div class="pm-periods mb-3" id="periods">
+        {% for k in ["1M", "3M", "6M", "YTD", "1A", "3A", "5A", "MAX"] %}<button data-p="{{ k }}" class="{{ 'active' if k == 'MAX' }}">{{ 'Max' if k == 'MAX' else k }}</button>{% endfor %}
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap small mb-2">
+        <span class="text-secondary">Comparar com:</span>
+        {% for b in benchmarks %}<button class="pm-chip bench" data-t="{{ b.ticker }}" style="--chip: {{ b.color }}"><span class="sw" style="background: {{ b.color }}"></span>{{ b.name }}</button>{% endfor %}
+        <span class="vr mx-1"></span>
+        <button class="pm-chip" id="posToggle" title="Mostra o contributo das posições com maior ganho ou perda no período"><i class="bi bi-graph-up"></i> As minhas posições</button>
+      </div>
+      <div style="height: 320px"><canvas id="perfChart"></canvas></div>
+      <div id="posLegend" class="d-flex flex-wrap gap-2 justify-content-center mt-2"></div>
     </div>
   </div>
 
@@ -117,24 +116,25 @@
     </div>
   </div>
 
-  <!-- Gráfico de desempenho -->
+  <!-- Movers -->
   <div class="col-xl-8">
     <div class="pm-card">
-      <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
-        <div class="pm-seg" id="modeSeg"><button class="active" data-mode="gain">Retorno total</button><button data-mode="value">Valor total</button></div>
-        <div class="ms-auto text-end"><div class="pm-label">Período</div><b id="periodLabel" class="small"></b></div>
+      <div class="row">
+        <div class="col-12">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="pm-label">Principais movers · {{ p.as_of|ddmm }}</span>
+            <a class="btn btn-pm btn-icon btn-sm ms-auto" href="/radar" title="Alertas"><i class="bi bi-bell"></i></a>
+            <a class="btn btn-pm btn-icon btn-sm" href="/carteira" title="Carteira"><i class="bi bi-list"></i></a>
+          </div>
+          {% for m in movers %}
+          <div class="pm-row">
+            {{ logo(m.asset) }}<b class="flex-grow-1">{{ m.asset.ticker }}</b>
+            <span class="{{ m.day_change_pct|tone }} fw-bold">{{ m.day_change_pct|pct(2) }}</span>
+            <small class="{{ m.day_change_eur|tone }} money" style="min-width:4.5rem;text-align:right">· {{ m.day_change_eur|money(sign=True) }}</small>
+          </div>
+          {% else %}<p class="text-secondary small">Sem cotações recentes.</p>{% endfor %}
+        </div>
       </div>
-      <div class="pm-periods mb-3" id="periods">
-        {% for k in ["1M", "3M", "6M", "YTD", "1A", "3A", "5A", "MAX"] %}<button data-p="{{ k }}" class="{{ 'active' if k == 'MAX' }}">{{ 'Max' if k == 'MAX' else k }}</button>{% endfor %}
-      </div>
-      <div class="d-flex align-items-center gap-2 flex-wrap small mb-2">
-        <span class="text-secondary">Comparar com:</span>
-        {% for b in benchmarks %}<button class="pm-chip bench" data-t="{{ b.ticker }}" style="--chip: {{ b.color }}"><span class="sw" style="background: {{ b.color }}"></span>{{ b.name }}</button>{% endfor %}
-        <span class="vr mx-1"></span>
-        <button class="pm-chip" id="posToggle" title="Mostra o contributo das posições com maior ganho ou perda no período"><i class="bi bi-graph-up"></i> As minhas posições</button>
-      </div>
-      <div style="height: 320px"><canvas id="perfChart"></canvas></div>
-      <div id="posLegend" class="d-flex flex-wrap gap-2 justify-content-center mt-2"></div>
     </div>
   </div>
 
