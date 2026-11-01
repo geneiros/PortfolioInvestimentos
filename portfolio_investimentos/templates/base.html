@@ -72,10 +72,10 @@
   <div class="pm-main">
     <nav class="navbar bg-body border-bottom sticky-top px-3 gap-2">
       <button class="btn btn-outline-secondary btn-icon d-lg-none" data-pm-toggle="menu"><i class="bi bi-list"></i></button>
-      <div class="dropdown">
-        <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown">
-          {% if broker_doc %}{{ broker_badge(broker_doc) }} {{ broker_doc.broker_name }}
-          {% else %}<i class="bi bi-collection"></i> Todas as corretoras{% endif %}
+      <div class="dropdown" style="min-width: 0">
+        <button class="btn btn-outline-primary dropdown-toggle d-flex align-items-center gap-2 pm-broker-btn" data-bs-toggle="dropdown">
+          {% if broker_doc %}{{ broker_badge(broker_doc) }} <span class="text-truncate">{{ broker_doc.broker_name }}</span>
+          {% else %}<i class="bi bi-collection"></i> <span class="text-truncate">Todas as corretoras</span>{% endif %}
         </button>
         <div class="dropdown-menu" style="min-width: 320px">
           <h6 class="dropdown-header">Ver dados de</h6>
@@ -94,6 +94,8 @@
           <a class="dropdown-item" href="/importar"><i class="bi bi-plus-lg me-2"></i>Adicionar corretora</a>
         </div>
       </div>
+      <!-- telemóvel: o grupo do meio esconde-se, por isso o «Esconder valores» tem aqui o seu botão -->
+      <button class="btn btn-outline-secondary btn-icon d-md-none ms-auto flex-shrink-0" data-pm-toggle="private" title="Esconder valores" aria-label="Esconder valores"><i class="bi bi-eye"></i></button>
 
       <div class="mx-auto d-none d-md-flex align-items-center gap-2">
         <button class="btn btn-outline-secondary btn-icon" data-pm-toggle="private" title="Esconder valores"><i class="bi bi-eye"></i></button>

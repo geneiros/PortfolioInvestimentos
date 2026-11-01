@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
-- **README: revisão e capturas da Visão Geral**  
+- **Esconder valores: botão também no telemóvel**  
+  No telemóvel (menos de 768 px) o grupo do meio da barra de topo esconde-se e o botão do olho ia com ele. Passa a haver um botão do olho à direita da barra de topo nos ecrãs pequenos; o seletor de corretora encolhe (texto truncado) para caberem os dois.
+- **README: revisão e capturas da Visão Geral** `7e37762`  
   Capturas 02, 03 e 04 (claro e escuro) refeitas com os gráficos novos dos principais movers. Tabela de funcionalidades pela ordem do menu; secção «Cotações» com o histórico de dividendos, os eventos e os dados fundamentais (fontes, frequência e correção manual); «Próximos passos» sem a exposição geográfica, que já existe; «Estrutura» com os módulos novos.
 - **Visão Geral: gráfico dos movers com o último ano** `2323566`  
   O gráfico de cada ação dos «Principais movers» passa a mostrar o último ano (eram os últimos 30 dias), e a data no valor ao passar o rato inclui o ano.

@@ -211,3 +211,9 @@ html.pm-private [data-pm-toggle=private] .bi-eye::before { content: "\f340"; }
   .pm-val-row { grid-template-columns: 1fr auto; grid-template-areas: "name value" "track track"; row-gap: .3rem; padding: .35rem 0; }
   .pm-val-name { grid-area: name; } .pm-val-value { grid-area: value; } .pm-val-track { grid-area: track; }
 }
+
+/* telemóvel: o seletor de corretora encolhe (texto truncado) para o botão «Esconder valores» caber na barra */
+@media (max-width: 767.98px) {
+  .pm-main > .navbar { flex-wrap: nowrap; }
+  .pm-broker-btn { max-width: calc(100vw - 8.5rem); }
+}

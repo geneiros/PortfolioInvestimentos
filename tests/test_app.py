@@ -74,6 +74,9 @@ def test_demo_pages_render(client):
         assert len(c["o"]) == len(c["v"]) > 100 and date.fromisoformat(c["s"]) <= date.today()
         assert c["avg"] > 0 and c["cur"] in ("EUR", "USD")
     assert "js/movers.js" in page
+    # o botão «Esconder valores» também no telemóvel (o do grupo central esconde-se abaixo de 768 px)
+    buttons = re.findall(r'<button[^>]*data-pm-toggle="private"[^>]*>', page)
+    assert len(buttons) == 2 and sum("d-md-none" in b for b in buttons) == 1
 
 
 def test_csrf_required(client):
