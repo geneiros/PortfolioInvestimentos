@@ -9,8 +9,8 @@ import math
 import random
 from datetime import date, timedelta
 
-from ..models import (Alert, Broker, Event, FxRate, ImportBatch, Instrument, OtherAsset, OtherAssetValue, Price,
-                      Setting, Transaction, WatchItem, db)
+from ..models import (Alert, Broker, Event, Fundamental, FxRate, ImportBatch, Instrument, OtherAsset, OtherAssetValue,
+                      Price, Setting, Transaction, WatchItem, db)
 from .market import DEFAULT_BENCHMARKS, ensure_benchmarks
 
 START = date(2021, 6, 1)
@@ -168,6 +168,7 @@ def create_demo(seed=42):
     db.session.add(WatchItem(instrument="DEMO-ATLE", target_price=round(prices["DEMO-ATLE"][days[-1]] * 0.95, 2),
                              note="Comprar abaixo do alvo"))
     _other_assets(rng, today)
+    _fundamentals(prices, days[-1], today)
     db.session.commit()
     Setting.set("demo", "1")
     return "Dados de demonstração criados."
@@ -205,3 +206,22 @@ def _other_assets(rng, today):
     if Setting.get("fire_expenses") is None:
         Setting.set("fire_expenses", DEMO_EXPENSES)
         Setting.set("demo_fire_expenses", "1")  # apagado com os dados de demonstração
+
+
+# dados fundamentais de exemplo (valor de cada ação), como múltiplos do preço final:
+# ticker → (preço/lucro, preço/lucro previsto, preço/valor contabilístico, preço/cash flow livre, crescimento)
+DEMO_FUNDAMENTALS = {
+    "DEMO-NVTX": (38, 30, 9, 42, 0.15),
+    "DEMO-SOLP": (17, 15, 4, 19, 0.05),
+    "DEMO-ATLE": (11, 12, 1.3, 9, 0.02),
+    "DEMO-LUSB": (9, 8, 1.1, None, 0.07),
+    "DEMO-AUTO": (-25, 40, 0.8, None, -0.02),
+}
+
+
+def _fundamentals(prices, last_day, today):
+    for ticker, (pe, pe_fwd, pb, pfcf, growth) in DEMO_FUNDAMENTALS.items():
+        price = prices[ticker][last_day]
+        db.session.merge(Fundamental(ticker=ticker, eps=round(price / pe, 4), eps_forward=round(price / pe_fwd, 4),
+                                     bvps=round(price / pb, 4), fcf=round(price / pfcf, 4) if pfcf else None,
+                                     growth=growth, updated=today))

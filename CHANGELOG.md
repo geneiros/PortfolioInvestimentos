@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
-- **README: capturas atualizadas e novas**  
+- **Carteira: o valor de cada ação**  
+  Para cada ação aberta, três métodos sempre em intervalo, numa barra com o preço como traço: DCF (cash flow livre por ação, ou o lucro, a crescer 10 anos e depois 2,5%, desconto de 8% a 10%, crescimento ±2,5 p.p.), número de Graham (lucro atual e previsto) e Bazin (dividendo médio de 3 anos ÷ 6% a 8%); e o crescimento que o preço de hoje já assume (desconto de 9%). Os dados fundamentais vêm do Yahoo na atualização de cotações (uma vez por semana; também sem o yfinance, pelo quoteSummary), convertidos para a moeda da cotação, e podem ser corrigidos à mão. Captura 24.
+- **README: capturas atualizadas e novas** `df711f9`  
   As 21 capturas (claro e escuro) refeitas com o menu na ordem nova e as funcionalidades recentes, mais duas novas: «Carteira: as crises e os custos» (22) e «Património: de onde veio o crescimento» (23). O README passa a descrever o «Esconder valores» e a cor das barras do sistema na aplicação instalada.
 - **Carteira: as crises e os custos** `3c1ff98`  
   Dois cartões novos na Carteira. «As crises»: a queda estimada da carteira de hoje se a crise financeira (2008), a dívida do euro (2011), a pandemia (2020) ou a inflação e juros (2022) se repetissem, = Σ peso × beta × queda do S&P 500 (beta de cada posição pelos retornos semanais dos últimos 3 anos, em euros; beta 1 sem histórico; a caixa não cai), em % e em euros, e o tempo do S&P 500 até recuperar o pico. «Os custos»: comissões dos últimos 12 meses (e nº de operações), custo dos ETF (valor × TER, que indicas no próprio cartão; migração 5) e retenções na fonte acima dos 15% da convenção (sem Portugal nem país desconhecido), por ano e o que representam em 20 anos.

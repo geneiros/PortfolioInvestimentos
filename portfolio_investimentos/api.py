@@ -355,6 +355,32 @@ def save_ters(**values):
     return "Custos dos ETF guardados."
 
 
+@action
+def save_fundamentals(ticker, eps="", bvps="", fcf="", growth=""):
+    """Correções manuais aos dados fundamentais de uma ação (vazio: volta ao valor do Yahoo). Crescimento em %."""
+    from .models import Fundamental
+    inst = db.session.get(Instrument, (ticker or "").strip())
+    if inst is None:
+        raise ApiError("Ativo desconhecido.")
+    row = db.session.get(Fundamental, inst.ticker) or Fundamental(ticker=inst.ticker)
+    for field, raw in (("eps", eps), ("bvps", bvps), ("fcf", fcf), ("growth", growth)):
+        raw = str(raw or "").strip().replace("%", "").replace(" ", "")
+        if not raw:
+            setattr(row, "manual_" + field, None)
+            continue
+        value = _float(raw)
+        if not math.isfinite(value):
+            raise ApiError(f"Número inválido: {raw}")
+        if field == "growth":
+            if not -10 <= value <= 25:
+                raise ApiError("O crescimento tem de estar entre −10% e 25% ao ano.")
+            value /= 100
+        setattr(row, "manual_" + field, value)
+    db.session.add(row)
+    db.session.commit()
+    return f"Dados de {inst.ticker} guardados."
+
+
 # --------------------------------------------------------- património (outros ativos)
 def _flag(v):
     return str(v).lower() in ("1", "true", "on", "sim")
@@ -525,8 +551,9 @@ def reset_data(confirm=""):
     if confirm != "APAGAR":
         raise ApiError('Escreve APAGAR para confirmar.')
     _backup("apagar-tudo")
+    from .models import Fundamental
     for model in (Transaction, ImportBatch, Alert, WatchItem, Event, DividendHistory, Price, FxRate,
-                  OtherAssetValue, OtherAsset):
+                  OtherAssetValue, OtherAsset, Fundamental):
         model.query.delete()
     Broker.query.delete()
     Instrument.query.filter(Instrument.kind != "index").delete()

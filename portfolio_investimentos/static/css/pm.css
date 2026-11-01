@@ -180,3 +180,14 @@ html.pm-private [data-pm-toggle=private] .bi-eye::before { content: "\f340"; }
   .pm-crisis-row .pm-crisis-bar { grid-column: 1 / -1; grid-row: 2; }
   .pm-crisis-row .pm-crisis-time { grid-column: 1 / -1; text-align: left !important; }
 }
+
+/* Carteira · O valor de cada ação: intervalo de cada método numa barra, com o preço como traço */
+.pm-valuation { border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: .75rem 1rem; }
+.pm-val-row { display: grid; grid-template-columns: 4rem 1fr 9.5rem; align-items: center; gap: .75rem; padding: .2rem 0; }
+.pm-val-track { position: relative; height: 8px; border-radius: 4px; background: var(--pm-surface-2); }
+.pm-val-range { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--pm-accent); }
+.pm-val-price { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--pm-text); }
+@media (max-width: 575.98px) {
+  .pm-val-row { grid-template-columns: 1fr auto; grid-template-areas: "name value" "track track"; row-gap: .3rem; padding: .35rem 0; }
+  .pm-val-name { grid-area: name; } .pm-val-value { grid-area: value; } .pm-val-track { grid-area: track; }
+}

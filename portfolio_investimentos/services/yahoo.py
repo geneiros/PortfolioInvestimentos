@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 
 CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search"
+SUMMARY_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}"
+SUMMARY_MODULES = "assetProfile,financialData,defaultKeyStatistics,summaryDetail,quoteType"
 # sem um User-Agent de browser o Yahoo responde muitas vezes com 429/403
 HEADERS = {"User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) "
                          "Chrome/128.0 Mobile Safari/537.36", "Accept": "application/json"}
@@ -129,8 +131,21 @@ class Ticker:
     def __init__(self, symbol):
         self.symbol = symbol
         self.history_metadata = {}
-        self.info = {}       # dados fundamentais: só servem para o setor, que é opcional
+        self._info = None
         self.calendar = {}   # eventos (resultados, dividendos): não disponíveis por esta via
+
+    @property
+    def info(self):
+        """Dados fundamentais (setor, lucros, cash flow…) no formato do `yfinance.Ticker.info`: um dicionário plano."""
+        if self._info is None:
+            data = _get_json(SUMMARY_URL.format(symbol=urllib.parse.quote(self.symbol)), {"modules": SUMMARY_MODULES})
+            result = ((data.get("quoteSummary") or {}).get("result") or [{}])[0] or {}
+            flat = {}
+            for module in result.values():
+                for key, value in (module or {}).items() if isinstance(module, dict) else ():
+                    flat[key] = value.get("raw") if isinstance(value, dict) and "raw" in value else value
+            self._info = flat
+        return self._info
 
     def history(self, start=None, **_):
         start = start or (datetime.now() - timedelta(days=365)).date()

@@ -535,3 +535,29 @@ def test_cost_report_fees_ter_and_excess_withholding():
     # ETF sem TER: fica de fora e listado
     rep = costs.cost_report(p, {}, {})
     assert rep["missing"] == ["WRLD"] and rep["etf_cost"] == 0 and rep["etf_ter"] is None and rep["excess"] == 0
+
+
+def test_valuation_methods_ranges_and_implied_growth():
+    from portfolio_investimentos.engine import valuation as val
+    # DCF sem crescimento e desconto = terminal + algo: confere com a fórmula fechada
+    v = val.dcf(10, 0.0, 0.10, years=10, terminal=0.0)
+    assert v == pytest.approx(10 / 0.10)  # perpetuidade de 10 a 10%
+    assert val.dcf(-1, 0.05, 0.09) is None and val.dcf(10, 0.05, 0.02) is None
+    # crescimento implícito: o g que dá o preço; com o preço = dcf(g=7%), devolve 7%
+    price = val.dcf(5, 0.07, 0.09)
+    assert val.implied_growth(price, 5) == pytest.approx(0.07, abs=1e-6)
+    assert val.implied_growth(100, -2) is None
+    assert val.graham(4, 25) == pytest.approx((22.5 * 100) ** 0.5) and val.graham(-1, 25) is None
+    out = val.value_stock(60, eps=4, eps_forward=5, bvps=25, fcf=3, growth=0.08, dividends=2.4)
+    m = {x["key"]: x for x in out["methods"]}
+    assert m["dcf"]["low"] == pytest.approx(val.dcf(3, 0.055, 0.10))
+    assert m["dcf"]["high"] == pytest.approx(val.dcf(3, 0.105, 0.08))
+    assert m["graham"]["low"] == pytest.approx(val.graham(4, 25)) and m["graham"]["high"] == pytest.approx(val.graham(5, 25))
+    assert m["bazin"]["low"] == pytest.approx(2.4 / 0.08) and m["bazin"]["high"] == pytest.approx(2.4 / 0.06)
+    assert out["base_kind"] == "cash flow livre" and out["implied"] is not None
+    assert out["scale"] >= max(60, m["dcf"]["high"])
+    # sem cash flow livre: usa o lucro; sem dividendos nem lucro: métodos vazios com o motivo
+    out = val.value_stock(10, eps=-1, bvps=5)
+    m = {x["key"]: x for x in out["methods"]}
+    assert m["dcf"]["low"] is None and m["graham"]["low"] is None and m["bazin"]["why"] == "não paga dividendos"
+    assert out["implied"] is None and out["growth"] == val.GROWTH_DEFAULT and out["growth_default"]

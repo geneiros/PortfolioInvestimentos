@@ -219,3 +219,22 @@ class OtherAssetValue(db.Model):
     asset = db.Column(db.Integer, db.ForeignKey("other_asset.id", ondelete="CASCADE"), nullable=False, index=True)
     date = db.Column(db.Date, nullable=False)
     value = db.Column(db.Float, nullable=False)
+
+
+class Fundamental(db.Model):
+    """Dados fundamentais de uma ação (para o valor justo na Carteira), por ação e na moeda da cotação.
+
+    Os campos sem prefixo vêm do Yahoo (atualização de cotações); os `manual_*` são correções do utilizador e,
+    quando existem, prevalecem.
+    """
+    ticker = db.Column(db.String(32), db.ForeignKey("instrument.ticker", ondelete="CASCADE"), primary_key=True)
+    eps = db.Column(db.Float)          # lucro por ação dos últimos 12 meses
+    eps_forward = db.Column(db.Float)  # lucro por ação previsto (próximos 12 meses)
+    bvps = db.Column(db.Float)         # valor contabilístico por ação
+    fcf = db.Column(db.Float)          # cash flow livre por ação
+    growth = db.Column(db.Float)       # crescimento anual esperado dos lucros (fração)
+    updated = db.Column(db.Date)
+    manual_eps = db.Column(db.Float)
+    manual_bvps = db.Column(db.Float)
+    manual_fcf = db.Column(db.Float)
+    manual_growth = db.Column(db.Float)

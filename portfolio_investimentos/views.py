@@ -6,8 +6,8 @@ from flask import Blueprint, Response, abort, current_app, render_template, requ
 
 from .engine import costs, stress
 from .engine.portfolio import MERIT_BENCHMARK
-from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, Event, ImportBatch, Instrument, Price, Setting, Transaction,
-                     WatchItem, db)
+from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, Fundamental, ImportBatch,
+                     Instrument, Price, Setting, Transaction, WatchItem, db)
 from . import auth
 from .services import context as ctx
 from .services import backups, data, insights, networth
@@ -141,9 +141,52 @@ def carteira():
                "fees": sum(x.fees_eur for x in p.open_positions),
                "roi": sum(x.roi_eur for x in p.open_positions)},
         alloc=ctx.js_json({k: p.allocation(k) for k in ("asset", "sector", "currency")}),
-        crisis=stress.crisis_test(p), costs=_costs(p),
+        crisis=stress.crisis_test(p), costs=_costs(p), valuations=_valuations(p),
     )
     return render_template("pages/carteira.html", **c)
+
+
+def _dividend_per_share(p, ticker):
+    """Dividendo anual médio por ação dos últimos 3 anos: o histórico do Yahoo ou, sem ele, os recebidos."""
+    since = p.as_of - timedelta(days=3 * 365)
+    rows = [(r.date, r.amount) for r in DividendHistory.query.filter(DividendHistory.instrument == ticker,
+                                                                       DividendHistory.date > since)]
+    if not rows:
+        rows = [(t.date, t.amount / t.quantity) for t in p.transactions
+                if t.type == "DIVIDEND" and t.asset is not None and t.asset.ticker == ticker and t.quantity
+                and t.amount and t.date > since]
+    if not rows:
+        return None
+    first = min(d for d, _ in rows)
+    years = min(max((p.as_of - first).days / 365.25, 1.0), 3.0)  # histórico curto: a média do que há
+    return sum(a for _, a in rows) / years
+
+
+def _valuations(p):
+    """O valor de cada ação aberta (três métodos e o crescimento implícito)."""
+    from .engine import valuation
+    stocks = [pos for pos in p.open_positions if pos.asset.kind == "stock"]
+    funds = {f.ticker: f for f in Fundamental.query.filter(Fundamental.ticker.in_([x.asset.ticker for x in stocks] or [""]))}
+    out = []
+    for pos in sorted(stocks, key=lambda x: -x.value_eur):
+        f = funds.get(pos.asset.ticker)
+
+        def pick(name, f=f):
+            manual = getattr(f, "manual_" + name, None) if f else None
+            return (manual, True) if manual is not None else ((getattr(f, name) if f else None), False)
+        eps, eps_manual = pick("eps")
+        bvps, bvps_manual = pick("bvps")
+        fcf, fcf_manual = pick("fcf")
+        growth, growth_manual = pick("growth")
+        price = p.book.price(pos.asset.ticker, p.as_of)
+        v = valuation.value_stock(price, eps=eps, eps_forward=f.eps_forward if f else None, bvps=bvps, fcf=fcf,
+                                  growth=growth, dividends=_dividend_per_share(p, pos.asset.ticker))
+        v.update(ticker=pos.asset.ticker, name=pos.asset.name, currency=pos.asset.currency, asset=pos.asset,
+                 inputs={"eps": eps, "bvps": bvps, "fcf": fcf, "growth": growth},
+                 manual={"eps": eps_manual, "bvps": bvps_manual, "fcf": fcf_manual, "growth": growth_manual},
+                 updated=f.updated if f else None)
+        out.append(v)
+    return out
 
 
 def _costs(p):

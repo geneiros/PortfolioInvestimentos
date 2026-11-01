@@ -14,7 +14,8 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..engine.formatting import WEEKDAYS
-from ..models import Alert, DividendHistory, Event, FxRate, Instrument, Price, Setting, Transaction, db
+from ..models import (Alert, DividendHistory, Event, Fundamental, FxRate, Instrument, Price, Setting, Transaction,
+                      db)
 
 log = logging.getLogger(__name__)
 
@@ -386,12 +387,15 @@ def refresh_all(start=None, progress=None, only_open=False):
             t = yf.Ticker(inst.data_symbol or inst.ticker)
             if not inst.sector and inst.kind == "etf":
                 inst.sector = "ETF"  # o Yahoo não tem "dados fundamentais" de ETF: o pedido só dava erro
-            elif not inst.sector:
+            elif inst.kind != "etf" and (not inst.sector or _fundamentals_due(inst.ticker)):
                 try:
                     info = t.info or {}
-                    inst.sector = info.get("sector") or ("ETF" if info.get("quoteType") == "ETF" else None)
-                except Exception:  # informação opcional
-                    pass
+                    if not inst.sector:
+                        inst.sector = info.get("sector") or ("ETF" if info.get("quoteType") == "ETF" else None)
+                    if info.get("quoteType", "EQUITY") == "EQUITY":
+                        _store_fundamentals(inst, info)
+                except Exception as exc:  # informação opcional (setor e valor justo)
+                    note(f"{inst.ticker} dados fundamentais: erro ({str(exc)[:120]})")
             try:
                 _store_calendar(inst.ticker, t.calendar or {})
             except Exception as exc:
@@ -688,6 +692,54 @@ def _store_dividends(yf, inst):
         db.session.add(DividendHistory(instrument=inst.ticker, date=day, amount=amount))
     db.session.flush()
     return len(found)
+
+
+FUNDAMENTALS_DAYS = 7  # os dados fundamentais mudam pouco: no máximo um pedido por semana e ação
+
+
+def _fundamentals_due(ticker):
+    row = db.session.get(Fundamental, ticker)
+    return row is None or row.updated is None or (date.today() - row.updated).days >= FUNDAMENTALS_DAYS
+
+
+def _num(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return v if math.isfinite(v) else None
+
+
+def _store_fundamentals(inst, info):
+    """Lucro por ação, valor contabilístico, cash flow livre por ação e crescimento, na moeda da cotação.
+
+    Os valores das contas (cash flow livre, valor contabilístico) vêm na moeda dos relatórios
+    (`financialCurrency`); quando é outra, convertem-se ao câmbio mais recente (ex.: ADR em USD de uma empresa
+    que reporta em EUR).
+    """
+    quote = (info.get("currency") or inst.currency or "EUR").upper()
+    report = (info.get("financialCurrency") or quote).upper()
+    factor = 1.0
+    if report != quote:
+        def per_eur(cur):
+            if cur == "EUR":
+                return 1.0
+            row = FxRate.query.filter_by(currency=cur).order_by(FxRate.date.desc()).first()
+            return row.rate if row else None
+        a, b = per_eur(report), per_eur(quote)
+        factor = b / a if a and b else None
+    shares = _num(info.get("sharesOutstanding"))
+    fcf_total = _num(info.get("freeCashflow"))
+    bvps = _num(info.get("bookValue"))
+    growths = [g for g in (_num(info.get("earningsGrowth")), _num(info.get("revenueGrowth"))) if g is not None]
+    row = db.session.get(Fundamental, inst.ticker) or Fundamental(ticker=inst.ticker)
+    row.eps = _num(info.get("trailingEps"))
+    row.eps_forward = _num(info.get("forwardEps"))
+    row.bvps = bvps * factor if bvps is not None and factor else None
+    row.fcf = fcf_total / shares * factor if fcf_total is not None and shares and factor else None
+    row.growth = sum(growths) / len(growths) if growths else None
+    row.updated = date.today()
+    db.session.add(row)
 
 
 def _store_calendar(ticker, cal, today=None):

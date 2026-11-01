@@ -1688,3 +1688,57 @@ def test_portfolio_crises_and_costs_cards(app, client):
         assert post(client, "save_ters", token, **{"ter_DEMO-CASH": bad}).status_code == 400
     assert post(client, "save_ters", token, **{"ter_NAOEXISTE": "0,2"}).status_code == 400
     assert post(client, "save_ters", token).status_code == 400
+
+
+def test_stock_valuation_card_fundamentals_and_manual_overrides(app, client):
+    from portfolio_investimentos.models import Fundamental, FxRate, Instrument
+    from portfolio_investimentos.services import market
+    token = csrf(client)
+    post(client, "load_demo", token)
+    html = client.get("/carteira").get_data(as_text=True)
+    assert 'id="valuationCard"' in html and 'data-ticker="DEMO-NVTX"' in html and "Graham" in html and "Bazin" in html
+    assert 'data-ticker="DEMO-WRLD"' not in html  # ETF: sem valor por ação
+    # correções manuais (crescimento em %), vazio volta ao Yahoo, e validação
+    assert post(client, "save_fundamentals", token, ticker="DEMO-NVTX", eps="2,5", growth="10").status_code == 200
+    with app.app_context():
+        f = db.session.get(Fundamental, "DEMO-NVTX")
+        assert f.manual_eps == 2.5 and f.manual_growth == pytest.approx(0.10) and f.manual_bvps is None
+    assert post(client, "save_fundamentals", token, ticker="DEMO-NVTX", eps="").status_code == 200
+    with app.app_context():
+        assert db.session.get(Fundamental, "DEMO-NVTX").manual_eps is None
+    for bad in ({"eps": "nan"}, {"growth": "40"}, {"ticker": "NAOEXISTE"}):
+        assert post(client, "save_fundamentals", token, **{"ticker": "DEMO-NVTX", **bad}).status_code == 400
+    # dados do Yahoo: valores das contas na moeda dos relatórios convertidos para a da cotação
+    with app.app_context():
+        db.session.add(FxRate(currency="USD", date=date.today(), rate=1.10))
+        db.session.commit()
+        inst = db.session.get(Instrument, "DEMO-NVTX")
+        market._store_fundamentals(inst, {"currency": "USD", "financialCurrency": "EUR", "trailingEps": 3.0,
+                                          "forwardEps": 3.5, "bookValue": 20.0, "freeCashflow": 1e9,
+                                          "sharesOutstanding": 4e8, "earningsGrowth": 0.12, "revenueGrowth": 0.08})
+        db.session.commit()
+        f = db.session.get(Fundamental, "DEMO-NVTX")
+        assert f.eps == 3.0 and f.bvps == pytest.approx(22.0) and f.fcf == pytest.approx(2.5 * 1.10)
+        assert f.growth == pytest.approx(0.10) and f.updated == date.today()
+        assert not market._fundamentals_due("DEMO-NVTX") and market._fundamentals_due("DEMO-SOLP-X")
+
+
+def test_direct_yahoo_info_flattens_quote_summary(monkeypatch):
+    from portfolio_investimentos.services import yahoo
+    calls = []
+
+    def fake(url, params, attempts=4):
+        calls.append((url, params))
+        return {"quoteSummary": {"result": [{
+            "assetProfile": {"sector": "Technology"},
+            "financialData": {"freeCashflow": {"raw": 5e9, "fmt": "5B"}, "financialCurrency": "EUR",
+                              "earningsGrowth": {"raw": 0.12}},
+            "defaultKeyStatistics": {"trailingEps": {"raw": 3.1}, "bookValue": {"raw": 20.5}},
+            "quoteType": {"quoteType": "EQUITY"}}]}}
+    monkeypatch.setattr(yahoo, "_get_json", fake)
+    t = yahoo.Ticker("ASML")
+    info = t.info
+    assert info["sector"] == "Technology" and info["freeCashflow"] == 5e9 and info["trailingEps"] == 3.1
+    assert info["financialCurrency"] == "EUR" and info["quoteType"] == "EQUITY"
+    assert t.info is info and len(calls) == 1  # um só pedido
+    assert "quoteSummary/ASML" in calls[0][0]
