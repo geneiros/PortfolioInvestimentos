@@ -68,7 +68,11 @@ def test_demo_pages_render(client):
     movers = page.split("Principais movers", 1)[1].split("Próximos eventos", 1)[0]
     charts = [json.loads(html_lib.unescape(x)) for x in re.findall(r"data-mover='([^']*)'", movers)]
     assert movers.count('class="pm-row pm-mover"') == len(charts) >= 1
-    assert all(len(c["d"]) == len(c["v"]) == 30 and c["avg"] > 0 and c["cur"] in ("EUR", "USD") for c in charts)
+    # o último ano de cotações (dias úteis), por ordem de data
+    for c in charts:
+        assert c["o"][0] == 0 and c["o"] == sorted(c["o"]) and c["o"][-1] <= 365
+        assert len(c["o"]) == len(c["v"]) > 100 and date.fromisoformat(c["s"]) <= date.today()
+        assert c["avg"] > 0 and c["cur"] in ("EUR", "USD")
     assert "js/movers.js" in page
 
 

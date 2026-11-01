@@ -1,12 +1,15 @@
-/* Visão Geral · principais movers: gráfico de cada ação (últimos 30 dias) face ao preço médio de aquisição.
+/* Visão Geral · principais movers: gráfico de cada ação (último ano) face ao preço médio de aquisição.
    A linha e o preenchimento ficam verdes acima do preço médio e vermelhos abaixo; o preço médio é o tracejado. */
 (function () {
-  const ddmm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  const ddmmyyyy = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
   const hidden = () => document.documentElement.classList.contains("pm-private");
 
   function draw(canvas) {
     const d = JSON.parse(canvas.dataset.mover || "{}");
     if (!d.v || d.v.length < 2) return;
+    // datas: dias desde a primeira ("s" + "o") → "aaaa-mm-dd"
+    const t0 = Date.parse(d.s + "T00:00:00Z");
+    d.d = d.o.map((k) => new Date(t0 + k * 86400000).toISOString().slice(0, 10));
     const old = Chart.getChart(canvas);
     if (old) old.destroy();
     const up = pm.css("--pm-up"), down = pm.css("--pm-down"), muted = pm.css("--bs-secondary-color");
@@ -57,7 +60,7 @@
     el.replaceChildren();
     const head = document.createElement("div");
     head.innerHTML = "<b></b> · <span></span>";
-    head.children[0].textContent = ddmm(point.label);
+    head.children[0].textContent = ddmmyyyy(point.label);
     head.children[1].textContent = price(v);
     el.appendChild(head);
     if (avg) {

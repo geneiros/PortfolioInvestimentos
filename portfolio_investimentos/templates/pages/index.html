@@ -130,7 +130,7 @@
           <div class="pm-row pm-mover">
             {{ logo(m.asset) }}
             <div class="pm-mover-name"><b>{{ m.asset.ticker }}</b><div class="sub text-truncate">{{ m.asset.name }}</div></div>
-            <div class="pm-mover-chart" title="Últimos 30 dias · preço médio {{ m.avg_price|money(2, currency=m.asset.currency) }}"><canvas data-mover='{{ mover_charts[m.asset.ticker] }}' aria-label="Preço de {{ m.asset.ticker }} nos últimos 30 dias"></canvas></div>
+            <div class="pm-mover-chart" title="Último ano · preço médio {{ m.avg_price|money(2, currency=m.asset.currency) }}"><canvas data-mover='{{ mover_charts[m.asset.ticker] }}' aria-label="Preço de {{ m.asset.ticker }} no último ano"></canvas></div>
             <span class="pm-mover-price text-end text-nowrap small">{{ m.price|money(2, currency=m.asset.currency) }}</span>
             <span class="pm-mover-pct text-end {{ m.day_change_pct|tone }} fw-bold">{{ m.day_change_pct|pct(2) }}</span>
             <small class="{{ m.day_change_eur|tone }} money" style="min-width:4.5rem;text-align:right">· {{ m.day_change_eur|money(sign=True) }}</small>

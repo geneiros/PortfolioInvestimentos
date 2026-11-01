@@ -128,10 +128,16 @@ def overview():
     return render_template("pages/index.html", **c)
 
 
-def _mover_chart(p, pos, n=30):
-    """Últimos `n` fechos de uma posição, com as datas e o preço médio de aquisição (na moeda do ativo)."""
-    rows = p.book.recent(pos.asset.ticker, n)
-    return {"d": [d.isoformat() for d, _ in rows], "v": [round(v, 4) for _, v in rows],
+def _mover_chart(p, pos, days=365):
+    """Fechos do último ano de uma posição, com as datas e o preço médio de aquisição (na moeda do ativo)."""
+    since = p.as_of - timedelta(days=days)
+    rows = [(d, v) for d, v in p.book.recent(pos.asset.ticker, 400) if d > since]
+    if len(rows) > 130:  # compacto: um em cada dois dias úteis chega para a forma da curva (fica sempre o último)
+        rows = rows[::-1][::2][::-1]
+    start = rows[0][0] if rows else p.as_of
+    # as datas vão como dias desde a primeira ("s"), para a página não crescer com 8 ações × 1 ano
+    return {"s": start.isoformat(), "o": [(d - start).days for d, _ in rows],
+            "v": [float(f"{v:.5g}") for _, v in rows],
             "avg": round(pos.avg_price, 4) if pos.avg_price else None, "cur": pos.asset.currency}
 
 
