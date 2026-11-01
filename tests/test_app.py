@@ -768,6 +768,7 @@ def test_planning_fire_page_and_settings(app, client):
     assert [tg["label"] for tg in chart["targets"]] == ["Para sempre", "Para sempre, com a pensão aos 67",
                                                         "Até aos 90 anos, com a pensão aos 67"]
     assert len({tg["color"] for tg in chart["targets"]}) == 3
+    assert 'id="stopAgeNote"' not in html  # sem «Investir até aos», sem nota
     # quando cada cenário chega a cada número FIRE: tabela e pontos no gráfico
     assert 'id="fireReach"' in html and "Quando chegas a cada número FIRE" in html
     assert [mk["label"] for mk in chart["markers"]] == [tg["label"] for tg in chart["targets"]]
@@ -785,6 +786,9 @@ def test_planning_fire_page_and_settings(app, client):
                 until="90", stop_age="55").status_code == 200
     html = client.get("/planeamento").get_data(as_text=True)
     assert "ou até aos 55 anos" in html and "O dinheiro dura" in html
+    # a nota explica que investir menos tempo adia a data FIRE (o capital pedido é o dessa data)
+    assert 'id="stopAgeNote"' in html and "Investir menos tempo não reduz o que precisas" in html
+    assert "na data FIRE do cenário base" in html
     assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45",
                 until="90", stop_age="40").status_code == 400
     assert post(client, "save_fire", token, expenses="0", swr="4", tax="0", monthly="0").status_code == 400

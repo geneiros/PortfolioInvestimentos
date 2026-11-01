@@ -41,9 +41,9 @@
   {{ help("Duas partes: até à pensão, a carteira paga as despesas todas; a partir dela, só o que a pensão não cobre, pela regra da taxa de levantamento (para sempre). O capital depende da idade em que chegas lá: quanto mais cedo, mais anos até à pensão.") }}</div>
 <div class="row g-3 mb-3">
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">O número FIRE com a pensão</div>
+    <div class="pm-label">O número FIRE com a pensão {{ help("O capital necessário na data FIRE do cenário base. Desce com a idade: quanto mais tarde te reformas, menos anos tens de pagar até à pensão (e até ao fim), por isso reformar mais tarde pede menos capital, mas demora mais a lá chegar. Por isso, investir menos tempo (Investir até aos) pode mostrar um valor mais baixo: não precisas de menos, só chegas lá mais tarde.") }}</div>
     <div class="pm-mid money">{{ with_pension.number|money if with_pension.number is not none else "—" }}</div>
-    <div class="small text-secondary">{% if with_pension.age_at %}na data FIRE, aos {{ with_pension.age_at|round|int }} anos (cenário base){% else %}não chega antes dos {{ cfg.until|int }} anos{% endif %};
+    <div class="small text-secondary">{% if with_pension.age_at %}<b class="text-body">aos {{ with_pension.age_at|round|int }} anos ({{ with_pension.date.year }})</b>, na data FIRE do cenário base{% else %}não chega antes dos {{ cfg.until|int }} anos{% endif %};
       depois da pensão: <span class="money">{{ with_pension.after|money }}</span></div>
   </div></div>
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
@@ -70,9 +70,9 @@
   {{ help("Capital que paga as despesas (já com o IRS dos levantamentos) desde a data FIRE até à idade indicada, a render a taxa real do cenário, e acaba perto de zero. A pensão, se indicada, abate às despesas. É menos do que o número FIRE «para sempre», sobretudo para quem se reforma tarde.") }}</div>
 <div class="row g-3 mb-3">
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">Capital necessário</div>
+    <div class="pm-label">Capital necessário {{ help("O capital necessário na data FIRE do cenário base. Desce com a idade: quanto mais tarde te reformas, menos anos tens de pagar até à pensão (e até ao fim), por isso reformar mais tarde pede menos capital, mas demora mais a lá chegar. Por isso, investir menos tempo (Investir até aos) pode mostrar um valor mais baixo: não precisas de menos, só chegas lá mais tarde.") }}</div>
     <div class="pm-mid money">{{ life.number|money if life.number else "—" }}</div>
-    <div class="small text-secondary">{% if life.age_at %}na data FIRE, aos {{ life.age_at|round|int }} anos (cenário base){% else %}não chega antes dos {{ (life.until_age - 1)|int }} anos{% endif %}</div>
+    <div class="small text-secondary">{% if life.age_at %}<b class="text-body">aos {{ life.age_at|round|int }} anos ({{ life.date.year }})</b>, na data FIRE do cenário base{% else %}não chega antes dos {{ (life.until_age - 1)|int }} anos{% endif %}</div>
   </div></div>
   <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
     <div class="pm-label">Se te reformasses hoje {{ help("Capital necessário para viver desde hoje até à idade indicada, e a parte que já tens.") }}</div>
@@ -86,6 +86,12 @@
     <div class="small text-secondary">{% if life.earliest and life.latest %}Entre {{ life.earliest.year }} e {{ life.latest.year }}{% elif life.earliest %}A partir de {{ life.earliest.year }}{% else %}Não chega com estes valores{% endif %}</div>
   </div></div>
 </div>
+{% if cfg.stop_age and life.age_at %}
+<div class="alert alert-secondary small d-flex gap-2 align-items-start mb-3" id="stopAgeNote"><i class="bi bi-info-circle"></i>
+  <div>Deixas de investir aos {{ cfg.stop_age|int }}: a data FIRE (cenário base) é aos <b>{{ life.age_at|round|int }} anos ({{ life.date.year }})</b>.
+    Investir menos tempo não reduz o que precisas, adia a data; o capital pedido é menor só porque, reformando-te mais tarde, faltam menos anos{% if life.pension %} até à pensão{% endif %}.</div>
+</div>
+{% endif %}
 {% elif not cfg.age %}
 <p class="small text-secondary">Indica a tua idade em «O teu plano» para ver também o capital necessário até uma certa idade (por exemplo, até aos 90 anos), com a pensão, em vez de um capital que dura para sempre.</p>
 {% endif %}

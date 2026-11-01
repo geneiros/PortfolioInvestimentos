@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-01
 
-- **Esconder valores: botão também no telemóvel**  
+- **Planeamento: o capital necessário com a idade e o ano, e nota sobre «investir até aos»**  
+  As contas estavam certas: nos blocos «com a pensão» e «até aos N anos», o capital necessário é o da data FIRE e desce com a idade (menos anos até à pensão), por isso investir menos tempo, que adia a data, mostrava um valor mais baixo. A página passa a pôr em destaque a idade e o ano a que corresponde cada valor, a explicá-lo no «?» e, com «Investir até aos» preenchido, a mostrar uma nota: investir menos tempo não reduz o que precisas, adia a data.
+- **Esconder valores: botão também no telemóvel** `64fa0c3`  
   No telemóvel (menos de 768 px) o grupo do meio da barra de topo esconde-se e o botão do olho ia com ele. Passa a haver um botão do olho à direita da barra de topo nos ecrãs pequenos; o seletor de corretora encolhe (texto truncado) para caberem os dois.
 - **README: revisão e capturas da Visão Geral** `7e37762`  
   Capturas 02, 03 e 04 (claro e escuro) refeitas com os gráficos novos dos principais movers. Tabela de funcionalidades pela ordem do menu; secção «Cotações» com o histórico de dividendos, os eventos e os dados fundamentais (fontes, frequência e correção manual); «Próximos passos» sem a exposição geográfica, que já existe; «Estrutura» com os módulos novos.
