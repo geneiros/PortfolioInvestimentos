@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Logótipos maiores e mais arredondados**  
+  Os logótipos e as iniciais dos ativos passam de 28 para 36 px, com cantos de 10 px, como nas apps das corretoras.
 - **Logótipos a preencher o quadrado**  
   A imagem do logótipo passa a ocupar o quadrado todo, sem margem nem borda, com os cantos arredondados como as iniciais.
 - **Logótipos só à mão**  
