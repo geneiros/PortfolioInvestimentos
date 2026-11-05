@@ -11,7 +11,7 @@ from datetime import date
 from flask import Blueprint, Response, abort, current_app, jsonify, request, send_file, session
 
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, FxRate, ImportBatch, Instrument,
-                     OtherAsset, OtherAssetValue, Price, Setting, Transaction, WatchItem, db)
+                     OtherAsset, OtherAssetValue, PortfolioAlert, Price, Setting, Transaction, WatchItem, db)
 from . import auth
 from .engine.portfolio import ASSET_TYPES
 from .services import backups, cerne, data, importer, market
@@ -269,6 +269,7 @@ def delete_broker(name):
     b = _get(Broker, name)
     if Transaction.query.filter_by(broker=b.id).first():
         raise ApiError("Esta corretora tem transações. Apaga primeiro os extratos/transações.")
+    PortfolioAlert.query.filter_by(broker=b.id).delete()
     db.session.delete(b)
     db.session.commit()
     if Setting.get("broker") == str(b.id):
@@ -303,6 +304,41 @@ def add_alert(instrument, kind, threshold):
     db.session.add(a)
     db.session.commit()
     return a.id
+
+
+@action
+def add_portfolio_alert(threshold, direction="down", broker=""):
+    """Alerta da variação do dia da carteira (toda ou de uma corretora), em %."""
+    from .services.portfolio_alerts import LEVELS
+    value = _float(threshold) / 100
+    if not any(abs(value - x) < 1e-9 for x in LEVELS):
+        raise ApiError("Escolhe uma variação de 1, 2, 3 ou 5%.")
+    if direction not in PortfolioAlert.DIRECTIONS:
+        raise ApiError("Sentido inválido.")
+    b = _get(Broker, broker).id if broker else None
+    if PortfolioAlert.query.filter_by(broker=b, threshold=value, direction=direction).first():
+        raise ApiError("Já existe um alerta igual.")
+    db.session.add(PortfolioAlert(broker=b, threshold=value, direction=direction, active=True))
+    db.session.commit()
+    return "Alerta da carteira criado."
+
+
+@action
+def delete_portfolio_alert(name):
+    db.session.delete(_get(PortfolioAlert, name))
+    db.session.commit()
+    return "Alerta apagado."
+
+
+@action
+def set_market_indices(tickers=""):
+    """Índices da «Carteira vs mercado» (até 5), separados por vírgulas."""
+    names = [t for t in str(tickers).split(",") if t]
+    try:
+        market.set_market_indices(names)
+    except ValueError as exc:
+        raise ApiError(str(exc)) from exc
+    return "Índices guardados."
 
 
 @action
@@ -661,7 +697,7 @@ def reset_data(confirm=""):
         raise ApiError('Escreve APAGAR para confirmar.')
     _backup("apagar-tudo")
     from .models import Fundamental
-    for model in (Transaction, ImportBatch, Alert, WatchItem, Event, DividendHistory, Price, FxRate,
+    for model in (Transaction, ImportBatch, Alert, PortfolioAlert, WatchItem, Event, DividendHistory, Price, FxRate,
                   OtherAssetValue, OtherAsset, Fundamental):
         model.query.delete()
     Broker.query.delete()

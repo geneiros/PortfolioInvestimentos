@@ -238,3 +238,8 @@ html.pm-private [data-pm-toggle=private] .bi-eye::before { content: "\f340"; }
 body.pm-widget-drag-on { user-select: none; -webkit-user-select: none; cursor: grabbing; }
 @media (prefers-reduced-motion: reduce) { .pm-widget-arming { animation-duration: .01s; animation-delay: 1.99s; } }
 body.pm-widget-drag-on .tooltip { display: none; }
+
+/* Carteira vs mercado: painéis dos índices e do alerta da carteira */
+#portfolioAlert [data-pa] .btn.active { background: var(--bs-primary); border-color: var(--bs-primary); color: #fff; }
+.pm-index-chip.active { background: var(--bs-primary); border-color: var(--bs-primary); color: #fff; }
+.pm-pop { max-width: calc(100vw - 2rem); }

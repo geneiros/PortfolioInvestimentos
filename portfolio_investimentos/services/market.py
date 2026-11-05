@@ -70,6 +70,50 @@ DEFAULT_BENCHMARKS = [
     ("URTH", "MSCI World", "#eab308"),
 ]
 
+# índices que se podem escolher na Carteira («Carteira vs mercado»): (grupo, ticker, nome, moeda, cor)
+INDEX_CATALOG = [
+    ("Global", "URTH", "MSCI World", "USD", "#eab308"),
+    ("EUA", "^GSPC", "S&P 500", "USD", "#f97316"),
+    ("EUA", "^DJI", "Dow Jones", "USD", "#0ea5e9"),
+    ("EUA", "^NDX", "Nasdaq 100", "USD", "#8b5cf6"),
+    ("EUA", "^RUT", "Russell 2000", "USD", "#ec4899"),
+    ("EUA", "BTC-USD", "Bitcoin", "USD", "#f59e0b"),
+    ("Europa", "^FTSE", "FTSE 100", "GBP", "#14b8a6"),
+    ("Europa", "^FCHI", "CAC 40", "EUR", "#6366f1"),
+    ("Europa", "^GDAXI", "DAX", "EUR", "#ef4444"),
+    ("Europa", "^STOXX50E", "Euro STOXX 50", "EUR", "#22c55e"),
+    ("Europa", "^AEX", "AEX", "EUR", "#f43f5e"),
+    ("Europa", "^N100", "Euronext 100", "EUR", "#06b6d4"),
+]
+MAX_MARKET_INDICES = 5
+
+
+def market_indices():
+    """Índices escolhidos para a «Carteira vs mercado» (por omissão os de comparação)."""
+    import json
+    known = {t for _, t, *_ in INDEX_CATALOG}
+    try:
+        chosen = json.loads(Setting.get("market_indices") or "null")
+    except ValueError:
+        chosen = None
+    if not isinstance(chosen, list):
+        return [t for t, *_ in DEFAULT_BENCHMARKS]
+    return [t for t in chosen if t in known][:MAX_MARKET_INDICES]
+
+
+def set_market_indices(tickers):
+    """Guarda os índices escolhidos e cria os que ainda não existem (as cotações chegam na atualização)."""
+    import json
+    catalog = {t: (name, cur, color) for _, t, name, cur, color in INDEX_CATALOG}
+    if len(tickers) > MAX_MARKET_INDICES or len(set(tickers)) != len(tickers) or any(t not in catalog for t in tickers):
+        raise ValueError(f"Escolhe até {MAX_MARKET_INDICES} índices da lista.")
+    for t in tickers:
+        if not db.session.get(Instrument, t):
+            name, cur, color = catalog[t]
+            db.session.add(Instrument(ticker=t, instrument_name=name, kind="index", currency=cur, data_symbol=t,
+                                      color=color))
+    Setting.set("market_indices", json.dumps(tickers))
+
 
 def _easter(year):
     """Domingo de Páscoa (algoritmo gregoriano anónimo)."""

@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Carteira: escolher os índices da «Carteira vs mercado» e alertas da variação da carteira**  
+  Dois botões no cartão «Carteira vs mercado». «Gerir índices» escolhe até 5 índices (Global: MSCI World; EUA: S&P 500, Dow Jones, Nasdaq 100, Russell 2000, Bitcoin; Europa: FTSE 100, CAC 40, DAX, Euro STOXX 50, AEX, Euronext 100); um índice novo recebe as cotações na atualização seguinte. «Alerta da carteira» cria alertas da variação do dia de toda a carteira ou de uma corretora (1, 2, 3 ou 5%; a subir, a descer ou os dois), com a variação de hoje à vista; disparam no máximo uma vez por dia e por sentido, sem contar depósitos e levantamentos, e o aviso aparece no topo da Visão Geral e da Carteira.
 - **Visão Geral: perfil de investidor por corretora**  
   Cada corretora tem o seu perfil de investidor, e «Todas as corretoras» também (o perfil escolhido antes passa a ser o de todas). As notas usam a carteira da corretora selecionada e o perfil dela; o aviso aparece quando o perfil escolhido (ou, sem escolha, o sugerido) não é o que a carteira dessa corretora sugere, e o link e a janela do perfil dizem a que corretora se referem.
 - **Mudar a ordem dos cartões em todas as páginas; gráfico da Visão Geral abre em YTD**  

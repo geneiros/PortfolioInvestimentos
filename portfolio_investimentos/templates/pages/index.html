@@ -7,6 +7,7 @@
   {{ empty("Ainda não tens transações", "Importa o extrato da tua corretora ou adiciona transações manualmente.", "/importar", "Importar extrato") }}
 {% else %}
 
+{% include "pages/_portfolio_fired.html" %}
 {% for a in fired %}
 <div class="alert alert-warning d-flex align-items-center gap-2"><i class="bi bi-bell-fill"></i>
   Alerta disparado: <b>{{ a.instrument }}</b> — {{ {'price_above': 'preço acima de', 'price_below': 'preço abaixo de', 'change_pct': 'variação diária superior a'}[a.kind] }} {{ a.threshold|number(2) }}{{ '%' if a.kind == 'change_pct' }}.

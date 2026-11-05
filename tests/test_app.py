@@ -2098,3 +2098,47 @@ def test_widget_order_all_pages(client):
     with client.application.app_context():  # a ordem da primeira versão (só a Visão Geral) continua a valer
         Setting.set("widgets_overview", '["movers"]')
     assert 'window.PM_WIDGET_ORDER = {"overviewGrid": ["movers"]};' in client.get("/").get_data(as_text=True)
+
+
+def test_market_indices_and_portfolio_alerts(app, client):
+    from portfolio_investimentos.models import Instrument, PortfolioAlert
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    html = client.get("/carteira").get_data(as_text=True)
+    assert 'id="indexPicker"' in html and 'id="portfolioAlert"' in html and "Euro STOXX 50" in html
+    assert 'pm-index-chip active" data-index="^GSPC"' in html and 'pm-index-chip " data-index="^GDAXI"' in html
+    # escolher os índices: até 5, só os da lista; um índice novo passa a existir (as cotações vêm depois)
+    assert post(client, "set_market_indices", token, tickers="^GDAXI,^GSPC").status_code == 200
+    with app.app_context():
+        dax = db.session.get(Instrument, "^GDAXI")
+        assert dax.kind == "index" and dax.currency == "EUR"
+    bars = client.get("/carteira").get_data(as_text=True).split('id="tab-open"', 1)[1].split('class="col-lg-9"', 1)[1][:6000]
+    assert bars.index('class="text-end">DAX<') < bars.index('class="text-end">S&amp;P 500<')
+    assert 'class="text-end">Nasdaq 100<' not in bars
+    for bad in ("^GSPC,^GSPC", "XPTO", "^GSPC,^NDX,URTH,^DJI,^RUT,^FTSE"):
+        assert post(client, "set_market_indices", token, tickers=bad).status_code == 400, bad
+    # alertas da carteira: no máximo uma vez por dia e por sentido
+    assert post(client, "add_portfolio_alert", token, threshold="3", direction="both").status_code == 200
+    assert post(client, "add_portfolio_alert", token, threshold="3", direction="both").status_code == 400  # igual
+    for t, d in (("4", "down"), ("3", "sideways")):
+        assert post(client, "add_portfolio_alert", token, threshold=t, direction=d).status_code == 400
+    assert post(client, "add_portfolio_alert", token, threshold="1", direction="up", broker="999").status_code == 400
+    from portfolio_investimentos.services import data as pdata, portfolio_alerts
+    with app.app_context():
+        p = pdata.load_portfolio(None)
+        pct = p.day_change()[1]
+        a = PortfolioAlert(threshold=max(abs(pct) - 0.0001, 0.0001), direction="up" if pct >= 0 else "down")
+        db.session.add(a)
+        db.session.commit()
+        fired = portfolio_alerts.check()
+        assert [f for f in fired if f["id"] == a.id]
+        again = portfolio_alerts.check()  # no mesmo dia continua no aviso, mas não volta a disparar
+        assert [f for f in again if f["id"] == a.id]
+        assert (a.last_up or a.last_down) == p.as_of
+        aid = a.id
+    assert "Alerta da carteira:" in client.get("/").get_data(as_text=True)
+    assert "Alertas guardados" in client.get("/carteira").get_data(as_text=True)
+    assert post(client, "delete_portfolio_alert", token, name=str(aid)).status_code == 200
+    assert post(client, "reset_data", token, confirm="APAGAR").status_code == 200
+    with app.app_context():
+        assert PortfolioAlert.query.count() == 0

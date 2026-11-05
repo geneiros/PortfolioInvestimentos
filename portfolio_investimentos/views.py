@@ -11,7 +11,7 @@ from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory
                      Instrument, Price, Setting, Transaction, WatchItem, db)
 from . import auth
 from .services import context as ctx
-from .services import backups, cerne, data, insights, networth, widgets
+from .services import backups, cerne, data, insights, market, networth, portfolio_alerts, widgets
 from .services.importer import BROKERS, INSTRUCTIONS
 from .services.market import check_alerts, refresh_state, upcoming_events, yfinance_available
 
@@ -119,7 +119,7 @@ def overview():
         event_groups=[("Próxima semana", [e for e in events if e.date <= week]),
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
                       ("Mais tarde", [e for e in events if e.date > two][:10])],
-        instruments=instruments, fired=check_alerts(p), perf=ctx.js_json(perf_payload(p, "YTD")),
+        instruments=instruments, fired=check_alerts(p), portfolio_fired=portfolio_alerts.check(), perf=ctx.js_json(perf_payload(p, "YTD")),
         benchmarks=p.benchmarks, scores=insights.scores(p, c["broker"], c["broker_doc"].broker_name if c["broker_doc"] else None),
         networth=networth.summary(data.load_portfolio(None)) if networth.assets() else None,
         networth_late=len(networth.reminder()),
@@ -148,6 +148,34 @@ def _hero_spark(p):
     return [float(f"{v:.5g}") for d, v in zip(p.series.dates, p.series.holdings) if d > since]
 
 
+def _market_bars(p):
+    """Barras da «Carteira vs mercado»: os índices escolhidos, pela ordem escolhida (None = sem cotações)."""
+    by_ticker = {b.ticker: b for b in p.benchmarks}
+    out = []
+    for t in market.market_indices():
+        b = by_ticker.get(t)
+        if b is not None:
+            out.append((b.name, p.benchmark_day_change(b), b.color))
+    return out
+
+
+def _index_catalog():
+    chosen = market.market_indices()
+    groups = {}
+    for group, ticker, name, _cur, color in market.INDEX_CATALOG:
+        groups.setdefault(group, []).append({"ticker": ticker, "name": name, "color": color, "on": ticker in chosen})
+    return {"groups": list(groups.items()), "chosen": chosen, "max": market.MAX_MARKET_INDICES}
+
+
+def _market_alerts(c):
+    """Para o painel «Alerta da carteira»: a variação de hoje de cada âmbito e os alertas guardados."""
+    scopes = [{"id": "", "name": "Toda a carteira", "pct": data.load_portfolio(None).day_change()[1]}]
+    scopes += [{"id": b.name, "name": b.broker_name, "pct": data.load_portfolio(b.name).day_change()[1]}
+               for b in c["brokers"]]
+    return {"scopes": scopes, "levels": [round(x * 100) for x in portfolio_alerts.LEVELS],
+            "rows": portfolio_alerts.rows()}
+
+
 @bp.route("/carteira")
 def carteira():
     c = ctx.build("carteira", "Carteira")
@@ -155,7 +183,8 @@ def carteira():
     c.update(
         positions=p.open_positions, closed=p.closed_positions, sectors=p.sectors(),
         sparks={pos.asset.ticker: ctx.js_json(p.sparkline(pos.asset.ticker, 30)) for pos in p.open_positions},
-        market_bars=[(b.name, p.benchmark_day_change(b), b.color) for b in p.benchmarks],
+        market_bars=_market_bars(p), index_catalog=_index_catalog(), market_alerts=_market_alerts(c),
+        portfolio_fired=portfolio_alerts.check(),
         total={"invested": p.cost_basis, "value": p.holdings_value, "unrealized": p.unrealized,
                "dividends": sum(x.dividends_eur for x in p.open_positions),
                "fx": sum(x.fx_effect_eur for x in p.open_positions),

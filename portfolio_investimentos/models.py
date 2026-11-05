@@ -131,6 +131,21 @@ class Alert(NameMixin, db.Model):
     creation = db.Column(db.DateTime, default=utcnow)
 
 
+class PortfolioAlert(db.Model):
+    """Alerta da variação do dia da carteira (toda ou de uma corretora): dispara no máximo uma vez por dia e por
+    sentido; os depósitos e levantamentos não contam (a variação do dia já os exclui)."""
+    DIRECTIONS = ("up", "down", "both")
+
+    id = db.Column(db.Integer, primary_key=True)
+    broker = db.Column(db.Integer, db.ForeignKey("broker.id", ondelete="CASCADE"))  # vazio = toda a carteira
+    threshold = db.Column(db.Float, nullable=False)  # fração (0,03 = 3%)
+    direction = db.Column(db.String(8), nullable=False, default="down")
+    active = db.Column(db.Boolean, default=True)
+    last_up = db.Column(db.Date)  # último dia em que disparou a subir
+    last_down = db.Column(db.Date)
+    creation = db.Column(db.DateTime, default=utcnow)
+
+
 class DividendHistory(db.Model):
     """Dividendos por ação de um ativo segundo o Yahoo (data ex-dividendo), para projetar posições recentes."""
     id = db.Column(db.Integer, primary_key=True)

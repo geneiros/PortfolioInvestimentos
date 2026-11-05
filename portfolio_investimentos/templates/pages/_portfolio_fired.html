@@ -1,0 +1,9 @@
+{# aviso dos alertas da carteira disparados no último dia de mercado #}
+{% for f in portfolio_fired or [] %}
+<div class="alert alert-warning alert-dismissible fade show d-flex align-items-center gap-2 small" data-portfolio-alert="{{ f.id }}-{{ f.side }}">
+  <i class="bi bi-bell-fill"></i>
+  <div><b>Alerta da carteira:</b> {{ f.scope }} {{ 'subiu' if f.side == 'up' else 'desceu' }} <b class="{{ f.pct|tone }}">{{ f.pct|pct(2) }}</b>
+    em {{ f.day.strftime('%d/%m') }} (alerta a {{ (f.threshold * 100)|round|int }}%).</div>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+</div>
+{% endfor %}

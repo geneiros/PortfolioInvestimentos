@@ -12,12 +12,67 @@
 </ul>
 
 <div class="tab-content">
+{% include "pages/_portfolio_fired.html" %}
 <div class="tab-pane fade show active" id="tab-open">
   <div class="pm-card mb-3">
     <div class="row align-items-center g-3">
       <div class="col-lg-3">
-        <div class="pm-label">Carteira vs mercado {{ help("Variação do último dia de mercado da carteira comparada com os índices de referência, convertidos para euros ao câmbio do dia.") }}</div>
+        <div class="pm-label">Carteira vs mercado {{ help("Variação do último dia de mercado da carteira comparada com os índices escolhidos, convertidos para euros ao câmbio do dia.") }}</div>
         <div class="small text-secondary">{{ p.as_of|ddmm }}</div>
+        <div class="d-flex gap-2 mt-2">
+          <div class="dropdown" id="indexPicker">
+            <button class="btn btn-pm btn-icon btn-sm" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-popper-config='{"strategy": "fixed"}' aria-expanded="false" title="Gerir índices"><i class="bi bi-globe"></i></button>
+            <div class="dropdown-menu p-3 pm-pop" style="width: 19rem">
+              <div class="d-flex align-items-start mb-2"><div><div class="fw-semibold">Gerir índices</div><div class="small text-secondary">máx. {{ index_catalog.max }} índices</div></div>
+                <button type="button" class="btn-close ms-auto" aria-label="Fechar" data-pm-pop-close></button></div>
+              {% for group, items in index_catalog.groups %}
+              <div class="pm-label mt-2 mb-1">{{ group }}</div>
+              <div class="d-flex flex-wrap gap-1">
+                {% for i in items %}<button type="button" class="pm-chip pm-index-chip {{ 'active' if i.on }}" data-index="{{ i.ticker }}" style="--chip: {{ i.color }}"><span class="sw" style="background: {{ i.color }}"></span>{{ i.name }}</button>{% endfor %}
+              </div>
+              {% endfor %}
+              <div class="small text-secondary mt-2">Um índice novo recebe as cotações na próxima atualização.</div>
+            </div>
+          </div>
+          <div class="dropdown" id="portfolioAlert">
+            <button class="btn btn-pm btn-icon btn-sm {{ 'active' if market_alerts.rows }}" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-popper-config='{"strategy": "fixed"}' aria-expanded="false" title="Alerta da carteira"><i class="bi bi-bell{{ '-fill' if market_alerts.rows }}"></i></button>
+            <div class="dropdown-menu p-3 pm-pop" style="width: 21rem">
+              <div class="d-flex align-items-start mb-2"><div><div class="fw-semibold">Alerta da carteira</div><div class="small text-secondary">A variação do dia de toda a carteira</div></div>
+                <button type="button" class="btn-close ms-auto" aria-label="Fechar" data-pm-pop-close></button></div>
+              <div class="pm-label mb-1">Carteira ou conta</div>
+              <div class="d-flex flex-wrap gap-1 mb-2" data-pa="scope">
+                {% for sc in market_alerts.scopes %}<button type="button" class="btn btn-sm btn-outline-secondary {{ 'active' if loop.first }}" data-value="{{ sc.id }}" data-name="{{ sc.name }}" data-pct="{{ sc.pct }}">{{ sc.name }}</button>{% endfor %}
+              </div>
+              <div class="mb-2"><b class="pa-today">—</b> <span class="text-secondary">hoje</span></div>
+              <div class="pm-label mb-1">Variação no dia</div>
+              <div class="btn-group btn-group-sm w-100 mb-2" data-pa="level">
+                {% for lv in market_alerts.levels %}<button type="button" class="btn btn-outline-secondary {{ 'active' if lv == 3 }}" data-value="{{ lv }}">{{ lv }}%</button>{% endfor %}
+              </div>
+              <div class="pm-label mb-1">Sentido</div>
+              <div class="btn-group btn-group-sm w-100 mb-2" data-pa="direction">
+                <button type="button" class="btn btn-outline-secondary" data-value="up">Subir</button>
+                <button type="button" class="btn btn-outline-secondary active" data-value="down">Descer</button>
+                <button type="button" class="btn btn-outline-secondary" data-value="both">Os dois</button>
+              </div>
+              <p class="mb-2 pa-sentence"></p>
+              <div class="small text-secondary mb-3"><i class="bi bi-info-circle"></i> No máximo uma vez por dia e por sentido. Depósitos e levantamentos não contam.</div>
+              {% if market_alerts.rows %}
+              <div class="pm-label mb-1">Alertas guardados</div>
+              {% for r in market_alerts.rows %}
+              <div class="d-flex align-items-center gap-2 small border-bottom py-1">
+                <span class="flex-grow-1">{{ r.scope }} · {{ {'up': 'subir', 'down': 'descer', 'both': 'subir ou descer'}[r.direction] }} {{ (r.threshold * 100)|round|int }}%</span>
+                <button type="button" class="btn btn-sm btn-link text-danger p-0" data-pm-action="delete_portfolio_alert" data-args='{"name": "{{ r.id }}"}' title="Apagar"><i class="bi bi-trash"></i></button>
+              </div>
+              {% endfor %}
+              <div class="mb-3"></div>
+              {% endif %}
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-pm-pop-close>Cancelar</button>
+                <button type="button" class="btn btn-sm btn-primary" id="paCreate">Criar alerta</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="col-lg-9">
         {% set rows = [("Carteira", dc[1], "var(--pm-up)" if dc[1] >= 0 else "var(--pm-down)")] + market_bars %}
@@ -353,6 +408,65 @@
 
 {% block scripts %}
 {% if has_data %}
+<script>
+// «Carteira vs mercado»: escolher os índices (até {{ index_catalog.max }}) e criar alertas da variação do dia
+(function () {
+  document.querySelectorAll("[data-pm-pop-close]").forEach((b) => b.addEventListener("click", () => {
+    const dd = bootstrap.Dropdown.getInstance(b.closest(".dropdown").querySelector("[data-bs-toggle=dropdown]"));
+    if (dd) dd.hide();
+  }));
+
+  const picker = document.getElementById("indexPicker");
+  if (picker) {
+    let changed = false;
+    const MAX = {{ index_catalog.max }};
+    picker.querySelectorAll(".pm-index-chip").forEach((chip) => chip.addEventListener("click", async () => {
+      const on = [...picker.querySelectorAll(".pm-index-chip.active")].map((c) => c.dataset.index);
+      const was = chip.classList.contains("active");
+      if (!was && on.length >= MAX) { pm.toast(`No máximo ${MAX} índices.`, "warning"); return; }
+      const next = was ? on.filter((t) => t !== chip.dataset.index) : [...on, chip.dataset.index];
+      try {
+        await pm.call("set_market_indices", { tickers: next.join(",") });
+        chip.classList.toggle("active", !was);
+        changed = true;
+      } catch (e) { /* já mostrado */ }
+    }));
+    picker.addEventListener("hidden.bs.dropdown", () => { if (changed) location.reload(); });
+  }
+
+  const box = document.getElementById("portfolioAlert");
+  if (box) {
+    const pick = (group) => box.querySelector(`[data-pa="${group}"] .active`);
+    const fmt = (v) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v * 100).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+    const words = { up: ["subir", "text-up"], down: ["descer", "text-down"], both: ["subir ou descer", ""] };
+    const render = () => {
+      const scope = pick("scope"), level = pick("level").dataset.value, dir = pick("direction").dataset.value;
+      const pct = parseFloat(scope.dataset.pct) || 0;
+      const today = box.querySelector(".pa-today");
+      today.textContent = fmt(pct);
+      today.className = `pa-today ${pct > 0 ? "text-up" : pct < 0 ? "text-down" : ""}`;
+      const who = scope.dataset.value ? `a tua conta ${scope.dataset.name}` : "a tua carteira";
+      const s = box.querySelector(".pa-sentence");
+      s.textContent = "";
+      const w = document.createElement("b"); w.className = words[dir][1]; w.textContent = words[dir][0];
+      s.append(`Avisa quando ${who} `, w, ` ${level}% num dia.`);
+    };
+    box.querySelectorAll("[data-pa] button").forEach((b) => b.addEventListener("click", () => {
+      b.parentElement.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+      render();
+    }));
+    render();
+    document.getElementById("paCreate").addEventListener("click", async () => {
+      try {
+        await pm.call("add_portfolio_alert", { broker: pick("scope").dataset.value, threshold: pick("level").dataset.value,
+                                               direction: pick("direction").dataset.value });
+        pm.toast("Alerta da carteira criado.");
+        setTimeout(() => location.reload(), 600);
+      } catch (e) { /* já mostrado */ }
+    });
+  }
+})();
+</script>
 <script>
 (function () {
   const alloc = {{ alloc|safe }};
