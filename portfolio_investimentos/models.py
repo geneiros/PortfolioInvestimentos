@@ -147,11 +147,8 @@ class PortfolioAlert(db.Model):
 
 
 class Logo(db.Model):
-    """Logótipo de um ativo, descarregado uma vez (na atualização de cotações) ou carregado à mão.
-
-    `source`: "site:<domínio>" (procurado pelo site da empresa ou do emitente do ETF), "manual" (imagem carregada),
-    "off" (sem logótipo, por escolha) ou "none3" (procurado e não encontrado; tenta-se de novo ao fim de 7 dias).
-    """
+    """Logótipo de um ativo, escolhido à mão em Definições → Ativos: `source` "site:<domínio>" (o ícone do site
+    indicado) ou "manual" (imagem carregada)."""
     ticker = db.Column(db.String(32), db.ForeignKey("instrument.ticker", ondelete="CASCADE"), primary_key=True)
     mime = db.Column(db.String(32))
     data = db.Column(db.LargeBinary)

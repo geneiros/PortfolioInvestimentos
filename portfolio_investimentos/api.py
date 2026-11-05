@@ -374,13 +374,10 @@ def upload_logo(ticker):
 
 
 @action
-def remove_logo(ticker, auto=""):
-    """Tira o logótipo (fica com as iniciais) ou, com `auto`, volta a procurá-lo na próxima atualização."""
+def remove_logo(ticker):
+    """Tira o logótipo: ficam as iniciais."""
     from .services import logos
     _logo_instrument(ticker)
-    if str(auto) in ("1", "true"):
-        logos.reset(ticker)
-        return "O logótipo volta a ser procurado na próxima atualização de cotações."
     logos.remove(ticker)
     return "Logótipo retirado."
 

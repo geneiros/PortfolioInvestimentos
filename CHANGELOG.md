@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Logótipos só à mão**  
+  A atualização de cotações deixa de procurar logótipos (no PythonAnywhere quase todos os serviços de ícones estão bloqueados e o Yahoo limita os pedidos). Em Definições → Ativos, clicar nas iniciais de um ativo permite carregar uma imagem, procurar o ícone pelo site indicado ou tirar o logótipo; os já guardados ficam.
 - **Logótipos: variantes do site e servidores bloqueados**  
   No PythonAnywhere só o DuckDuckGo responde (o Google, o gstatic e os sites das empresas estão fora da lista de sites permitidos). Quando o DuckDuckGo não tem o ícone do site, tenta-se também com «www.» e os outros sites do emitente (ex.: Xtrackers → dws.com); um servidor que falha por rede salta-se no resto da atualização. Os marcados como «sem ícone» voltam a procurar-se já.
 - **Logótipos: nome do ETF pelo cliente da atualização e mais serviços de ícones, com o motivo no resumo**  

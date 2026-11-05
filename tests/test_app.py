@@ -2164,156 +2164,54 @@ def test_portfolio_alerts_on_radar(client):
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 200
 
 
-def test_logos_service_and_pages(app, client, monkeypatch):
+def test_logos_manual(app, client, monkeypatch):
+    import urllib.error as urllib_error
     from portfolio_investimentos.models import Instrument, Logo
-    from portfolio_investimentos.services import logos
+    from portfolio_investimentos.services import logos, market
     assert logos.domain_of("https://www.apple.com/pt/") == "apple.com" and logos.domain_of("apple") is None
-    assert logos.issuer_domain("iShares Core MSCI World UCITS ETF") == "ishares.com"
-    assert logos.issuer_domain("Vanguard FTSE All-World") == "vanguard.com" and logos.issuer_domain("Apple Inc.") is None
-    calls = []
+    assert logos.variants("ir.finvgroup.com") == ["ir.finvgroup.com", "www.ir.finvgroup.com", "finvgroup.com",
+                                                  "www.finvgroup.com"]
+    assert logos.candidates("investor.x.co.uk") == ["investor.x.co.uk", "x.co.uk"]
+    assert "logos" not in open(market.__file__, encoding="utf-8").read()  # a atualização de cotações não procura
+    seen = []
 
-    def fake(url):
-        calls.append(url)
-        if "nada.pt" in url:
-            raise OSError("404")
-        return "image/png", PNG
-    monkeypatch.setattr(logos, "_download", fake)
+    def pa(url):  # como no PythonAnywhere: só o DuckDuckGo responde
+        seen.append(url)
+        if "duckduckgo" not in url:
+            raise urllib_error.URLError("Tunnel connection failed: 403 Forbidden")
+        if "finvgroup.com" in url and "ir." not in url:
+            return "image/x-icon", PNG
+        raise urllib_error.HTTPError(url, 404, "nf", {}, None)
+    monkeypatch.setattr(logos, "_download", pa)
     token = csrf(client)
     assert post(client, "load_demo", token).status_code == 200
     with app.app_context():
-        inst = Instrument.query.filter(Instrument.kind == "stock").first()
-        etf = Instrument(ticker="IWDA", currency="EUR", kind="etf", instrument_name="iShares Core MSCI World")
-        db.session.add(etf)
-        db.session.commit()
-        tk = inst.ticker
-        monkeypatch.setattr(logos, "yahoo_website", lambda symbol: None)
-        monkeypatch.setattr(logos, "yahoo_chart_name", lambda symbol: None)
-        assert logos.needs(tk)
-        assert logos.update(inst, {"website": "https://www.apple.com"}, download=fake) == "apple.com (Yahoo)"
-        assert logos.update(etf, None, download=fake) == "ishares.com (nome)" and "ishares.com" in calls[-1]
-        none = Instrument(ticker="XYZ1", currency="EUR", kind="stock")
-        db.session.add(none)
-        db.session.commit()
-        assert logos.update(none, None, download=fake).startswith("sem site")
-        db.session.commit()
-        assert not logos.needs(tk) and not logos.needs("XYZ1")  # não encontrado: só ao fim de 7 dias
+        tk = Instrument.query.filter(Instrument.kind == "stock").first().ticker
+    assert 'id="logoModal"' in client.get("/definicoes").get_data(as_text=True)
+    # pelo site: tenta o subdomínio e o domínio principal; um servidor bloqueado só se tenta uma vez
+    assert post(client, "set_logo_site", token, ticker=tk, site="https://ir.finvgroup.com").status_code == 200
+    assert sum("google.com" in u for u in seen) == 1
+    with app.app_context():
+        assert db.session.get(Logo, tk).source == "site:finvgroup.com"
+    r = post(client, "set_logo_site", token, ticker=tk, site="adobe.com")
+    assert r.status_code == 400 and "Carrega uma imagem" in r.get_json()["error"]
+    assert post(client, "set_logo_site", token, ticker=tk, site="nada").status_code == 400
     html = client.get("/carteira").get_data(as_text=True)
     assert f'src="/logo/{tk}?v=' in html and "pm-logo-img" in html
     r = client.get(f"/logo/{tk}")
-    assert r.status_code == 200 and r.mimetype == "image/png" and r.data == PNG
+    assert r.status_code == 200 and r.data == PNG
     assert client.get(f"/logo/{tk}", headers={"If-None-Match": r.headers["ETag"]}).status_code == 304
-    assert client.get("/logo/XYZ1").status_code == 404
-    # à mão: site, imagem, iniciais e voltar ao automático
-    assert post(client, "set_logo_site", token, ticker="XYZ1", site="nada.pt").status_code == 400
-    assert post(client, "set_logo_site", token, ticker="XYZ1", site="exemplo.pt").status_code == 200
+    # imagem carregada
     r = client.post("/api/upload_logo", headers={"X-CSRF-Token": token},
                     data={"ticker": tk, "file": (io.BytesIO(PNG), "logo.png", "image/png")})
     assert r.status_code == 200
+    with app.app_context():
+        assert db.session.get(Logo, tk).source == "manual"
     r = client.post("/api/upload_logo", headers={"X-CSRF-Token": token},
                     data={"ticker": tk, "file": (io.BytesIO(b"x"), "a.txt", "text/plain")})
     assert r.status_code == 400
+    # tirar: ficam as iniciais
     assert post(client, "remove_logo", token, ticker=tk).status_code == 200
     assert f'src="/logo/{tk}?v=' not in client.get("/carteira").get_data(as_text=True)
-    with app.app_context():
-        assert db.session.get(Logo, tk).source == "off" and not logos.needs(tk)
-    assert post(client, "remove_logo", token, ticker=tk, auto="1").status_code == 200
-    with app.app_context():
-        assert logos.needs(tk)
-    assert 'id="logoModal"' in client.get("/definicoes").get_data(as_text=True)
+    assert client.get(f"/logo/{tk}").status_code == 404
     assert post(client, "remove_logo", token, ticker="NAOHA").status_code == 400
-
-
-def test_logos_more_sources_and_errors(app, monkeypatch):
-    import urllib.error as urllib_error
-    from datetime import datetime
-    from portfolio_investimentos.models import Instrument, Logo
-    from portfolio_investimentos.services import logos
-
-    def wd(url, params):  # Wikidata: o ISIN da Adobe → o site oficial
-        if params["action"] == "query":
-            return {"query": {"search": [{"title": "Q11463"}] if "US00724F1012" in params["srsearch"] else []}}
-        return {"entities": {"Q11463": {"claims": {"P856": [{"mainsnak": {"datavalue": {"value": "https://www.adobe.com/"}}}]},
-                                       "labels": {"en": {"value": "Adobe"}}}}}
-
-    def down(url):
-        raise OSError("sem rede")
-    ok = lambda url: ("image/png", PNG)  # noqa: E731
-    with app.app_context():
-        adb = Instrument(ticker="ADB", currency="EUR", kind="stock", isin="US00724F1012", data_symbol="ADBE")
-        xeon = Instrument(ticker="XEON.DE", currency="EUR", kind="etf", instrument_name="EUR Overnight Rate Swap")
-        db.session.add_all([adb, xeon])
-        db.session.commit()
-        monkeypatch.setattr(logos, "_get_json", wd)
-        monkeypatch.setattr(logos, "yahoo_website", lambda symbol: None)
-        # sem site nos dados do Yahoo: vem do Wikidata pelo ISIN
-        assert logos.update(adb, {}, download=ok) == "adobe.com (Wikidata)"
-        # ETF com o nome da corretora: o emitente vem do nome longo do Yahoo
-        def limited(symbol):
-            raise logos.Unavailable("HTTP 429")
-        monkeypatch.setattr(logos, "yahoo_chart_name", limited)  # o acesso direto limitado: vale o da atualização
-
-        class FakeTicker:  # o objeto do yfinance da atualização: o nome longo vem nas cotações
-            history_metadata = {}
-
-            def history(self, start=None, auto_adjust=False):
-                self.history_metadata = {"longName": "Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C"}
-        assert logos.update(xeon, None, download=ok, ticker=FakeTicker()) == "xtrackers.com (Yahoo)"
-        db.session.delete(db.session.get(Logo, "XEON.DE"))
-        db.session.commit()
-        assert "erro" in logos.update(xeon, None, download=ok)  # sem o da atualização e com o direto limitado
-        # sem ícone em nenhum serviço: o resumo diz a resposta de cada um
-        def nf(url):
-            raise urllib_error.HTTPError(url, 404, "nf", {}, None)
-        msg = logos.update(adb, {"website": "adobe.com"}, download=nf)
-        assert "sem ícone" in msg and "google 404" in msg and "site-ico 404" in msg
-        db.session.delete(db.session.get(Logo, "ADB"))
-        db.session.commit()
-        # subdomínio sem ícone (ir.finvgroup.com): usa-se o domínio principal
-        assert logos.candidates("ir.finvgroup.com") == ["ir.finvgroup.com", "finvgroup.com"]
-        assert logos.candidates("investor.x.co.uk") == ["investor.x.co.uk", "x.co.uk"] and logos.candidates("a.com") == ["a.com"]
-        fin = Instrument(ticker="FINV", currency="EUR", kind="stock")
-        db.session.add(fin)
-        db.session.commit()
-
-        def only_main(url):
-            if "domain=finvgroup.com&sz=64" in url:
-                return "image/png", PNG
-            raise urllib_error.HTTPError(url, 404, "nf", {}, None)
-        assert logos.update(fin, {"website": "https://ir.finvgroup.com"}, download=only_main) == "finvgroup.com (Yahoo)"
-        # o DuckDuckGo é o único serviço acessível (ex.: PythonAnywhere): os outros saltam-se depois da 1.ª falha;
-        # sem ícone para xtrackers.com, tenta-se www. e os outros sites do emitente (dws.com)
-        assert logos.variants("xtrackers.com") == ["xtrackers.com", "www.xtrackers.com", "dws.com", "etf.dws.com"]
-        logos.reset_blocked()
-        seen = []
-
-        def pa(url):
-            seen.append(url)
-            if "duckduckgo" not in url:
-                raise urllib_error.URLError("Tunnel connection failed: 403 Forbidden")
-            if "dws.com" in url:
-                return "image/x-icon", PNG
-            raise urllib_error.HTTPError(url, 404, "nf", {}, None)
-        Logo.query.filter_by(ticker="XEON.DE").delete()
-        db.session.commit()
-        assert logos.update(xeon, None, download=pa, ticker=FakeTicker()) == "dws.com (Yahoo)"
-        assert sum("google.com" in u for u in seen) == 1  # bloqueado: só se tentou uma vez
-        logos.reset_blocked()
-        db.session.commit()
-        # erros de rede não contam como «não há»: nada se grava e tenta-se outra vez
-        Logo.query.filter_by(ticker="ADB").delete()
-        db.session.commit()
-        msg = logos.update(adb, {}, download=down)
-        assert "erro" in msg and db.session.get(Logo, "ADB") is None and logos.needs("ADB")
-
-        def no_net(url, params):
-            raise logos.Unavailable("sem rede")
-        monkeypatch.setattr(logos, "_get_json", no_net)
-        assert "erro" in logos.update(adb, {}, download=ok) and logos.needs("ADB")
-        # os «none» da primeira versão voltam a procurar-se já
-        for old in logos.LEGACY_NOT_FOUND:  # os de versões anteriores voltam a procurar-se já
-            db.session.merge(Logo(ticker="ADB", source=old, fetched=datetime.now()))
-            db.session.commit()
-            assert logos.needs("ADB")
-        db.session.merge(Logo(ticker="ADB", source=logos.NOT_FOUND, fetched=datetime.now()))
-        db.session.commit()
-        assert not logos.needs("ADB")
