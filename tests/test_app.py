@@ -2186,15 +2186,17 @@ def test_logos_service_and_pages(app, client, monkeypatch):
         db.session.add(etf)
         db.session.commit()
         tk = inst.ticker
+        monkeypatch.setattr(logos, "yahoo_website", lambda symbol: None)
+        monkeypatch.setattr(logos, "yahoo_long_name", lambda symbol: None)
         assert logos.needs(tk)
-        assert logos.update(inst, "https://www.apple.com", download=fake)
-        assert logos.update(etf, None, download=fake) and "ishares.com" in calls[-1]
+        assert logos.update(inst, {"website": "https://www.apple.com"}, download=fake) == "apple.com (Yahoo)"
+        assert logos.update(etf, None, download=fake) == "ishares.com (nome)" and "ishares.com" in calls[-1]
         none = Instrument(ticker="XYZ1", currency="EUR", kind="stock")
         db.session.add(none)
         db.session.commit()
-        assert not logos.update(none, None, download=fake)
+        assert logos.update(none, None, download=fake).startswith("sem site")
         db.session.commit()
-        assert not logos.needs(tk) and not logos.needs("XYZ1")  # não encontrado: só ao fim de 30 dias
+        assert not logos.needs(tk) and not logos.needs("XYZ1")  # não encontrado: só ao fim de 7 dias
     html = client.get("/carteira").get_data(as_text=True)
     assert f'src="/logo/{tk}?v=' in html and "pm-logo-img" in html
     r = client.get(f"/logo/{tk}")
@@ -2219,3 +2221,46 @@ def test_logos_service_and_pages(app, client, monkeypatch):
         assert logos.needs(tk)
     assert 'id="logoModal"' in client.get("/definicoes").get_data(as_text=True)
     assert post(client, "remove_logo", token, ticker="NAOHA").status_code == 400
+
+
+def test_logos_more_sources_and_errors(app, monkeypatch):
+    from datetime import datetime
+    from portfolio_investimentos.models import Instrument, Logo
+    from portfolio_investimentos.services import logos
+
+    def wd(url, params):  # Wikidata: o ISIN da Adobe → o site oficial
+        if params["action"] == "query":
+            return {"query": {"search": [{"title": "Q11463"}] if "US00724F1012" in params["srsearch"] else []}}
+        return {"entities": {"Q11463": {"claims": {"P856": [{"mainsnak": {"datavalue": {"value": "https://www.adobe.com/"}}}]},
+                                       "labels": {"en": {"value": "Adobe"}}}}}
+
+    def down(url):
+        raise OSError("sem rede")
+    ok = lambda url: ("image/png", PNG)  # noqa: E731
+    with app.app_context():
+        adb = Instrument(ticker="ADB", currency="EUR", kind="stock", isin="US00724F1012", data_symbol="ADBE")
+        xeon = Instrument(ticker="XEON.DE", currency="EUR", kind="etf", instrument_name="EUR Overnight Rate Swap")
+        db.session.add_all([adb, xeon])
+        db.session.commit()
+        monkeypatch.setattr(logos, "_get_json", wd)
+        monkeypatch.setattr(logos, "yahoo_website", lambda symbol: None)
+        # sem site nos dados do Yahoo: vem do Wikidata pelo ISIN
+        assert logos.update(adb, {}, download=ok) == "adobe.com (Wikidata)"
+        # ETF com o nome da corretora: o emitente vem do nome longo do Yahoo
+        monkeypatch.setattr(logos, "yahoo_long_name", lambda symbol: "Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C")
+        assert logos.update(xeon, None, download=ok) == "xtrackers.com (Yahoo)"
+        db.session.commit()
+        # erros de rede não contam como «não há»: nada se grava e tenta-se outra vez
+        db.session.delete(db.session.get(Logo, "ADB"))
+        db.session.commit()
+        msg = logos.update(adb, {}, download=down)
+        assert "erro" in msg and db.session.get(Logo, "ADB") is None and logos.needs("ADB")
+
+        def no_net(url, params):
+            raise logos.Unavailable("sem rede")
+        monkeypatch.setattr(logos, "_get_json", no_net)
+        assert "erro" in logos.update(adb, {}, download=ok) and logos.needs("ADB")
+        # os «none» da primeira versão voltam a procurar-se já
+        db.session.add(Logo(ticker="ADB", source="none", fetched=datetime.now()))
+        db.session.commit()
+        assert logos.needs("ADB")

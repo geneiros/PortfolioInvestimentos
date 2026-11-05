@@ -456,9 +456,9 @@ def refresh_all(start=None, progress=None, only_open=False):
                     if inst.kind != "etf" and info is None:
                         try:
                             info = t.info or {}
-                        except Exception:
+                        except Exception:  # há outras fontes (Wikidata pelo ISIN)
                             info = {}
-                    logos.update(inst, (info or {}).get("website"))
+                    note(f"{inst.ticker} logótipo: {logos.update(inst, info)}")
                     db.session.commit()
             except Exception as exc:  # opcional
                 db.session.rollback()

@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Logótipos: mais fontes e erros que já não contam como «não há»**  
+  Só aparecia o logótipo quando o Yahoo devolvia o site da empresa, e esse pedido falha muitas vezes (ex.: no PythonAnywhere); nos ETF, o nome da corretora («EUR Overnight Rate Swap») não diz o emitente. Agora o site da empresa vem também do Wikidata pelo ISIN, e o emitente do ETF também do nome longo do Yahoo (a pesquisa, ex.: «Xtrackers II EUR Overnight Rate Swap…») ou do Wikidata. Uma fonte que não responde já não grava «sem logótipo»: tenta-se na atualização seguinte (os marcados assim antes voltam a procurar-se já); um não encontrado repete-se ao fim de 7 dias. O resumo da atualização tem uma linha «logótipo» por ativo com o site e a origem, ou o motivo.
 - **Logótipos das empresas e dos ETF**  
   Na atualização de cotações, cada posição aberta sem logótipo recebe o ícone do site da empresa (o site vem dos dados da empresa no Yahoo) ou, num ETF, o do emitente reconhecido pelo nome (iShares, Vanguard, Xtrackers, Invesco, Amundi/Lyxor, SPDR, WisdomTree, VanEck, …). A imagem fica guardada na base de dados (tabela nova Logo) e é servida pela própria aplicação, por isso as páginas não fazem pedidos a outros sites e funcionam offline; sem logótipo ficam as iniciais, e um não encontrado volta a procurar-se ao fim de 30 dias. Em Definições → Ativos, clicar no logótipo abre o editor: procurar por um site, carregar uma imagem (até 200 KB), ficar com as iniciais ou voltar à procura automática.
 - **README e capturas de ecrã atualizados**  

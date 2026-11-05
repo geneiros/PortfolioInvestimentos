@@ -8,7 +8,7 @@ Gestor de carteira de investimentos local: desempenho, dividendos, fiscalidade (
 - **Abre-se com um duplo clique.** O script de arranque prepara tudo na primeira vez e abre o browser.
 - **Interface Bootstrap 5.3 nativa**, com modo claro, escuro ou automático (segue o sistema operativo).
 - **Cartões à tua medida:** em todas as páginas, um clique longo (2 segundos no fundo de um cartão, com o rato ou o dedo) levanta o cartão para o arrastar para outro lugar; a ordem fica guardada na aplicação, igual em todos os dispositivos, e repõe-se em Definições.
-- **Logótipos das empresas e ETF:** procurados uma vez na atualização de cotações (o site da empresa, pelo Yahoo, ou o emitente do ETF: iShares, Vanguard, Xtrackers, Invesco, Amundi, SPDR, …) e guardados na aplicação, por isso as páginas não fazem pedidos a outros sites; em Definições → Ativos, clica no logótipo para indicar o site, carregar uma imagem ou ficar com as iniciais.
+- **Logótipos das empresas e ETF:** procurados uma vez na atualização de cotações (o site da empresa, pelo Yahoo ou pelo Wikidata com o ISIN, ou o emitente do ETF, pelo nome ou pelo nome longo do Yahoo: iShares, Vanguard, Xtrackers, Invesco, Amundi, SPDR, …) e guardados na aplicação, por isso as páginas não fazem pedidos a outros sites; em Definições → Ativos, clica no logótipo para indicar o site, carregar uma imagem ou ficar com as iniciais.
 - **Esconder valores** (botão do olho, no topo): cada valor em euros passa a «€ ••••», na cor do valor, em todas as páginas; o botão fica selecionado enquanto o modo está ligado e a escolha fica guardada no dispositivo.
 
 ## Como usar

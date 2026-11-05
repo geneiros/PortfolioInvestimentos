@@ -1,11 +1,13 @@
 """Logótipos dos ativos: descarregados uma vez e guardados na base de dados, para as páginas não fazerem pedidos
 a sites externos (que ficariam a saber que ações tens) e funcionarem offline.
 
-Ações: o ícone do site da empresa (o `website` que o Yahoo devolve nos dados da empresa). ETF: o do emitente,
-reconhecido pelo nome (iShares, Vanguard, Xtrackers, …). Em Definições → Ativos pode indicar-se o site à mão,
+Ações: o ícone do site da empresa: o `website` que o Yahoo devolve nos dados da empresa ou, se não vier (o pedido
+falha muitas vezes, ex.: no PythonAnywhere), o site oficial no Wikidata, encontrado pelo ISIN. ETF: o do emitente,
+reconhecido pelo nome (o da corretora, o nome longo do Yahoo ou o do Wikidata): iShares, Vanguard, Xtrackers, … Em Definições → Ativos pode indicar-se o site à mão,
 carregar uma imagem ou ficar com as iniciais.
 """
 import hashlib
+import json
 import re
 import urllib.error
 import urllib.parse
@@ -16,13 +18,20 @@ from flask import g
 
 from ..models import Logo, db
 
-RETRY_DAYS = 30
+RETRY_DAYS = 7
+WIKIDATA = "https://www.wikidata.org/w/api.php"
+UA = {"User-Agent": "PortfolioInvestimentos/1.0 (https://github.com/geneiros/PortfolioInvestimentos)"}
+
+
+class Unavailable(Exception):
+    """Uma fonte não respondeu (rede, limite de pedidos): tenta-se outra vez na próxima atualização."""
 MAX_BYTES = 200_000
 MIMES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml", "image/x-icon",
          "image/vnd.microsoft.icon"}
 # emitente do ETF (pelo nome) → site
 ISSUERS = [
-    (r"\bishares\b", "ishares.com"), (r"\bvanguard\b", "vanguard.com"), (r"\bxtrackers\b", "xtrackers.com"),
+    (r"\bishares\b|\bblackrock\b", "ishares.com"), (r"\bvanguard\b", "vanguard.com"),
+    (r"\bxtrackers\b|\bdws\b|\bdb x-trackers\b", "xtrackers.com"),
     (r"\binvesco\b", "invesco.com"), (r"\bamundi\b|\blyxor\b", "amundi.com"), (r"\bspdr\b", "ssga.com"),
     (r"\bwisdomtree\b", "wisdomtree.eu"), (r"\bvaneck\b", "vaneck.com"), (r"\bhsbc\b", "hsbc.com"),
     (r"\bubs\b", "ubs.com"), (r"\bjpm\b|\bj\.?p\.? ?morgan\b", "jpmorgan.com"),
@@ -56,25 +65,112 @@ def _download(url):
         return mime, resp.read(MAX_BYTES + 1)
 
 
+def _get_json(url, params):
+    req = urllib.request.Request(f"{url}?{urllib.parse.urlencode(params)}", headers=UA)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read(2_000_000).decode())
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        raise Unavailable(str(getattr(exc, "reason", exc))[:100]) from exc
+
+
 def fetch_icon(domain, download=None):
-    """(tipo, imagem) do ícone do site, ou None (sem ícone, ou o ícone genérico do serviço)."""
+    """(tipo, imagem) do ícone do site, ou None (sem ícone, ou o ícone genérico do serviço).
+    Levanta Unavailable se nenhum serviço de ícones respondeu (rede, site não permitido)."""
     download = download or _download
+    failures = []
     for template in ICON_URLS:
         try:
             mime, data = download(template.format(d=urllib.parse.quote(domain)))
-        except (urllib.error.URLError, OSError, ValueError):
+        except urllib.error.HTTPError:  # 404 e afins: o serviço respondeu que não tem ícone
+            continue
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            failures.append(str(getattr(exc, "reason", exc))[:80])
             continue
         if mime in MIMES and 100 < len(data) <= MAX_BYTES:
             return mime, data
+    if len(failures) == len(ICON_URLS):
+        raise Unavailable("serviço de ícones sem resposta: " + "; ".join(failures))
     return None
 
 
+def wikidata(isin, get=None):
+    """(site oficial, nome) da entidade com este ISIN no Wikidata; (None, None) se não houver."""
+    get = get or _get_json
+    if not isin or not re.fullmatch(r"[A-Z]{2}[A-Z0-9]{9}[0-9]", isin):
+        return None, None
+    found = get(WIKIDATA, {"action": "query", "list": "search", "srsearch": f"haswbstatement:P946={isin}",
+                           "srlimit": 1, "format": "json"})
+    hits = ((found or {}).get("query") or {}).get("search") or []
+    if not hits:
+        return None, None
+    qid = hits[0].get("title")
+    ent = get(WIKIDATA, {"action": "wbgetentities", "ids": qid, "props": "claims|labels", "languages": "en",
+                         "format": "json"})
+    e = ((ent or {}).get("entities") or {}).get(qid) or {}
+    sites = [c.get("mainsnak", {}).get("datavalue", {}).get("value") for c in (e.get("claims") or {}).get("P856", [])]
+    label = ((e.get("labels") or {}).get("en") or {}).get("value")
+    return next((x for x in sites if isinstance(x, str)), None), label
+
+
+def yahoo_long_name(symbol):
+    """Nome longo do Yahoo (a pesquisa, que não precisa dos dados da empresa), ex.: «Xtrackers II EUR Overnight…»."""
+    from . import yahoo
+    try:
+        quotes = yahoo.Search(symbol, max_results=5).quotes
+    except Exception as exc:
+        raise Unavailable(str(exc)[:100]) from exc
+    exact = [q for q in quotes if (q.get("symbol") or "").upper() == symbol.upper()] or quotes[:1]
+    return (exact[0].get("longname") or exact[0].get("shortname")) if exact else None
+
+
+def yahoo_website(symbol):
+    """`website` dos dados da empresa pelo acesso direto ao Yahoo (quando o yfinance veio sem ele)."""
+    from . import yahoo
+    try:
+        return (yahoo.Ticker(symbol).info or {}).get("website")
+    except Exception as exc:
+        raise Unavailable(str(exc)[:100]) from exc
+
+
+def resolve(inst, info=None, get=None):
+    """(domínio, origem, erros): o site para o logótipo e de onde veio; `erros` são as fontes que não responderam."""
+    errors = []
+    symbol = inst.data_symbol or inst.ticker
+
+    def attempt(fn, *args):
+        try:
+            return fn(*args)
+        except Unavailable as exc:
+            errors.append(f"{fn.__name__}: {exc}")
+            return None
+    if inst.kind == "etf":
+        d = issuer_domain(inst.instrument_name)
+        if d:
+            return d, "nome", errors
+        d = issuer_domain(attempt(yahoo_long_name, symbol))
+        if d:
+            return d, "Yahoo", errors
+        site_label = attempt(wikidata, inst.isin, get) or (None, None)
+        d = issuer_domain(site_label[1])
+        return (d, "Wikidata", errors) if d else (None, None, errors)
+    d = domain_of((info or {}).get("website"))
+    if d:
+        return d, "Yahoo", errors
+    site_label = attempt(wikidata, inst.isin, get) or (None, None)
+    d = domain_of(site_label[0])
+    if d:
+        return d, "Wikidata", errors
+    d = domain_of(attempt(yahoo_website, symbol))
+    return (d, "Yahoo", errors) if d else (None, None, errors)
+
+
 def needs(ticker, now=None):
-    """Falta procurar o logótipo (nunca procurado, ou não encontrado há mais de 30 dias)?"""
+    """Falta procurar o logótipo (nunca procurado, ou não encontrado há mais de 7 dias)?"""
     row = db.session.get(Logo, ticker)
-    if row is None:
+    if row is None or row.source == "none":  # «none»: da primeira versão, que contava os erros como «não há»
         return True
-    return row.source == "none" and row.fetched < (now or datetime.now()) - timedelta(days=RETRY_DAYS)
+    return row.source == "none2" and row.fetched < (now or datetime.now()) - timedelta(days=RETRY_DAYS)
 
 
 def _save(ticker, mime, data, source):
@@ -83,22 +179,36 @@ def _save(ticker, mime, data, source):
     db.session.add(row)
 
 
-def update(inst, website=None, download=None):
-    """Procura e guarda o logótipo de um ativo (o site da empresa ou o emitente do ETF). Devolve True se guardou."""
-    domain = domain_of(website) or (issuer_domain(inst.instrument_name) if inst.kind == "etf" else None)
-    icon = fetch_icon(domain, download) if domain else None
-    if icon:
-        _save(inst.ticker, icon[0], icon[1], f"site:{domain}"[:80])
-    else:
-        _save(inst.ticker, None, None, "none")
-    return bool(icon)
+def update(inst, info=None, download=None, get=None):
+    """Procura e guarda o logótipo de um ativo. Devolve a linha para o resumo da atualização.
+
+    Uma fonte que não respondeu não conta como «não há»: não se grava nada e tenta-se na próxima atualização.
+    """
+    domain, origin, errors = resolve(inst, info, get)
+    if not domain:
+        if errors:
+            return "erro (" + "; ".join(errors)[:200] + "); tenta-se na próxima atualização"
+        _save(inst.ticker, None, None, "none2")
+        return "sem site encontrado (indica-o em Definições → Ativos)"
+    try:
+        icon = fetch_icon(domain, download)
+    except Unavailable as exc:
+        return f"{domain}: erro ({exc}); tenta-se na próxima atualização"
+    if not icon:
+        _save(inst.ticker, None, None, "none2")
+        return f"{domain}: sem ícone"
+    _save(inst.ticker, icon[0], icon[1], f"site:{domain}"[:80])
+    return f"{domain} ({origin})"
 
 
 def set_site(ticker, site, download=None):
     domain = domain_of(site)
     if not domain:
         raise ValueError("Indica um site, por exemplo apple.com.")
-    icon = fetch_icon(domain, download)
+    try:
+        icon = fetch_icon(domain, download)
+    except Unavailable as exc:
+        raise ValueError(f"Não consegui contactar o serviço de ícones ({exc}).") from exc
     if not icon:
         raise ValueError(f"Não encontrei um logótipo para {domain}.")
     _save(ticker, icon[0], icon[1], f"site:{domain}"[:80])
