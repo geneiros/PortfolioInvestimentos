@@ -129,6 +129,30 @@
     </div>
     {% endif %}
 
+    {% if stale_refresh %}
+    <div class="alert alert-warning rounded-0 border-0 border-bottom mb-0 py-2 small d-flex align-items-center gap-2 flex-wrap" id="staleRefresh" data-key="{{ stale_refresh.key }}">
+      <i class="bi bi-clock-history flex-shrink-0"></i>
+      <div style="flex: 1 1 14rem; min-width: 0">As cotações das posições abertas não são atualizadas há <b>{{ stale_refresh.days }} dias</b> (desde {{ stale_refresh.since.strftime('%d/%m') }}).
+        <a href="/definicoes" class="alert-link fw-normal">Mudar o aviso</a></div>
+      <div class="d-flex align-items-center gap-2 ms-auto">
+        <button class="btn btn-sm btn-warning text-nowrap" data-pm-refresh data-only-open="1"><i class="bi bi-arrow-repeat"></i> Atualizar posições abertas</button>
+        <button type="button" class="btn-close" aria-label="Fechar" data-pm-stale-close></button>
+      </div>
+    </div>
+    <script>
+      // fechado: fica escondido até ao fim da sessão do browser (volta a aparecer ao abrir a aplicação outra vez)
+      (function () {
+        const bar = document.getElementById("staleRefresh");
+        try { if (sessionStorage.getItem("pm-stale-closed") === bar.dataset.key) bar.remove(); } catch (e) {}
+        const close = bar.querySelector("[data-pm-stale-close]");
+        if (close) close.addEventListener("click", () => {
+          try { sessionStorage.setItem("pm-stale-closed", bar.dataset.key); } catch (e) {}
+          bar.remove();
+        });
+      })();
+    </script>
+    {% endif %}
+
     <main class="pm-content">
       {% if warnings and active in ("overview", "carteira", "desempenho", "fiscal", "importar") %}
         {% for w in warnings %}

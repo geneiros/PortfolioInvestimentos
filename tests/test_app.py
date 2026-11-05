@@ -1738,7 +1738,10 @@ def test_stock_valuation_card_fundamentals_and_manual_overrides(app, client):
         assert post(client, "save_fundamentals", token, **{"ticker": "DEMO-NVTX", **bad}).status_code == 400
     # dados do Yahoo: valores das contas na moeda dos relatórios convertidos para a da cotação
     with app.app_context():
-        db.session.add(FxRate(currency="USD", date=date.today(), rate=1.10))
+        # o câmbio de hoje (a demonstração já pode ter um, nos dias úteis): fica 1,10 USD por EUR
+        fx = FxRate.query.filter_by(currency="USD", date=date.today()).first() or FxRate(currency="USD", date=date.today())
+        fx.rate = 1.10
+        db.session.add(fx)
         db.session.commit()
         inst = db.session.get(Instrument, "DEMO-NVTX")
         market._store_fundamentals(inst, {"currency": "USD", "financialCurrency": "EUR", "trailingEps": 3.0,
@@ -1875,3 +1878,57 @@ def test_migration_adds_fundamental_columns(tmp_path, monkeypatch):
     with app.app_context():
         f = db.session.get(Fundamental, "ABC")
         assert f.eps == 2.0 and f.owner is None and f.manual_net_cash is None
+
+
+def test_stale_refresh_banner_and_setting(app, client):
+    from datetime import datetime
+    from portfolio_investimentos.models import Instrument, Price, Setting
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="AAA", currency="EUR"),
+            Transaction(date=date(2026, 1, 5), type="DEPOSIT", amount=1000, currency="EUR"),
+            Transaction(date=date(2026, 1, 5), type="BUY", instrument="AAA", quantity=10, price=10.0, currency="EUR"),
+            Price(instrument="AAA", date=date(2026, 1, 6), close=11.0)])
+        db.session.commit()
+
+    def page(days_ago):
+        with app.app_context():
+            Setting.set("last_refresh", (datetime.now() - timedelta(days=days_ago)).isoformat(timespec="seconds"))
+        return client.get("/carteira").get_data(as_text=True)
+    html = page(6)
+    assert 'id="staleRefresh"' in html and "há <b>6 dias</b>" in html
+    banner = html.split('id="staleRefresh"', 1)[1].split("</div>\n    <script>", 1)[0]
+    assert 'data-pm-refresh data-only-open="1"' in banner
+    assert 'id="staleRefresh"' in client.get("/definicoes").get_data(as_text=True)  # em todas as páginas
+    assert 'id="staleRefresh"' not in page(3)  # dentro dos 5 dias
+    token = csrf(client)
+    assert post(client, "set_stale_days", token, days="10").status_code == 200
+    assert 'id="staleRefresh"' not in page(6)
+    assert 'id="staleRefresh"' in page(11)
+    assert post(client, "set_stale_days", token, days="0").status_code == 200  # 0 desliga
+    assert 'id="staleRefresh"' not in page(60)
+    for bad in ("nan", "-1", "2.5", "abc", "91"):
+        assert post(client, "set_stale_days", token, days=bad).status_code == 400, bad
+    assert 'value="0"' in client.get("/definicoes").get_data(as_text=True).split('id="staleDays"', 1)[1][:120]
+    # na demonstração não há aviso
+    assert post(client, "set_stale_days", token, days="5").status_code == 200
+    post(client, "load_demo", token)
+    assert 'id="staleRefresh"' not in page(30)
+
+
+def test_delete_backup(app, client):
+    from pathlib import Path
+    from portfolio_investimentos.services import backups
+    path = app.config["DB_PATH"]
+    first = backups.make_backup(path, "manual")
+    backups.make_backup(path, "importar")
+    names = [b.name for b in backups.list_backups(path)]
+    assert len(names) == 2
+    html = client.get("/definicoes").get_data(as_text=True)
+    assert html.count('data-pm-action="delete_backup"') == 2
+    token = csrf(client)
+    for bad in ("../portfolio.db", "portfolio.db", "nada.db", ""):
+        assert post(client, "delete_backup", token, name=bad).status_code == 400, bad
+    assert Path(path).exists() and len(backups.list_backups(path)) == 2
+    assert post(client, "delete_backup", token, name=Path(first).name).status_code == 200
+    assert [b.name for b in backups.list_backups(path)] == [n for n in names if n != Path(first).name]

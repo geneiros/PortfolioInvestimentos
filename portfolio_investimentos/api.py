@@ -503,6 +503,26 @@ def set_offline(enabled):
 
 
 @action
+def set_stale_days(days):
+    """Dias sem atualizar as cotações a partir dos quais aparece o aviso no topo (0 = nunca)."""
+    value = _float(days)
+    if not math.isfinite(value) or value != int(value) or not 0 <= value <= 90:
+        raise ApiError("Indica um número inteiro de dias entre 0 (nunca avisar) e 90.")
+    Setting.set("stale_days", int(value))
+    return "Sem aviso de cotações antigas." if not value else f"Aviso quando as cotações tiverem mais de {int(value)} dias."
+
+
+@action
+def delete_backup(name):
+    path = current_app.config["DB_PATH"]
+    try:
+        backups.delete(path, name)
+    except FileNotFoundError as exc:
+        raise ApiError("Cópia não encontrada.") from exc
+    return "Cópia eliminada."
+
+
+@action
 def set_risk_free(rate):
     value = _float(rate)
     if not 0 <= value <= 20:

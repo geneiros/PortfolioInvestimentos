@@ -72,6 +72,11 @@ def backup_path(db_path, name):
     return p
 
 
+def delete(db_path, name):
+    """Apaga uma cópia (só nomes gerados aqui, dentro da pasta das cópias: ver `backup_path`)."""
+    backup_path(db_path, name).unlink()
+
+
 def restore(db_path, name):
     """Substitui o conteúdo da base de dados pela cópia (feita uma cópia do estado atual antes)."""
     src_path = backup_path(db_path, name)

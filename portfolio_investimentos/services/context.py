@@ -1,5 +1,6 @@
 """Contexto comum às páginas (barra lateral, barra de topo)."""
 import json
+from datetime import datetime
 
 from ..engine.formatting import MONTHS
 from .. import auth
@@ -57,8 +58,38 @@ def build(active, title, **extra):
     )
     if ctx["has_data"] and not ctx["is_demo"]:
         ctx["warnings"] += _refresh_warnings(p, active)
+        ctx["stale_refresh"] = stale_refresh(p)
     ctx.update(extra)
     return ctx
+
+
+STALE_DAYS = 5  # por omissão: aviso no topo quando as posições abertas não são atualizadas há mais de 5 dias
+
+
+def stale_days():
+    """Dias sem atualizar as cotações a partir dos quais aparece o aviso no topo (0 = nunca)."""
+    try:
+        return max(int(float(Setting.get("stale_days"))), 0)
+    except (TypeError, ValueError):
+        return STALE_DAYS
+
+
+def stale_refresh(p, now=None):
+    """{"days", "since"} quando a última atualização de cotações tem mais de `stale_days()` dias; senão None.
+
+    Só com posições abertas e depois de pelo menos uma atualização (antes disso há o aviso «Ainda não
+    atualizaste»), e nunca durante uma atualização.
+    """
+    limit = stale_days()
+    last = Setting.get("last_refresh")
+    if not limit or not last or not p.open_positions or refresh_state()[0]:
+        return None
+    try:
+        since = datetime.fromisoformat(last)
+    except ValueError:
+        return None
+    days = ((now or datetime.now()) - since).days
+    return {"days": days, "since": since, "key": last} if days > limit else None
 
 
 PERF_NOTE = (" No Desempenho, a volatilidade, o drawdown, o Sharpe e a comparação com o mercado ficam distorcidos, "

@@ -50,6 +50,16 @@
         <button class="btn btn-sm btn-outline-secondary" type="submit">Guardar</button>
         <span class="text-body-secondary w-100">Por omissão 2%, perto da taxa de depósito do BCE. Usa a taxa média do período que analisas.</span>
       </form>
+      <hr>
+      <form class="d-flex flex-wrap gap-2 align-items-center small" data-pm-method="set_stale_days" data-pm-success="Guardado.">
+        <label for="staleDays" class="text-body-secondary">Avisar quando as posições abertas não forem atualizadas há mais de</label>
+        <div class="input-group input-group-sm" style="width: 110px">
+          <input id="staleDays" name="days" type="number" step="1" min="0" max="90" value="{{ stale_days }}" class="form-control">
+          <span class="input-group-text">dias</span>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" type="submit">Guardar</button>
+        <span class="text-body-secondary w-100">Uma faixa no topo de todas as páginas, com o botão para atualizar. Por omissão 5 dias; 0 desliga o aviso.</span>
+      </form>
     </div>
 
     <div class="pm-card mb-3">
@@ -111,6 +121,7 @@
         <div class="d-flex align-items-center gap-2 small py-1 border-bottom">
           <span class="flex-grow-1"><b>{{ b.when.strftime('%d/%m/%Y %H:%M') }}</b> · {{ b.label }} <span class="text-body-secondary">({{ (b.size / 1024)|round|int }} KB)</span></span>
           <button class="btn btn-sm btn-outline-secondary" data-pm-action="restore_backup" data-args='{"name": "{{ b.name }}"}' data-confirm="Restaurar a cópia de {{ b.when.strftime('%d/%m/%Y %H:%M') }}? Os dados atuais são substituídos (fica antes uma cópia do estado atual)."><i class="bi bi-arrow-counterclockwise"></i> Restaurar</button>
+          <button class="btn btn-sm btn-outline-danger" data-pm-action="delete_backup" data-args='{"name": "{{ b.name }}"}' data-confirm="Eliminar a cópia de {{ b.when.strftime('%d/%m/%Y %H:%M') }}? Não pode ser desfeito."><i class="bi bi-trash"></i> Eliminar</button>
         </div>
       {% else %}<p class="small text-body-secondary mb-2">Ainda não há cópias automáticas.</p>{% endfor %}
       <button class="btn btn-sm btn-outline-secondary mt-2" data-pm-action="create_backup"><i class="bi bi-safe"></i> Criar cópia agora</button>

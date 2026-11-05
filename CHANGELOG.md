@@ -2,9 +2,14 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-05
+
+- **Aviso de cotações antigas e eliminar cópias de segurança**  
+  Quando as cotações das posições abertas não são atualizadas há mais de 5 dias (configurável em Definições → Dados de mercado; 0 desliga), aparece uma faixa no topo de todas as páginas com o botão «Atualizar posições abertas»; fechada, fica escondida até ao fim da sessão do browser. Em Definições, cada cópia automática tem um botão «Eliminar» a seguir a «Restaurar».
+
 ## 2026-11-01
 
-- **Planeamento: o capital necessário com a idade e o ano, e nota sobre «investir até aos»**  
+- **Planeamento: o capital necessário com a idade e o ano, e nota sobre «investir até aos»** `e7635a3`  
   As contas estavam certas: nos blocos «com a pensão» e «até aos N anos», o capital necessário é o da data FIRE e desce com a idade (menos anos até à pensão), por isso investir menos tempo, que adia a data, mostrava um valor mais baixo. A página passa a pôr em destaque a idade e o ano a que corresponde cada valor, a explicá-lo no «?» e, com «Investir até aos» preenchido, a mostrar uma nota: investir menos tempo não reduz o que precisas, adia a data.
 - **Esconder valores: botão também no telemóvel** `64fa0c3`  
   No telemóvel (menos de 768 px) o grupo do meio da barra de topo esconde-se e o botão do olho ia com ele. Passa a haver um botão do olho à direita da barra de topo nos ecrãs pequenos; o seletor de corretora encolhe (texto truncado) para caberem os dois.

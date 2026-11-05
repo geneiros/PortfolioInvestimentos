@@ -447,6 +447,7 @@ def definicoes():
              db_path=current_app.config["DB_PATH"], backups=backups.list_backups(current_app.config["DB_PATH"]),
              yfinance=yfinance_available(),
              risk_free_pct=round(data.risk_free() * 100, 2), last_refresh=Setting.get("last_refresh"), refresh_report=Setting.get("refresh_report"),
+             stale_days=ctx.stale_days(),
              password_env=bool(auth.env_password()))
     return render_template("pages/definicoes.html", **c)
 
