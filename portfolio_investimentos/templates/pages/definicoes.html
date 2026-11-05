@@ -77,12 +77,18 @@
     </div>
 
     <div class="pm-card mb-3" id="widgetsCard">
-      <div class="pm-label mb-2">Ordem dos widgets</div>
-      <p class="small text-body-secondary mb-2">Na Visão Geral, carrega 2 segundos no fundo de um cartão (com o rato ou o dedo) e arrasta-o para outro lugar. A ordem fica guardada na aplicação, igual em todos os dispositivos; Esc cancela.</p>
+      <div class="pm-label mb-2">Ordem dos cartões</div>
+      <p class="small text-body-secondary mb-2">Em qualquer página, carrega 2 segundos no fundo de um cartão (com o rato ou o dedo) e arrasta-o para outro lugar. A ordem fica guardada na aplicação, igual em todos os dispositivos; Esc cancela.</p>
+      {% if widget_pages %}
       <div class="d-flex flex-wrap gap-2 align-items-center small">
-        <button class="btn btn-sm btn-outline-secondary" data-pm-action="reset_widget_order" data-args='{"page": "overview"}' {{ 'disabled' if not widget_custom }}><i class="bi bi-arrow-counterclockwise"></i> Repor a ordem da Visão Geral</button>
-        <span class="text-body-secondary">{{ 'Com uma ordem tua.' if widget_custom else 'Na ordem de omissão.' }}</span>
+        <span class="text-body-secondary">Com uma ordem tua:</span>
+        {% for pg in widget_pages %}
+        {% set label = (nav + nav_bottom)|selectattr('2', 'equalto', pg)|map(attribute='1')|first or pg %}
+        <button class="btn btn-sm btn-outline-secondary" data-pm-action="reset_widget_order" data-args='{"page": "{{ pg }}"}' title="Repor a ordem de omissão"><i class="bi bi-arrow-counterclockwise"></i> {{ label }}</button>
+        {% endfor %}
+        <button class="btn btn-sm btn-outline-danger" data-pm-action="reset_widget_order" data-args='{}'>Repor todas</button>
       </div>
+      {% else %}<div class="small text-body-secondary">Todas as páginas na ordem de omissão.</div>{% endif %}
     </div>
 
     <div class="pm-card mb-3">

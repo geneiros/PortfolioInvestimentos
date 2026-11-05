@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Mudar a ordem dos cartões em todas as páginas; gráfico da Visão Geral abre em YTD**  
+  O clique longo e arrastar passa da Visão Geral a todos os cartões de todas as páginas: os cartões e as grelhas encontram-se sozinhos (cada cartão muda de lugar dentro da sua grelha; títulos e avisos ficam onde estão) e a ordem fica guardada por página na aplicação, aplicada antes de a página desenhar os gráficos. Em Definições → Ordem dos cartões, repor a ordem de cada página ou de todas. O gráfico «Retorno total / Valor total» da Visão Geral abre com o período YTD.
 - **Visão Geral: mudar a ordem dos widgets arrastando**  
   Carregar 2 segundos no fundo de um cartão (rato ou toque; não conta em texto, botões, links ou gráficos, e mexer antes cancela) levanta o widget, que se arrasta para outro lugar; um marcador tracejado mostra onde cai, a página desliza perto das margens e Esc cancela. Os cartões altos encolhem enquanto se arrastam. A ordem fica guardada na aplicação (igual em todos os dispositivos) e repõe-se em Definições → Ordem dos widgets.
 - **Visão Geral: Investor Score e Portfolio Score a seguir ao gráfico**  

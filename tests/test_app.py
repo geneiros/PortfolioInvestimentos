@@ -2058,20 +2058,28 @@ def test_core_portfolio_missing_etfs_in_demo(client):
     assert "Não encontrei" in html.split('id="coreCard"', 1)[1][:1500] and 'id="coreBanner"' not in html
 
 
-def test_overview_widget_order(client):
+def test_widget_order_all_pages(client):
+    from portfolio_investimentos.models import Setting
     token = csrf(client)
     assert post(client, "load_demo", token).status_code == 200
     html = client.get("/").get_data(as_text=True)
-    assert 'data-pm-widgets="overview"' in html and "js/widgets.js" in html
+    assert "js/widgets.js" in html and "window.PM_WIDGET_ORDER = {};" in html
     names = re.findall(r'data-widget="(\w+)"', html)
     assert names == ["carteira", "grafico", "notas", "movers", "eventos", "peso", "alocacao"]
-    assert "const grid = document.getElementById(\"overviewGrid\"), order = [];" in html
-    assert post(client, "save_widget_order", token, page="overview", order="movers,carteira").status_code == 200
-    html = client.get("/").get_data(as_text=True)
-    assert 'order = ["movers", "carteira"];' in html
-    assert "Com uma ordem tua." in client.get("/definicoes").get_data(as_text=True)
-    for bad in ("movers,movers", "nada", "carteira,<script>"):
-        assert post(client, "save_widget_order", token, page="overview", order=bad).status_code == 400, bad
-    assert post(client, "save_widget_order", token, page="outra", order="carteira").status_code == 400
-    assert post(client, "reset_widget_order", token, page="overview").status_code == 200
-    assert "order = [];" in client.get("/").get_data(as_text=True)
+    assert 'class="active">YTD' in html  # o gráfico abre no ano corrente
+    r = post(client, "save_widget_order", token, page="/carteira", grid="g-crisiscard", order="costscard,crisiscard")
+    assert r.status_code == 200
+    assert 'window.PM_WIDGET_ORDER = {"g-crisiscard": ["costscard", "crisiscard"]};' in client.get("/carteira").get_data(as_text=True)
+    assert "window.PM_WIDGET_ORDER = {};" in client.get("/").get_data(as_text=True)  # cada página tem a sua
+    assert post(client, "save_widget_order", token, page="/", grid="overviewGrid", order="movers,carteira").status_code == 200
+    assert "/carteira" in client.get("/definicoes").get_data(as_text=True).split('id="widgetsCard"', 1)[1][:1500]
+    for page, grid, bad in (("/", "g0", "a,a"), ("/", "g0", "<script>"), ("http://x", "g0", "a"), ("/", "g 0", "a"),
+                            ("/", "g0", ",".join(f"c{i}" for i in range(41)))):
+        assert post(client, "save_widget_order", token, page=page, grid=grid, order=bad).status_code == 400, bad
+    assert post(client, "reset_widget_order", token, page="/carteira").status_code == 200
+    assert "window.PM_WIDGET_ORDER = {};" in client.get("/carteira").get_data(as_text=True)
+    assert post(client, "reset_widget_order", token).status_code == 200  # todas
+    assert "window.PM_WIDGET_ORDER = {};" in client.get("/").get_data(as_text=True)
+    with client.application.app_context():  # a ordem da primeira versão (só a Visão Geral) continua a valer
+        Setting.set("widgets_overview", '["movers"]')
+    assert 'window.PM_WIDGET_ORDER = {"overviewGrid": ["movers"]};' in client.get("/").get_data(as_text=True)

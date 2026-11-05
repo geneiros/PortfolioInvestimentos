@@ -566,23 +566,25 @@ def core_ack(step):
 
 # ------------------------------------------------------------------ ordem dos widgets
 @action
-def save_widget_order(page, order):
-    """Ordem dos widgets de uma página (arrastados com um clique longo); `order`: nomes separados por vírgulas."""
-    from .views import WIDGETS
-    known = WIDGETS.get(page)
-    if known is None:
-        raise ApiError("Página desconhecida.")
+def save_widget_order(page, grid, order):
+    """Ordem dos cartões de uma grelha de uma página (mudada com um clique longo e arrastar);
+    `order`: nomes separados por vírgulas."""
+    from .services import widgets
     names = order if isinstance(order, list) else [x for x in str(order).split(",") if x]
-    if len(set(names)) != len(names) or any(n not in known for n in names):
-        raise ApiError("Ordem inválida.")
-    Setting.set(f"widgets_{page}", json.dumps(names))
+    try:
+        widgets.save(page, grid, names)
+    except ValueError as exc:
+        raise ApiError(str(exc)) from exc
     return "Ordem guardada."
 
 
 @action
-def reset_widget_order(page="overview"):
-    Setting.set(f"widgets_{page}", None)
-    return "Ordem dos widgets reposta."
+def reset_widget_order(page=""):
+    from .services import widgets
+    if page and not widgets.valid_page(page):
+        raise ApiError("Página inválida.")
+    widgets.reset(page or None)
+    return "Ordem dos cartões reposta."
 
 
 @action

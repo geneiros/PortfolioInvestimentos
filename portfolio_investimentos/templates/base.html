@@ -190,6 +190,8 @@
 <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pm.js') }}"></script>
+<script>window.PM_WIDGET_ORDER = {{ (widget_orders or {})|tojson }};</script>
+<script src="{{ url_for('static', filename='js/widgets.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
