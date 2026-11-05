@@ -49,10 +49,10 @@
         <div class="text-secondary">tempo-ponderado</div>
       </div>
       <div class="col-sm-6 border-start" style="border-color: var(--pm-border)!important">
-        <div class="pm-label">Por ano <span class="badge text-bg-secondary">CAGR</span> {{ help("Taxa de crescimento anual composta do TWR.") }}</div>
+        <div class="pm-label">Por ano <span class="badge text-bg-secondary">CAGR</span> {{ help("Taxa de crescimento anual composta do TWR. Com um período de menos de 1 ano não se anualiza (seria uma extrapolação): mostra o retorno do período.") }}</div>
         <div class="d-flex align-items-baseline gap-2 flex-wrap mt-2"><span class="pm-big {{ perf.cagr|tone }}">{{ perf.cagr|pct(2) }}</span>
           {% if b %}<small><span class="pm-chip active py-0" style="--chip: {{ b.color }}">{{ b.name }} <b class="{{ b.cagr|tone }}">{{ b.cagr|pct(2) }}</b></span></small>{% endif %}</div>
-        <div class="text-secondary">composto anual</div>
+        <div class="text-secondary">{% if perf.years < 1 %}no período (menos de 1 ano, não anualizado){% else %}composto anual{% endif %}</div>
       </div>
     </div>
   </div></div>
@@ -104,7 +104,7 @@
   <div class="pm-label mb-3">Mérito vs mercado <span class="text-secondary">· referência {{ merit_name }}</span></div>
   <div class="row g-3">
     {% for label, v, hint, good in [
-      ("Captura em alta", m.up_capture, "Quanto da subida do mercado capturaste nos meses em que ele subiu.", (m.up_capture or 0) >= 1),
+      ("Captura em alta", m.up_capture, "Quanto da subida do mercado capturaste nos meses em que ele subiu (com pelo menos 6 meses).", (m.up_capture or 0) >= 1),
       ("Captura em baixa", m.down_capture, "Quanto da descida do mercado sofreste nos meses em que ele caiu (menos é melhor).", (m.down_capture or 0) <= 1)] %}
     <div class="col-lg-4"><div class="pm-card pm-card-sm" style="background: var(--pm-surface-2)">
       <div class="pm-label">{{ label }} {{ help(hint) }}</div>
@@ -115,8 +115,8 @@
     {% endfor %}
     <div class="col-lg-4"><div class="pm-card pm-card-sm" style="background: var(--pm-surface-2)">
       <div class="pm-label">Beta vs {{ merit_name }} {{ help("Sensibilidade aos movimentos do mercado. 1 = acompanha o mercado.") }}</div>
-      <div class="pm-mid text-up">{{ m.beta|number(2) }}×</div>
-      <div class="small">{% if m.beta is none %}—{% elif m.beta < 0.8 %}menos volátil que o mercado{% elif m.beta <= 1.2 %}volatilidade parecida com a do mercado{% else %}mais volátil que o mercado{% endif %}</div>
+      <div class="pm-mid text-up">{{ m.beta|number(2) }}{% if m.beta is not none %}×{% endif %}</div>
+      <div class="small">{% if m.beta is none %}precisa de pelo menos 6 meses{% elif m.beta < 0.8 %}menos volátil que o mercado{% elif m.beta <= 1.2 %}volatilidade parecida com a do mercado{% else %}mais volátil que o mercado{% endif %}</div>
     </div></div>
   </div>
   <div class="pm-card pm-card-sm mt-3 {{ 'accent-top' if m.beat_months * 2 >= m.months else 'accent-red' }}" style="height:auto">
@@ -136,12 +136,12 @@
   <div class="pm-label mb-3">Risco & detalhe</div>
   <div class="row g-3">
     {% for label, v, fmt, rate, hint in [
-      ("Sharpe", r.sharpe, "n", ratings.sharpe, "Retorno anual acima da taxa sem risco (" ~ (perf.risk_free * 100)|round(2) ~ "%, em Definições) por unidade de volatilidade."),
-      ("Sortino", r.sortino, "n", ratings.sortino, "Como o Sharpe (também acima da taxa sem risco), mas só penaliza a volatilidade negativa."),
-      ("Calmar", r.calmar, "n", ratings.calmar, "CAGR dividido pela maior queda."),
+      ("Sharpe", r.sharpe, "n", ratings.sharpe, "Retorno médio anual (média dos retornos diários × 252, na mesma base da volatilidade) acima da taxa sem risco (" ~ (perf.risk_free * 100)|round(2) ~ "%, em Definições), por unidade de volatilidade."),
+      ("Sortino", r.sortino, "n", ratings.sortino, "Como o Sharpe (retorno médio anual acima da taxa sem risco), mas só penaliza a volatilidade negativa."),
+      ("Calmar", r.calmar, "n", ratings.calmar, "CAGR dividido pela maior queda. Só com um período de pelo menos 1 ano."),
       ("Volatilidade", r.volatility, "p", ratings.volatility ~ (" · ~" ~ ((r.volatility / m.volatility)|number(1)) ~ "× a do " ~ merit_name ~ " (" ~ (m.volatility|pct(2, sign=False)) ~ ")" if m and m.volatility else ""), "Desvio-padrão anualizado dos retornos diários."),
       ("Max drawdown", r.max_drawdown, "p", ratings.max_drawdown, "Maior queda desde um máximo."),
-      ("Retorno médio/ano", r.avg_year, "p", r.years ~ " períodos anuais", "Média simples dos retornos anuais."),
+      ("Retorno médio/ano", r.avg_year, "p", r.years ~ (" ano completo" if r.years == 1 else " anos completos"), "Média simples dos retornos dos anos completos: sem o ano a decorrer nem o primeiro, se começou a meio do ano."),
     ] %}
     <div class="col-md-6 col-xl-4"><div class="pm-card pm-card-sm" style="background: var(--pm-surface-2)">
       <div class="pm-label">{{ label }} {{ help(hint) }}</div>
@@ -159,9 +159,9 @@
   <div class="pm-card pm-card-sm {{ 'accent-top' if (m.alpha or 0) >= 0 else 'accent-red' }}" style="height:auto">
     <div class="row g-3 align-items-center">
       <div class="col-lg-5"><div class="pm-hero-value {{ m.alpha|tone }}" style="font-size: 3rem">{{ m.alpha|pct(2) }}</div>
-        <div class="small">diferença face ao mercado depois de descontar o risco</div></div>
+        <div class="small">{% if m.alpha is none %}precisa de pelo menos 6 meses{% else %}diferença face ao mercado depois de descontar o risco{% if perf.years < 1 %} (no período, não anualizada){% endif %}{% endif %}</div></div>
       <div class="col-6 col-lg-3"><div class="pm-label">Superação do mercado</div><div class="pm-mid {{ m.excess_cagr|tone }}">{{ m.excess_cagr|pct(2) }}</div><div class="small text-secondary">sem ajustar ao risco</div></div>
-      <div class="col-6 col-lg-3"><div class="pm-label">Média anual</div><div class="pm-mid {{ m.avg_yearly_excess|tone }}">{{ m.avg_yearly_excess|pct(2) }}</div><div class="small text-secondary">{{ m.years }} anos · média anual</div></div>
+      <div class="col-6 col-lg-3"><div class="pm-label">Média anual</div><div class="pm-mid {{ m.avg_yearly_excess|tone }}">{{ m.avg_yearly_excess|pct(2) }}</div><div class="small text-secondary">{{ m.years }} {{ 'ano completo' if m.years == 1 else 'anos completos' }} · média anual</div></div>
     </div>
   </div>
   {% set pos = m.sorted|selectattr(0, "ge", 0)|list|length %}

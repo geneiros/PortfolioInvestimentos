@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
-- **Visão Geral verificada; posição de abertura estimada por corretora**  
+- **Desempenho: Sharpe, Sortino e alfa corretos em períodos curtos; médias só com anos completos**  
+  Verificados o TWR, o CAGR, a IRR, a volatilidade, o drawdown e o beta com um cálculo independente. Corrigido: o Sharpe e o Sortino comparavam o retorno do período (ex.: 1 mês) com a taxa sem risco anual e a volatilidade anualizada (1M com +0,45% dava Sharpe −0,15); passam a usar o retorno médio diário anualizado. Com menos de 1 ano, o Calmar fica «—», o CAGR diz «no período, não anualizado» e o alfa usa a taxa sem risco do período; o beta, as capturas e o alfa precisam de 6 meses. A média anual, o melhor/pior ano e o mérito anual deixam de contar o primeiro ano (se começou a meio) e o ano a decorrer.
+- **Visão Geral verificada; posição de abertura estimada por corretora** `53d8851`  
   Confirmados os cartões da Visão Geral (carteira, retorno total = soma das partes, variação diária, ano corrente, máximo histórico, resultados, conta, peso vs retorno, alocação). A alocação por corretora não batia com o total: uma venda numa corretora sem o histórico completo consumia as ações de outra corretora na vista consolidada. A posição de abertura estimada passa a ser por corretora e ativo, por isso o consolidado é a soma das corretoras. A demonstração deixa de vender numa corretora ações que só existiam na outra.
 - **Carteira: ROI % do total com a mesma base das linhas; «?» no 1D** `c1da696`  
   Confirmados os totais da tabela (cada coluna é a soma das linhas). O ROI % do total passava a dividir pelo investido só nas posições abertas, enquanto as linhas dividem por tudo o que se investiu no ativo (incluindo partes já vendidas, de onde vem o realizado); o total passa a usar a mesma base. A coluna 1D ganha um «?»: a % é a do preço na moeda do ativo e o valor em euros inclui o câmbio.

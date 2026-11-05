@@ -255,9 +255,9 @@ Tipos aceites: `BUY`, `SELL`, `DIVIDEND`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `INTER
 - **Depósitos implícitos:** se uma compra não tiver dinheiro em caixa, o valor em falta conta como depósito. Assim, quem só importa compras e vendas continua a ter retornos corretos.
 - **TWR** encadeia os retornos diários, descontando os fluxos externos. **IRR** é a XIRR dos depósitos e levantamentos mais o valor final.
 - **Índices de referência** (S&P 500, Nasdaq 100, MSCI World) convertidos para euros ao câmbio de cada dia, como a carteira. Assim a variação do dólar não aparece como mérito ou demérito.
-- **Volatilidade, Sharpe e Sortino** calculados só com dias úteis (os juros lançados ao fim de semana não contam como dias de bolsa), anualizados com 252 dias.
+- **Volatilidade, Sharpe e Sortino** calculados só com dias úteis (os juros lançados ao fim de semana não contam como dias de bolsa), anualizados com 252 dias. O Sharpe e o Sortino usam o retorno médio diário anualizado (× 252), na mesma base da volatilidade e da taxa sem risco, por isso valem também para períodos curtos. O **Calmar** (CAGR ÷ maior queda) só aparece com pelo menos 1 ano, e o **beta**, as **capturas** e o **alfa** com pelo menos 6 meses; com menos de 1 ano, o CAGR é o retorno do período, sem anualizar.
 - **Taxa sem risco** de 2% ao ano por omissão (perto da taxa de depósito do BCE) no Sharpe, no Sortino e no alfa; ajustável em **Definições → Dados de mercado**.
-- **Melhor/pior mês e ano** e **sequência atual** só contam períodos completos: o mês e o ano em curso ficam de fora.
+- **Melhor/pior mês e ano**, **sequência atual** e **médias anuais** só contam períodos completos: ficam de fora o mês e o ano em curso e o primeiro mês ou ano, se a carteira (ou o período escolhido) começou a meio.
 
 ## Estrutura
 

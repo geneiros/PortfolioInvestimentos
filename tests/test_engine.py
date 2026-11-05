@@ -473,8 +473,36 @@ def test_incomplete_periods_and_risk_free():
     assert perf0["worst_month"][0] != "2026-10" and perf0["partial_month"] == "2026-10"
     assert perf0["worst_year"][0] != "2026"
     r0, r2 = perf0["risk"], perf2["risk"]
-    assert r2["sharpe"] == pytest.approx((perf2["cagr"] - 0.02) / r2["volatility"])
+    from portfolio_investimentos.engine.portfolio import daily_returns
+    rets = daily_returns([1 + x for x in perf2["twr"]], [date.fromisoformat(x) for x in perf2["dates"]])
+    annual = sum(rets) / len(rets) * 252  # retorno médio diário anualizado, na base da volatilidade
+    assert r2["sharpe"] == pytest.approx((annual - 0.02) / r2["volatility"])
     assert r2["sharpe"] < r0["sharpe"]
+
+
+def test_short_periods_and_incomplete_years():
+    """Períodos curtos: Sharpe com o retorno anualizado (positivo se a carteira sobe), sem Calmar, sem beta nem
+    alfa com menos de 6 meses; o ano da primeira compra (a meio do ano) não entra no melhor/pior nem na média."""
+    d0, d1 = date(2024, 6, 3), date(2026, 10, 30)
+    prices = book_linear("ACME", d0, d1, 10.0, 15.0)
+    prices.update(book_linear("^GSPC", d0, d1, 4000.0, 5000.0))
+    for t in ("ACME", "^GSPC"):  # alguma volatilidade, a subir em média
+        prices[t] = [(d, v * (1.004 if i % 2 else 0.997)) for i, (d, v) in enumerate(prices[t])]
+    txs = [Tx(d0, "DEPOSIT", amount=1000), Tx(d0, "BUY", ACME, quantity=100, price=10)]
+    p = Portfolio(txs, PriceBook(prices), benchmarks=[SPX], as_of=d1)
+    one_month = p.performance("1M", risk_free=0.02)
+    assert one_month["twr_total"] > 0 and one_month["risk"]["sharpe"] > 0
+    assert one_month["risk"]["calmar"] is None and one_month["years"] < 1
+    assert one_month["merit"]["beta"] is None and one_month["merit"]["alpha"] is None
+    full = p.performance("MAX", risk_free=0.02)
+    assert [k for k, _ in full["yearly"]] == ["2024", "2025", "2026"]
+    assert full["best_year"][0] == "2025" and full["worst_year"][0] == "2025"  # 2024 (desde junho) e 2026 não
+    assert full["risk"]["years"] == 1 and full["risk"]["avg_year"] == pytest.approx(dict(full["yearly"])["2025"])
+    assert full["merit"]["years"] == 1 and full["merit"]["beta"] is not None
+    from portfolio_investimentos.engine.portfolio import _complete
+    months = [("2024-06", 0.1), ("2024-07", 0.2)]
+    assert _complete(months, date(2024, 7, 31), "month", start=date(2024, 6, 3)) == months  # 3 de junho: completo
+    assert _complete(months, date(2024, 7, 31), "month", start=date(2024, 6, 20)) == [("2024-07", 0.2)]
 
 
 def _stress_book(as_of, amp):
