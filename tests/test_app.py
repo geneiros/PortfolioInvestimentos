@@ -2187,7 +2187,7 @@ def test_logos_service_and_pages(app, client, monkeypatch):
         db.session.commit()
         tk = inst.ticker
         monkeypatch.setattr(logos, "yahoo_website", lambda symbol: None)
-        monkeypatch.setattr(logos, "yahoo_long_name", lambda symbol: None)
+        monkeypatch.setattr(logos, "yahoo_chart_name", lambda symbol: None)
         assert logos.needs(tk)
         assert logos.update(inst, {"website": "https://www.apple.com"}, download=fake) == "apple.com (Yahoo)"
         assert logos.update(etf, None, download=fake) == "ishares.com (nome)" and "ishares.com" in calls[-1]
@@ -2250,9 +2250,24 @@ def test_logos_more_sources_and_errors(app, monkeypatch):
         # ETF com o nome da corretora: o emitente vem do nome longo do Yahoo
         def limited(symbol):
             raise logos.Unavailable("HTTP 429")
-        monkeypatch.setattr(logos, "yahoo_long_name", limited)  # a pesquisa limitada: vale o nome das cotações
-        monkeypatch.setattr(logos, "yahoo_chart_name", lambda symbol: "Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C")
-        assert logos.update(xeon, None, download=ok) == "xtrackers.com (Yahoo)"
+        monkeypatch.setattr(logos, "yahoo_chart_name", limited)  # o acesso direto limitado: vale o da atualização
+
+        class FakeTicker:  # o objeto do yfinance da atualização: o nome longo vem nas cotações
+            history_metadata = {}
+
+            def history(self, start=None, auto_adjust=False):
+                self.history_metadata = {"longName": "Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C"}
+        assert logos.update(xeon, None, download=ok, ticker=FakeTicker()) == "xtrackers.com (Yahoo)"
+        db.session.delete(db.session.get(Logo, "XEON.DE"))
+        db.session.commit()
+        assert "erro" in logos.update(xeon, None, download=ok)  # sem o da atualização e com o direto limitado
+        # sem ícone em nenhum serviço: o resumo diz a resposta de cada um
+        def nf(url):
+            raise urllib_error.HTTPError(url, 404, "nf", {}, None)
+        msg = logos.update(adb, {"website": "adobe.com"}, download=nf)
+        assert "sem ícone" in msg and "google 404" in msg and "site-ico 404" in msg
+        db.session.delete(db.session.get(Logo, "ADB"))
+        db.session.commit()
         # subdomínio sem ícone (ir.finvgroup.com): usa-se o domínio principal
         assert logos.candidates("ir.finvgroup.com") == ["ir.finvgroup.com", "finvgroup.com"]
         assert logos.candidates("investor.x.co.uk") == ["investor.x.co.uk", "x.co.uk"] and logos.candidates("a.com") == ["a.com"]
@@ -2267,7 +2282,7 @@ def test_logos_more_sources_and_errors(app, monkeypatch):
         assert logos.update(fin, {"website": "https://ir.finvgroup.com"}, download=only_main) == "finvgroup.com (Yahoo)"
         db.session.commit()
         # erros de rede não contam como «não há»: nada se grava e tenta-se outra vez
-        db.session.delete(db.session.get(Logo, "ADB"))
+        Logo.query.filter_by(ticker="ADB").delete()
         db.session.commit()
         msg = logos.update(adb, {}, download=down)
         assert "erro" in msg and db.session.get(Logo, "ADB") is None and logos.needs("ADB")

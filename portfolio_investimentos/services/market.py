@@ -458,7 +458,7 @@ def refresh_all(start=None, progress=None, only_open=False):
                             info = t.info or {}
                         except Exception:  # há outras fontes (Wikidata pelo ISIN)
                             info = {}
-                    note(f"{inst.ticker} logótipo: {logos.update(inst, info)}")
+                    note(f"{inst.ticker} logótipo: {logos.update(inst, info, ticker=t)}")
                     db.session.commit()
             except Exception as exc:  # opcional
                 db.session.rollback()

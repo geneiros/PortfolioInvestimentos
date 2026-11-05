@@ -41,9 +41,17 @@ ISSUERS = [
     (r"\bfidelity\b", "fidelity.com"), (r"\bschwab\b", "schwab.com"), (r"\bfirst trust\b", "ftportfolios.com"),
     (r"\bsparinvest\b", "sparinvest.lu"), (r"\bdimensional\b", "dimensional.com"),
 ]
-# o Google responde 404 quando não tem o ícone no tamanho pedido: pedem-se tamanhos menores antes de desistir
-ICON_URLS = ["https://www.google.com/s2/favicons?domain={d}&sz=128", "https://www.google.com/s2/favicons?domain={d}&sz=64",
-             "https://www.google.com/s2/favicons?domain={d}&sz=32", "https://icons.duckduckgo.com/ip3/{d}.ico"]
+# serviços de ícones, por ordem: (nome para o resumo, endereço). O Google responde 404 quando não tem o ícone no
+# tamanho pedido (por isso pedem-se tamanhos menores) e redireciona para o gstatic, que também se pede diretamente;
+# por fim, o ícone do próprio site
+ICON_URLS = [
+    ("google", "https://www.google.com/s2/favicons?domain={d}&sz=128"),
+    ("google64", "https://www.google.com/s2/favicons?domain={d}&sz=64"),
+    ("gstatic", "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://{d}&size=128"),
+    ("duckduckgo", "https://icons.duckduckgo.com/ip3/{d}.ico"),
+    ("site", "https://{d}/apple-touch-icon.png"),
+    ("site-ico", "https://{d}/favicon.ico"),
+]
 
 
 def domain_of(site):
@@ -85,23 +93,28 @@ def _get_json(url, params):
         raise Unavailable(str(getattr(exc, "reason", exc))[:100]) from exc
 
 
-def fetch_icon(domain, download=None):
-    """(tipo, imagem) do ícone do site, ou None (sem ícone, ou o ícone genérico do serviço).
-    Levanta Unavailable se nenhum serviço de ícones respondeu (rede, site não permitido)."""
+def fetch_icon(domain, download=None, reasons=None):
+    """(tipo, imagem) do ícone do site, ou None (nenhum serviço tem ícone). Levanta Unavailable se nenhum serviço
+    respondeu (rede, site não permitido). Em `reasons` (lista) fica a resposta de cada serviço, para o resumo."""
     download = download or _download
-    failures = []
-    for template in ICON_URLS:
+    reasons = [] if reasons is None else reasons
+    failures = 0
+    for name, template in ICON_URLS:
+        url = template.format(d=urllib.parse.quote(domain))
         try:
-            mime, data = download(template.format(d=urllib.parse.quote(domain)))
-        except urllib.error.HTTPError:  # 404 e afins: o serviço respondeu que não tem ícone
+            mime, data = download(url)
+        except urllib.error.HTTPError as exc:  # 404 e afins: o serviço respondeu que não tem ícone
+            reasons.append(f"{name} {exc.code}")
             continue
         except (urllib.error.URLError, OSError, ValueError) as exc:
-            failures.append(str(getattr(exc, "reason", exc))[:80])
+            failures += 1
+            reasons.append(f"{name}: {str(getattr(exc, 'reason', exc))[:60]}")
             continue
         if mime in MIMES and 100 < len(data) <= MAX_BYTES:
             return mime, data
-    if len(failures) == len(ICON_URLS):
-        raise Unavailable("serviço de ícones sem resposta: " + "; ".join(failures))
+        reasons.append(f"{name}: {mime or 'sem tipo'} {len(data)} B")
+    if failures == len(ICON_URLS):
+        raise Unavailable("serviços de ícones sem resposta: " + "; ".join(reasons))
     return None
 
 
@@ -138,17 +151,6 @@ def yahoo_chart_name(symbol):
     return meta.get("longName") or meta.get("shortName")
 
 
-def yahoo_long_name(symbol):
-    """Nome longo do Yahoo pela pesquisa (quando as cotações vêm sem ele)."""
-    from . import yahoo
-    try:
-        quotes = yahoo.Search(symbol, max_results=5).quotes
-    except Exception as exc:
-        raise Unavailable(str(exc)[:100]) from exc
-    exact = [q for q in quotes if (q.get("symbol") or "").upper() == symbol.upper()] or quotes[:1]
-    return (exact[0].get("longname") or exact[0].get("shortname")) if exact else None
-
-
 def yahoo_website(symbol):
     """`website` dos dados da empresa pelo acesso direto ao Yahoo (quando o yfinance veio sem ele)."""
     from . import yahoo
@@ -158,8 +160,27 @@ def yahoo_website(symbol):
         raise Unavailable(str(exc)[:100]) from exc
 
 
-def resolve(inst, info=None, get=None):
-    """(domínio, origem, erros): o site para o logótipo e de onde veio; `erros` são as fontes que não responderam."""
+def ticker_long_name(t):
+    """Nome longo nas cotações pelo cliente da atualização (o yfinance, que o Yahoo não limita como os pedidos
+    diretos), ex.: «Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C»."""
+    from datetime import date as _date
+    if t is None:
+        return None
+    meta = getattr(t, "history_metadata", None) or {}
+    if not (meta.get("longName") or meta.get("shortName")):
+        try:
+            t.history(start=_date.today() - timedelta(days=7), auto_adjust=False)
+        except TypeError:  # o acesso direto (yahoo.py) não tem auto_adjust
+            t.history(start=_date.today() - timedelta(days=7))
+        except Exception as exc:
+            raise Unavailable(str(exc)[:100]) from exc
+        meta = getattr(t, "history_metadata", None) or {}
+    return meta.get("longName") or meta.get("shortName")
+
+
+def resolve(inst, info=None, get=None, ticker=None):
+    """(domínio, origem, erros): o site para o logótipo e de onde veio; `erros` são as fontes que não responderam.
+    `ticker`: o objeto do cliente da atualização (yfinance ou yahoo.py) para este ativo."""
     errors = []
     symbol = inst.data_symbol or inst.ticker
 
@@ -173,8 +194,11 @@ def resolve(inst, info=None, get=None):
         d = issuer_domain(inst.instrument_name)
         if d:
             return d, "nome", errors
-        for fn in (yahoo_chart_name, yahoo_long_name):
-            d = issuer_domain(attempt(fn, symbol))
+        d = issuer_domain(attempt(ticker_long_name, ticker)) if ticker is not None else None
+        if d:
+            return d, "Yahoo", errors
+        if ticker is None:  # fora da atualização: o acesso direto
+            d = issuer_domain(attempt(yahoo_chart_name, symbol))
             if d:
                 return d, "Yahoo", errors
         site_label = attempt(wikidata, inst.isin, get) or (None, None)
@@ -205,32 +229,36 @@ def _save(ticker, mime, data, source):
     db.session.add(row)
 
 
-def update(inst, info=None, download=None, get=None):
+def update(inst, info=None, download=None, get=None, ticker=None):
     """Procura e guarda o logótipo de um ativo. Devolve a linha para o resumo da atualização.
 
     Uma fonte que não respondeu não conta como «não há»: não se grava nada e tenta-se na próxima atualização.
     """
-    domain, origin, errors = resolve(inst, info, get)
+    domain, origin, errors = resolve(inst, info, get, ticker)
     if not domain:
         if errors:
             return "erro (" + "; ".join(errors)[:200] + "); tenta-se na próxima atualização"
         _save(inst.ticker, None, None, NOT_FOUND)
         return "sem site encontrado (indica-o em Definições → Ativos)"
+    reasons = []
     try:
-        icon, used = _icon_for(domain, download)
+        icon, used = _icon_for(domain, download, reasons)
     except Unavailable as exc:
         return f"{domain}: erro ({exc}); tenta-se na próxima atualização"
     if not icon:
         _save(inst.ticker, None, None, NOT_FOUND)
-        return f"{domain}: sem ícone (indica outro site em Definições → Ativos)"
+        return f"{domain}: sem ícone ({' | '.join(reasons)[:300]}); indica outro site em Definições → Ativos"
     _save(inst.ticker, icon[0], icon[1], f"site:{used}"[:80])
     return f"{used} ({origin})"
 
 
-def _icon_for(domain, download=None):
+def _icon_for(domain, download=None, reasons=None):
     """(ícone, domínio usado): o do domínio ou, sem ele, o do domínio principal."""
     for d in candidates(domain):
-        icon = fetch_icon(d, download)
+        tried = []
+        icon = fetch_icon(d, download, tried)
+        if reasons is not None:
+            reasons.append(f"{d}: " + ", ".join(tried))
         if icon:
             return icon, d
     return None, domain
