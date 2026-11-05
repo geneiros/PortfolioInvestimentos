@@ -14,7 +14,7 @@ from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory
                      OtherAsset, OtherAssetValue, Price, Setting, Transaction, WatchItem, db)
 from . import auth
 from .engine.portfolio import ASSET_TYPES
-from .services import backups, data, importer, market
+from .services import backups, cerne, data, importer, market
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -510,6 +510,58 @@ def set_stale_days(days):
         raise ApiError("Indica um número inteiro de dias entre 0 (nunca avisar) e 90.")
     Setting.set("stale_days", int(value))
     return "Sem aviso de cotações antigas." if not value else f"Aviso quando as cotações tiverem mais de {int(value)} dias."
+
+
+# ------------------------------------------------------------------ carteira cerne
+@action
+def save_core_plan(**values):
+    """Ativo de cada papel da carteira cerne (ticker_<papel>; vazio = procurar pelo código). As misturas da
+    tabela não mudam aqui; o intervalo de queda entre escalões muda-se em Definições."""
+    plan = cerne.plan()
+    for a in plan["assets"]:
+        ticker = (values.get(f"ticker_{a['role']}") or "").strip()
+        if ticker and db.session.get(Instrument, ticker) is None:
+            raise ApiError(f"Ativo não encontrado: {ticker}")
+        if ticker:
+            a["ticker"] = ticker
+        else:
+            a.pop("ticker", None)
+    cerne.save(plan)
+    return "Carteira cerne guardada."
+
+
+@action
+def set_core_interval(percent):
+    """Queda do ETF de crescimento que faz passar ao escalão seguinte da carteira cerne (as misturas não mudam)."""
+    value = _float(percent)
+    n = len(cerne.plan()["steps"])
+    if not math.isfinite(value) or not 1 <= value <= 30 or n * value >= 100:
+        raise ApiError(f"Indica um intervalo entre 1 e {min(30, math.ceil(100 / n) - 1)}%.")
+    plan = cerne.plan()
+    plan["interval"] = value / 100
+    cerne.save(plan)
+    drops = " / ".join(f"−{k * value:g}%".replace(".", ",") for k in range(1, n + 1))
+    return f"Escalões da carteira cerne: {drops}."
+
+
+@action
+def set_core_enabled(enabled):
+    plan = cerne.plan()
+    plan["enabled"] = str(enabled) not in ("0", "", "false")
+    cerne.save(plan)
+    return "Carteira cerne ligada." if plan["enabled"] else "Carteira cerne desligada."
+
+
+@action
+def core_reset():
+    cerne.reset()
+    return "De volta ao alvo base."
+
+
+@action
+def core_ack(step):
+    cerne.acknowledge(int(_float(step)))
+    return "Aviso fechado."
 
 
 @action

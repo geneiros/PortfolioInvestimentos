@@ -1972,3 +1972,87 @@ def test_portfolio_totals_match_rows(app, client):
     html = client.get("/carteira").get_data(as_text=True)
     total = html.split("<tfoot>", 1)[1].split("</tfoot>", 1)[0]
     assert pct(roi / base, 2) in total
+
+
+def _core_portfolio(app, growth_last):
+    from portfolio_investimentos.models import Instrument, Price
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="ERNX", currency="EUR", data_symbol="ERNX.L"),
+            Instrument(ticker="FWIA", currency="EUR", data_symbol="FWIA.DE"),
+            Instrument(ticker="XEON", currency="EUR", data_symbol="XEON.DE"),
+            Transaction(date=date(2026, 1, 5), type="DEPOSIT", amount=10000, currency="EUR"),
+            Transaction(date=date(2026, 1, 5), type="BUY", instrument="ERNX", quantity=45, price=100.0, currency="EUR"),
+            Transaction(date=date(2026, 1, 5), type="BUY", instrument="FWIA", quantity=300, price=10.0, currency="EUR"),
+            Transaction(date=date(2026, 1, 5), type="BUY", instrument="XEON", quantity=50, price=50.0, currency="EUR"),
+            Price(instrument="ERNX", date=date(2026, 1, 6), close=100.0),
+            Price(instrument="XEON", date=date(2026, 1, 6), close=50.0),
+            Price(instrument="FWIA", date=date(2026, 1, 6), close=10.0),
+            Price(instrument="FWIA", date=date(2026, 1, 7), close=growth_last)])
+        db.session.commit()
+
+
+def _core_badge(client, url="/carteira"):
+    card = client.get(url).get_data(as_text=True).split('id="coreCard"', 1)[1]
+    m = re.search(r'<span class="badge [^"]*">([^<]+)</span>', card)
+    return m.group(1) if m else None
+
+
+def _set_fwia(app, close):
+    from portfolio_investimentos.models import Price
+    with app.app_context():
+        db.session.add(Price(instrument="FWIA", date=date(2026, 1, 8) + timedelta(days=db.session.query(Price).count()),
+                             close=close))
+        db.session.commit()
+
+
+def test_core_portfolio_card_banner_and_ratchet(app, client):
+    from portfolio_investimentos.models import Setting
+    _core_portfolio(app, 7.8)  # FWIA −22% → escalão 2
+    html = client.get("/carteira").get_data(as_text=True)
+    card = html.split('id="coreCard"', 1)[1]
+    assert _core_badge(client) == "Escalão 2" and "−22,0%" in card and 'id="coreLadder"' in card
+    assert 'id="coreBanner"' in html and "escalão 2" in html.split('id="coreBanner"', 1)[1][:600]
+    with app.app_context():
+        assert Setting.get("core_reached") == "2"
+    token = csrf(client)
+    assert post(client, "core_ack", token, step="2").status_code == 200
+    assert 'id="coreBanner"' not in client.get("/").get_data(as_text=True)
+    # recupera: mantém o escalão 2; cai até −30%: escalão 3 e aviso outra vez
+    _set_fwia(app, 9.9)
+    assert _core_badge(client) == "Escalão 2"
+    _set_fwia(app, 7.0)
+    html = client.get("/carteira").get_data(as_text=True)
+    assert _core_badge(client) == "Escalão 3" and 'id="coreBanner"' in html
+    # dinheiro novo e voltar à base
+    assert "Investir" in client.get("/carteira?investir=1000").get_data(as_text=True).split('id="coreCard"', 1)[1]
+    assert client.get("/carteira?investir=abc").status_code == 200
+    _set_fwia(app, 10.0)
+    assert post(client, "core_reset", token).status_code == 200
+    assert _core_badge(client) == "Alvo base"
+
+
+def test_core_portfolio_settings(app, client):
+    _core_portfolio(app, 9.4)  # −6%: na base com o intervalo de 10%
+    token = csrf(client)
+    assert _core_badge(client) == "Alvo base"
+    assert 'id="coreInterval"' in client.get("/definicoes").get_data(as_text=True)
+    r = post(client, "set_core_interval", token, percent="5")
+    assert r.status_code == 200 and "−5% / −10% / −15% / −20% / −25%" in r.get_json()["message"]
+    assert _core_badge(client) == "Escalão 1"
+    assert "<td class=\"text-end\">40%</td>" in client.get("/carteira").get_data(as_text=True)  # as misturas da tabela não mudam
+    for bad in ("0", "nan", "abc", "25", "31"):
+        assert post(client, "set_core_interval", token, percent=bad).status_code == 400, bad
+    assert post(client, "save_core_plan", token, ticker_growth="NAOEXISTE").status_code == 400
+    assert post(client, "save_core_plan", token, ticker_growth="XEON").status_code == 200
+    assert post(client, "save_core_plan", token).status_code == 200  # volta ao automático
+    assert post(client, "set_core_enabled", token, enabled="0").status_code == 200
+    assert 'id="coreCard"' not in client.get("/carteira").get_data(as_text=True)
+    assert post(client, "set_core_enabled", token, enabled="1").status_code == 200
+    assert 'id="coreCard"' in client.get("/carteira").get_data(as_text=True)
+
+
+def test_core_portfolio_missing_etfs_in_demo(client):
+    assert post(client, "load_demo", csrf(client)).status_code == 200
+    html = client.get("/carteira").get_data(as_text=True)
+    assert "Não encontrei" in html.split('id="coreCard"', 1)[1][:1500] and 'id="coreBanner"' not in html

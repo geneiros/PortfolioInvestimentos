@@ -5,7 +5,7 @@ from datetime import datetime
 from ..engine.formatting import MONTHS
 from .. import auth
 from ..models import Setting
-from . import data
+from . import cerne, data
 from .market import market_status, refresh_state
 
 NAV = [
@@ -59,6 +59,7 @@ def build(active, title, **extra):
     if ctx["has_data"] and not ctx["is_demo"]:
         ctx["warnings"] += _refresh_warnings(p, active)
         ctx["stale_refresh"] = stale_refresh(p)
+        ctx["core_banner"] = cerne.banner(p)
     ctx.update(extra)
     return ctx
 
