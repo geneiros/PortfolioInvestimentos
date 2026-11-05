@@ -2224,6 +2224,7 @@ def test_logos_service_and_pages(app, client, monkeypatch):
 
 
 def test_logos_more_sources_and_errors(app, monkeypatch):
+    import urllib.error as urllib_error
     from datetime import datetime
     from portfolio_investimentos.models import Instrument, Logo
     from portfolio_investimentos.services import logos
@@ -2247,8 +2248,23 @@ def test_logos_more_sources_and_errors(app, monkeypatch):
         # sem site nos dados do Yahoo: vem do Wikidata pelo ISIN
         assert logos.update(adb, {}, download=ok) == "adobe.com (Wikidata)"
         # ETF com o nome da corretora: o emitente vem do nome longo do Yahoo
-        monkeypatch.setattr(logos, "yahoo_long_name", lambda symbol: "Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C")
+        def limited(symbol):
+            raise logos.Unavailable("HTTP 429")
+        monkeypatch.setattr(logos, "yahoo_long_name", limited)  # a pesquisa limitada: vale o nome das cotações
+        monkeypatch.setattr(logos, "yahoo_chart_name", lambda symbol: "Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C")
         assert logos.update(xeon, None, download=ok) == "xtrackers.com (Yahoo)"
+        # subdomínio sem ícone (ir.finvgroup.com): usa-se o domínio principal
+        assert logos.candidates("ir.finvgroup.com") == ["ir.finvgroup.com", "finvgroup.com"]
+        assert logos.candidates("investor.x.co.uk") == ["investor.x.co.uk", "x.co.uk"] and logos.candidates("a.com") == ["a.com"]
+        fin = Instrument(ticker="FINV", currency="EUR", kind="stock")
+        db.session.add(fin)
+        db.session.commit()
+
+        def only_main(url):
+            if "domain=finvgroup.com&sz=64" in url:
+                return "image/png", PNG
+            raise urllib_error.HTTPError(url, 404, "nf", {}, None)
+        assert logos.update(fin, {"website": "https://ir.finvgroup.com"}, download=only_main) == "finvgroup.com (Yahoo)"
         db.session.commit()
         # erros de rede não contam como «não há»: nada se grava e tenta-se outra vez
         db.session.delete(db.session.get(Logo, "ADB"))
@@ -2261,6 +2277,10 @@ def test_logos_more_sources_and_errors(app, monkeypatch):
         monkeypatch.setattr(logos, "_get_json", no_net)
         assert "erro" in logos.update(adb, {}, download=ok) and logos.needs("ADB")
         # os «none» da primeira versão voltam a procurar-se já
-        db.session.add(Logo(ticker="ADB", source="none", fetched=datetime.now()))
+        for old in ("none", "none2"):  # os de versões anteriores voltam a procurar-se já
+            db.session.merge(Logo(ticker="ADB", source=old, fetched=datetime.now()))
+            db.session.commit()
+            assert logos.needs("ADB")
+        db.session.merge(Logo(ticker="ADB", source=logos.NOT_FOUND, fetched=datetime.now()))
         db.session.commit()
-        assert logos.needs("ADB")
+        assert not logos.needs("ADB")

@@ -150,7 +150,7 @@ class Logo(db.Model):
     """Logótipo de um ativo, descarregado uma vez (na atualização de cotações) ou carregado à mão.
 
     `source`: "site:<domínio>" (procurado pelo site da empresa ou do emitente do ETF), "manual" (imagem carregada),
-    "off" (sem logótipo, por escolha) ou "none" (procurado e não encontrado; tenta-se de novo ao fim de 30 dias).
+    "off" (sem logótipo, por escolha) ou "none3" (procurado e não encontrado; tenta-se de novo ao fim de 7 dias).
     """
     ticker = db.Column(db.String(32), db.ForeignKey("instrument.ticker", ondelete="CASCADE"), primary_key=True)
     mime = db.Column(db.String(32))

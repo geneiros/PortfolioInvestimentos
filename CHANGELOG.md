@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Logótipos: nome do ETF pelas cotações, domínio principal e ícones mais pequenos**  
+  Na atualização no PythonAnywhere, a pesquisa do Yahoo respondia 429 (pedidos limitados) para os ETF; o nome longo (ex.: «Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C») passa a vir primeiro do pedido das cotações, que já funciona. Um site num subdomínio sem ícone (ex.: ir.finvgroup.com) tenta também o domínio principal (finvgroup.com), e ao serviço de ícones pedem-se também 64 e 32 px quando não tem 128 px. Os marcados como «sem ícone» até agora voltam a procurar-se já.
 - **Logótipos: mais fontes e erros que já não contam como «não há»**  
   Só aparecia o logótipo quando o Yahoo devolvia o site da empresa, e esse pedido falha muitas vezes (ex.: no PythonAnywhere); nos ETF, o nome da corretora («EUR Overnight Rate Swap») não diz o emitente. Agora o site da empresa vem também do Wikidata pelo ISIN, e o emitente do ETF também do nome longo do Yahoo (a pesquisa, ex.: «Xtrackers II EUR Overnight Rate Swap…») ou do Wikidata. Uma fonte que não responde já não grava «sem logótipo»: tenta-se na atualização seguinte (os marcados assim antes voltam a procurar-se já); um não encontrado repete-se ao fim de 7 dias. O resumo da atualização tem uma linha «logótipo» por ativo com o site e a origem, ou o motivo.
 - **Logótipos das empresas e dos ETF**  

@@ -19,6 +19,7 @@ from flask import g
 from ..models import Logo, db
 
 RETRY_DAYS = 7
+NOT_FOUND = "none3"  # procurado e não encontrado (com as fontes desta versão)
 WIKIDATA = "https://www.wikidata.org/w/api.php"
 UA = {"User-Agent": "PortfolioInvestimentos/1.0 (https://github.com/geneiros/PortfolioInvestimentos)"}
 
@@ -40,7 +41,9 @@ ISSUERS = [
     (r"\bfidelity\b", "fidelity.com"), (r"\bschwab\b", "schwab.com"), (r"\bfirst trust\b", "ftportfolios.com"),
     (r"\bsparinvest\b", "sparinvest.lu"), (r"\bdimensional\b", "dimensional.com"),
 ]
-ICON_URLS = ["https://www.google.com/s2/favicons?domain={d}&sz=128", "https://icons.duckduckgo.com/ip3/{d}.ico"]
+# o Google responde 404 quando não tem o ícone no tamanho pedido: pedem-se tamanhos menores antes de desistir
+ICON_URLS = ["https://www.google.com/s2/favicons?domain={d}&sz=128", "https://www.google.com/s2/favicons?domain={d}&sz=64",
+             "https://www.google.com/s2/favicons?domain={d}&sz=32", "https://icons.duckduckgo.com/ip3/{d}.ico"]
 
 
 def domain_of(site):
@@ -51,6 +54,14 @@ def domain_of(site):
     host = urllib.parse.urlsplit(site if "//" in site else "//" + site).hostname or ""
     host = host.removeprefix("www.")
     return host if re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", host) else None
+
+
+def candidates(domain):
+    """O domínio e o principal (ir.finvgroup.com → finvgroup.com; investor.x.co.uk → x.co.uk)."""
+    parts = domain.split(".")
+    keep = 3 if len(parts) >= 3 and len(parts[-2]) <= 3 and len(parts[-1]) == 2 else 2  # co.uk, com.br
+    main = ".".join(parts[-keep:])
+    return [domain] if main == domain else [domain, main]
 
 
 def issuer_domain(name):
@@ -113,8 +124,22 @@ def wikidata(isin, get=None):
     return next((x for x in sites if isinstance(x, str)), None), label
 
 
+def yahoo_chart_name(symbol):
+    """Nome longo do Yahoo nas cotações (o mesmo pedido das cotações, que raramente é limitado), ex.:
+    «Xtrackers II EUR Overnight Rate Swap UCITS ETF 1C»."""
+    from datetime import date as _date
+    from . import yahoo
+    try:
+        t = yahoo.Ticker(symbol)
+        t.history(start=_date.today() - timedelta(days=7))
+    except Exception as exc:
+        raise Unavailable(str(exc)[:100]) from exc
+    meta = t.history_metadata or {}
+    return meta.get("longName") or meta.get("shortName")
+
+
 def yahoo_long_name(symbol):
-    """Nome longo do Yahoo (a pesquisa, que não precisa dos dados da empresa), ex.: «Xtrackers II EUR Overnight…»."""
+    """Nome longo do Yahoo pela pesquisa (quando as cotações vêm sem ele)."""
     from . import yahoo
     try:
         quotes = yahoo.Search(symbol, max_results=5).quotes
@@ -148,9 +173,10 @@ def resolve(inst, info=None, get=None):
         d = issuer_domain(inst.instrument_name)
         if d:
             return d, "nome", errors
-        d = issuer_domain(attempt(yahoo_long_name, symbol))
-        if d:
-            return d, "Yahoo", errors
+        for fn in (yahoo_chart_name, yahoo_long_name):
+            d = issuer_domain(attempt(fn, symbol))
+            if d:
+                return d, "Yahoo", errors
         site_label = attempt(wikidata, inst.isin, get) or (None, None)
         d = issuer_domain(site_label[1])
         return (d, "Wikidata", errors) if d else (None, None, errors)
@@ -168,9 +194,9 @@ def resolve(inst, info=None, get=None):
 def needs(ticker, now=None):
     """Falta procurar o logótipo (nunca procurado, ou não encontrado há mais de 7 dias)?"""
     row = db.session.get(Logo, ticker)
-    if row is None or row.source == "none":  # «none»: da primeira versão, que contava os erros como «não há»
+    if row is None or row.source in ("none", "none2"):  # de versões anteriores, com menos fontes: já
         return True
-    return row.source == "none2" and row.fetched < (now or datetime.now()) - timedelta(days=RETRY_DAYS)
+    return row.source == NOT_FOUND and row.fetched < (now or datetime.now()) - timedelta(days=RETRY_DAYS)
 
 
 def _save(ticker, mime, data, source):
@@ -188,17 +214,26 @@ def update(inst, info=None, download=None, get=None):
     if not domain:
         if errors:
             return "erro (" + "; ".join(errors)[:200] + "); tenta-se na próxima atualização"
-        _save(inst.ticker, None, None, "none2")
+        _save(inst.ticker, None, None, NOT_FOUND)
         return "sem site encontrado (indica-o em Definições → Ativos)"
     try:
-        icon = fetch_icon(domain, download)
+        icon, used = _icon_for(domain, download)
     except Unavailable as exc:
         return f"{domain}: erro ({exc}); tenta-se na próxima atualização"
     if not icon:
-        _save(inst.ticker, None, None, "none2")
-        return f"{domain}: sem ícone"
-    _save(inst.ticker, icon[0], icon[1], f"site:{domain}"[:80])
-    return f"{domain} ({origin})"
+        _save(inst.ticker, None, None, NOT_FOUND)
+        return f"{domain}: sem ícone (indica outro site em Definições → Ativos)"
+    _save(inst.ticker, icon[0], icon[1], f"site:{used}"[:80])
+    return f"{used} ({origin})"
+
+
+def _icon_for(domain, download=None):
+    """(ícone, domínio usado): o do domínio ou, sem ele, o do domínio principal."""
+    for d in candidates(domain):
+        icon = fetch_icon(d, download)
+        if icon:
+            return icon, d
+    return None, domain
 
 
 def set_site(ticker, site, download=None):
@@ -206,12 +241,12 @@ def set_site(ticker, site, download=None):
     if not domain:
         raise ValueError("Indica um site, por exemplo apple.com.")
     try:
-        icon = fetch_icon(domain, download)
+        icon, used = _icon_for(domain, download)
     except Unavailable as exc:
         raise ValueError(f"Não consegui contactar o serviço de ícones ({exc}).") from exc
     if not icon:
         raise ValueError(f"Não encontrei um logótipo para {domain}.")
-    _save(ticker, icon[0], icon[1], f"site:{domain}"[:80])
+    _save(ticker, icon[0], icon[1], f"site:{used}"[:80])
     db.session.commit()
 
 
