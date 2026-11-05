@@ -61,6 +61,16 @@ body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
 .pm-section-title { text-transform: uppercase; letter-spacing: .06em; font-size: .85rem; font-weight: 600; color: var(--bs-secondary-color); margin: 2rem 0 1rem; }
 .pm-hero-chart { position: absolute; inset: auto 0 0 0; height: 55%; opacity: .35; pointer-events: none; }
 .pm-hero-chart canvas { width: 100% !important; height: 100% !important; }
+/* Visão Geral: resultados e conta por baixo dos valores do widget Carteira */
+.pm-hero-facts { display: grid; grid-template-columns: 1fr; gap: .35rem; align-items: start;
+  margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--pm-border); }
+.pm-facts-title { color: var(--pm-text); }
+.pm-facts-grid + .pm-facts-title { margin-top: .6rem; }
+.pm-facts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: .5rem 1rem; }
+.pm-fact { font-weight: 600; font-size: 1.05rem; }
+.pm-fact > *, .pm-fact.money { white-space: nowrap; }
+.pm-fact small { font-size: .8em; }
+@media (max-width: 575.98px) { .pm-facts-grid { grid-template-columns: 1fr 1fr; } }
 .pm-progress { height: 6px; background: var(--bs-secondary-bg); border-radius: var(--bs-border-radius-pill); overflow: hidden; }
 .pm-progress > div { height: 100%; background: var(--bs-success); }
 

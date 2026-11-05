@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Visão Geral: resultados e conta no cartão Carteira**  
+  Os valores do cartão «Resultados / Conta» (não realizado, dividendos, realizado, comissões, custo base, depositado, caixa, valor total e juros da conta) passam para uma faixa por baixo dos valores do primeiro cartão, Carteira. O cartão antigo sai e o gráfico de evolução passa a ocupar a largura toda.
 - **Carteira: carteira cerne (ERNX · FWIA · XEON) com escalões quando o FWIA cai**  
   Um cartão novo na Carteira com os pesos alvo de 3 ETF (reserva, crescimento e estável; por omissão ERNX 45% · FWIA 30% · XEON 25%). Quando o FWIA cai face ao máximo, a mistura alvo passa ao escalão seguinte da tabela (40/35/25, 35/40/25, 30/50/20, 25/60/15, 20/70/10), por omissão a cada 10% de queda; o intervalo muda-se em Definições → Dados de mercado (ex.: 5% → −5/−10/−15/−20/−25%), sem mudar as misturas. O escalão atingido mantém-se quando o FWIA recupera; «Voltar ao alvo base» é manual. O cartão mostra a queda, os pesos atuais e alvo, o desvio, as ordens para chegar ao alvo em € e unidades, ou, com dinheiro novo a investir, só as compras (sem vender nem pagar IRS), e o retorno esperado, a volatilidade e o pior ano típico de cada escalão. Ao chegar a um escalão novo, aparece uma faixa no topo de todas as páginas, até carregares em «Já vi».
 - **Desempenho: Sharpe, Sortino e alfa corretos em períodos curtos; médias só com anos completos**  

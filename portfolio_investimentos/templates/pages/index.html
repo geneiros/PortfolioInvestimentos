@@ -17,6 +17,7 @@
   <!-- Carteira -->
   <div class="col-xl-8">
     <div class="pm-card accent-top">
+      <div class="position-relative">
       <div class="pm-hero-chart"><canvas id="heroSpark"></canvas></div>
       <div class="row position-relative">
         <div class="col-md-7">
@@ -31,6 +32,26 @@
           <div class="pm-big {{ p.total_return|tone }}">{{ p.total_return_pct|pct(1) }} <small class="fs-5 money">· {{ p.total_return|money(sign=True) }}</small></div>
           <div class="pm-label mt-4">Ano corrente {{ help("Em euros: variação do valor desde 31 de dezembro, sem contar depósitos e levantamentos. Em %: esse ganho dividido pelo capital investido no ano (valor a 31 de dezembro mais as entradas do ano).") }}</div>
           <div class="pm-big {{ ytd[1]|tone }}">{{ ytd[1]|pct(1) }} <small class="fs-5 money">· {{ ytd[0]|money(sign=True) }}</small></div>
+        </div>
+      </div>
+      </div>
+      <!-- Resultados / conta -->
+      <div class="pm-hero-facts" id="heroFacts">
+        <div class="pm-facts-title pm-label">Resultados</div>
+        <div class="pm-facts-grid">
+          <div><div class="pm-label">Não realizado {{ help("Ganho/perda das posições abertas face ao custo.") }}</div>
+            <div class="pm-fact">{{ signed(p.unrealized, 0, p.unrealized / p.cost_basis if p.cost_basis else 0) }}</div></div>
+          <div><div class="pm-label">Dividendos {{ help("Dividendos líquidos de retenção.") }}</div><div class="pm-fact">{{ signed(p.dividends_total) }}</div></div>
+          <div><div class="pm-label">Realizado {{ help("Mais/menos-valias de vendas (FIFO).") }}</div><div class="pm-fact">{{ signed(p.realized) }}</div></div>
+          <div><div class="pm-label">Comissões</div><div class="pm-fact">{{ signed(-p.fees_eur) }}</div></div>
+        </div>
+        <div class="pm-facts-title pm-label">Conta</div>
+        <div class="pm-facts-grid">
+          <div><div class="pm-label">Custo base</div><div class="pm-fact money">{{ p.cost_basis|money }} <small class="text-secondary fw-normal">{{ p.open_positions|length }} posições</small></div></div>
+          <div><div class="pm-label">Depositado {{ help("Depósitos menos levantamentos (inclui compras sem depósito registado).") }}</div><div class="pm-fact money">{{ p.net_deposits|money }}</div></div>
+          <div><div class="pm-label">Caixa</div><div class="pm-fact money">{{ p.cash|money }} <small class="text-secondary fw-normal">{{ (p.cash / p.total_value if p.total_value else 0)|pct(1, sign=False) }}</small></div></div>
+          <div><div class="pm-label">Valor total</div><div class="pm-fact money">{{ p.total_value|money }}</div></div>
+          <div><div class="pm-label">Juros da conta</div><div class="pm-fact">{{ signed(p.interest_eur) }}</div></div>
         </div>
       </div>
     </div>
@@ -70,7 +91,7 @@
   {{ ins.scores_row(scores) }}
 
   <!-- Gráfico de desempenho -->
-  <div class="col-xl-8">
+  <div class="col-12">
     <div class="pm-card">
       <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
         <div class="pm-seg" id="modeSeg"><button class="active" data-mode="gain">Retorno total</button><button data-mode="value">Valor total</button></div>
@@ -87,32 +108,6 @@
       </div>
       <div style="height: 320px"><canvas id="perfChart"></canvas></div>
       <div id="posLegend" class="d-flex flex-wrap gap-2 justify-content-center mt-2"></div>
-    </div>
-  </div>
-
-  <!-- Resultados / conta -->
-  <div class="col-xl-4">
-    <div class="pm-card">
-      <div class="pm-label mb-2" style="color:var(--pm-text)">Resultados</div>
-      <div class="row g-2">
-        <div class="col-6"><div class="pm-label">Não realizado {{ help("Ganho/perda das posições abertas face ao custo.") }}</div>
-          <div class="pm-mid">{{ signed(p.unrealized, 0, p.unrealized / p.cost_basis if p.cost_basis else 0) }}</div></div>
-        <div class="col-6"><div class="pm-label">Dividendos {{ help("Dividendos líquidos de retenção.") }}</div>
-          <div class="pm-mid">{{ signed(p.dividends_total) }}</div></div>
-        <div class="col-6"><div class="pm-label">Realizado {{ help("Mais/menos-valias de vendas (FIFO).") }}</div>
-          <div class="pm-mid">{{ signed(p.realized) }}</div></div>
-        <div class="col-6"><div class="pm-label">Comissões</div>
-          <div class="pm-mid">{{ signed(-p.fees_eur) }}</div></div>
-      </div>
-      <hr style="border-color:var(--pm-border)">
-      <div class="pm-label mb-2" style="color:var(--pm-text)">Conta</div>
-      <div class="row g-2">
-        <div class="col-6"><div class="pm-label">Custo base</div><div class="pm-mid money">{{ p.cost_basis|money }} <small class="fs-6 text-secondary fw-normal">{{ p.open_positions|length }} posições</small></div></div>
-        <div class="col-6"><div class="pm-label">Depositado {{ help("Depósitos menos levantamentos (inclui compras sem depósito registado).") }}</div><div class="pm-mid money">{{ p.net_deposits|money }}</div></div>
-        <div class="col-6"><div class="pm-label">Caixa</div><div class="pm-mid money">{{ p.cash|money }} <small class="fs-6 text-secondary fw-normal">{{ (p.cash / p.total_value if p.total_value else 0)|pct(1, sign=False) }}</small></div></div>
-        <div class="col-6"><div class="pm-label">Valor total</div><div class="pm-mid money">{{ p.total_value|money }}</div></div>
-        <div class="col-6"><div class="pm-label">Juros da conta</div><div class="pm-mid">{{ signed(p.interest_eur) }}</div></div>
-      </div>
     </div>
   </div>
 
