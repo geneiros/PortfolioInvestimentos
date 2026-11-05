@@ -2280,6 +2280,24 @@ def test_logos_more_sources_and_errors(app, monkeypatch):
                 return "image/png", PNG
             raise urllib_error.HTTPError(url, 404, "nf", {}, None)
         assert logos.update(fin, {"website": "https://ir.finvgroup.com"}, download=only_main) == "finvgroup.com (Yahoo)"
+        # o DuckDuckGo é o único serviço acessível (ex.: PythonAnywhere): os outros saltam-se depois da 1.ª falha;
+        # sem ícone para xtrackers.com, tenta-se www. e os outros sites do emitente (dws.com)
+        assert logos.variants("xtrackers.com") == ["xtrackers.com", "www.xtrackers.com", "dws.com", "etf.dws.com"]
+        logos.reset_blocked()
+        seen = []
+
+        def pa(url):
+            seen.append(url)
+            if "duckduckgo" not in url:
+                raise urllib_error.URLError("Tunnel connection failed: 403 Forbidden")
+            if "dws.com" in url:
+                return "image/x-icon", PNG
+            raise urllib_error.HTTPError(url, 404, "nf", {}, None)
+        Logo.query.filter_by(ticker="XEON.DE").delete()
+        db.session.commit()
+        assert logos.update(xeon, None, download=pa, ticker=FakeTicker()) == "dws.com (Yahoo)"
+        assert sum("google.com" in u for u in seen) == 1  # bloqueado: só se tentou uma vez
+        logos.reset_blocked()
         db.session.commit()
         # erros de rede não contam como «não há»: nada se grava e tenta-se outra vez
         Logo.query.filter_by(ticker="ADB").delete()
@@ -2292,7 +2310,7 @@ def test_logos_more_sources_and_errors(app, monkeypatch):
         monkeypatch.setattr(logos, "_get_json", no_net)
         assert "erro" in logos.update(adb, {}, download=ok) and logos.needs("ADB")
         # os «none» da primeira versão voltam a procurar-se já
-        for old in ("none", "none2"):  # os de versões anteriores voltam a procurar-se já
+        for old in logos.LEGACY_NOT_FOUND:  # os de versões anteriores voltam a procurar-se já
             db.session.merge(Logo(ticker="ADB", source=old, fetched=datetime.now()))
             db.session.commit()
             assert logos.needs("ADB")

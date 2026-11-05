@@ -316,6 +316,8 @@ def refresh_all(start=None, progress=None, only_open=False):
         return "Já existe uma atualização em curso."
     try:
         ensure_benchmarks()
+        from . import logos
+        logos.reset_blocked()
         first_tx = db.session.query(db.func.min(Transaction.date)).scalar()
         full = start is not None  # com data de início explícita pede-se o histórico todo
         start = start or (first_tx - timedelta(days=7) if first_tx else date.today() - timedelta(days=365))

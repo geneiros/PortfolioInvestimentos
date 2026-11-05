@@ -19,7 +19,12 @@ from flask import g
 from ..models import Logo, db
 
 RETRY_DAYS = 7
-NOT_FOUND = "none3"  # procurado e não encontrado (com as fontes desta versão)
+NOT_FOUND = "none4"  # procurado e não encontrado (com as fontes desta versão)
+LEGACY_NOT_FOUND = ("none", "none2", "none3")  # de versões anteriores, com menos fontes: procuram-se já
+# outros sites do mesmo emitente, para quando o serviço de ícones não tem o do principal
+ALT_DOMAINS = {"xtrackers.com": ["dws.com", "etf.dws.com"], "ssga.com": ["statestreet.com"],
+               "amundi.com": ["amundietf.com"], "ishares.com": ["blackrock.com"], "invesco.com": ["invescoetf.com"]}
+_blocked = set()  # servidores de ícones que não respondem a partir daqui (ex.: fora da lista de sites do PythonAnywhere)
 WIKIDATA = "https://www.wikidata.org/w/api.php"
 UA = {"User-Agent": "PortfolioInvestimentos/1.0 (https://github.com/geneiros/PortfolioInvestimentos)"}
 
@@ -64,12 +69,25 @@ def domain_of(site):
     return host if re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", host) else None
 
 
+def reset_blocked():
+    """Esquece os serviços bloqueados (no início de cada atualização e ao procurar à mão)."""
+    _blocked.clear()
+
+
 def candidates(domain):
     """O domínio e o principal (ir.finvgroup.com → finvgroup.com; investor.x.co.uk → x.co.uk)."""
     parts = domain.split(".")
     keep = 3 if len(parts) >= 3 and len(parts[-2]) <= 3 and len(parts[-1]) == 2 else 2  # co.uk, com.br
     main = ".".join(parts[-keep:])
     return [domain] if main == domain else [domain, main]
+
+
+def variants(domain):
+    """Todos os domínios a tentar, por ordem: o próprio, o principal, com «www.» e os outros sites do emitente."""
+    out = []
+    for d in candidates(domain):
+        out += [d, f"www.{d}"] + ALT_DOMAINS.get(d, [])
+    return list(dict.fromkeys(out))
 
 
 def issuer_domain(name):
@@ -101,6 +119,10 @@ def fetch_icon(domain, download=None, reasons=None):
     failures = 0
     for name, template in ICON_URLS:
         url = template.format(d=urllib.parse.quote(domain))
+        host = urllib.parse.urlsplit(url).hostname
+        if host in _blocked:  # o servidor do serviço já falhou por rede nesta atualização: não se perde tempo
+            failures += 1
+            continue
         try:
             mime, data = download(url)
         except urllib.error.HTTPError as exc:  # 404 e afins: o serviço respondeu que não tem ícone
@@ -108,13 +130,15 @@ def fetch_icon(domain, download=None, reasons=None):
             continue
         except (urllib.error.URLError, OSError, ValueError) as exc:
             failures += 1
+            if not name.startswith("site"):  # o site de cada empresa é outro servidor: não conta para os outros
+                _blocked.add(host)
             reasons.append(f"{name}: {str(getattr(exc, 'reason', exc))[:60]}")
             continue
         if mime in MIMES and 100 < len(data) <= MAX_BYTES:
             return mime, data
         reasons.append(f"{name}: {mime or 'sem tipo'} {len(data)} B")
     if failures == len(ICON_URLS):
-        raise Unavailable("serviços de ícones sem resposta: " + "; ".join(reasons))
+        raise Unavailable("serviços de ícones sem resposta: " + ("; ".join(reasons) or "bloqueados neste servidor"))
     return None
 
 
@@ -218,7 +242,7 @@ def resolve(inst, info=None, get=None, ticker=None):
 def needs(ticker, now=None):
     """Falta procurar o logótipo (nunca procurado, ou não encontrado há mais de 7 dias)?"""
     row = db.session.get(Logo, ticker)
-    if row is None or row.source in ("none", "none2"):  # de versões anteriores, com menos fontes: já
+    if row is None or row.source in LEGACY_NOT_FOUND:
         return True
     return row.source == NOT_FOUND and row.fetched < (now or datetime.now()) - timedelta(days=RETRY_DAYS)
 
@@ -254,7 +278,7 @@ def update(inst, info=None, download=None, get=None, ticker=None):
 
 def _icon_for(domain, download=None, reasons=None):
     """(ícone, domínio usado): o do domínio ou, sem ele, o do domínio principal."""
-    for d in candidates(domain):
+    for d in variants(domain):
         tried = []
         icon = fetch_icon(d, download, tried)
         if reasons is not None:
@@ -265,6 +289,7 @@ def _icon_for(domain, download=None, reasons=None):
 
 
 def set_site(ticker, site, download=None):
+    reset_blocked()
     domain = domain_of(site)
     if not domain:
         raise ValueError("Indica um site, por exemplo apple.com.")

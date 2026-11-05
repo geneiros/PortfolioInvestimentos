@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Logótipos: variantes do site e servidores bloqueados**  
+  No PythonAnywhere só o DuckDuckGo responde (o Google, o gstatic e os sites das empresas estão fora da lista de sites permitidos). Quando o DuckDuckGo não tem o ícone do site, tenta-se também com «www.» e os outros sites do emitente (ex.: Xtrackers → dws.com); um servidor que falha por rede salta-se no resto da atualização. Os marcados como «sem ícone» voltam a procurar-se já.
 - **Logótipos: nome do ETF pelo cliente da atualização e mais serviços de ícones, com o motivo no resumo**  
   No PythonAnywhere o Yahoo limita (HTTP 429) os pedidos diretos, mas não os do yfinance: o nome longo do ETF passa a vir do mesmo cliente que obtém as cotações (deixa de se usar a pesquisa, que demorava ~20 s por ETF a falhar). Os ícones procuram-se no Google (128 e 64 px), no gstatic, no DuckDuckGo e no próprio site; quando nenhum tem, a linha do resumo diz a resposta de cada serviço.
 - **Logótipos: nome do ETF pelas cotações, domínio principal e ícones mais pequenos**  
