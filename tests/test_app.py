@@ -1951,3 +1951,24 @@ def test_delete_backup(app, client):
     assert Path(path).exists() and len(backups.list_backups(path)) == 2
     assert post(client, "delete_backup", token, name=Path(first).name).status_code == 200
     assert [b.name for b in backups.list_backups(path)] == [n for n in names if n != Path(first).name]
+
+
+def test_portfolio_totals_match_rows(app, client):
+    """Carteira: o total de cada coluna é a soma das linhas e o ROI % usa a mesma base das linhas."""
+    from portfolio_investimentos.engine.formatting import pct
+    token = csrf(client)
+    post(client, "load_demo", token)
+    with app.app_context():
+        p = data_portfolio()
+        rows = p.open_positions
+        assert abs(sum(x.value_eur for x in rows) - p.holdings_value) < 0.01
+        assert abs(sum(x.invested_eur for x in rows) - p.cost_basis) < 0.01
+        for x in rows:
+            assert abs(x.unrealized_eur - (x.value_eur - x.invested_eur)) < 0.01
+            assert abs(x.roi_eur - (x.unrealized_eur + x.realized_eur + x.dividends_eur)) < 0.01
+        roi = sum(x.roi_eur for x in rows)
+        base = sum((x.bought_eur or x.invested_eur) for x in rows)
+        assert sum(x.value_eur / p.holdings_value for x in rows) == pytest.approx(1.0)
+    html = client.get("/carteira").get_data(as_text=True)
+    total = html.split("<tfoot>", 1)[1].split("</tfoot>", 1)[0]
+    assert pct(roi / base, 2) in total

@@ -153,7 +153,9 @@ def carteira():
                "dividends": sum(x.dividends_eur for x in p.open_positions),
                "fx": sum(x.fx_effect_eur for x in p.open_positions),
                "fees": sum(x.fees_eur for x in p.open_positions),
-               "roi": sum(x.roi_eur for x in p.open_positions)},
+               "roi": sum(x.roi_eur for x in p.open_positions),
+               # base do ROI % como nas linhas: tudo o que se investiu em cada ativo (incluindo partes já vendidas)
+               "roi_base": sum((x.bought_eur or x.invested_eur) for x in p.open_positions)},
         alloc=ctx.js_json({k: p.allocation(k) for k in ("asset", "sector", "currency")}),
         crisis=stress.crisis_test(p), costs=_costs(p), valuations=_valuations(p),
         aaa_yield=_aaa_yield() or valuation.AAA_YIELD,
