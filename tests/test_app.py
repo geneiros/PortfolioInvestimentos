@@ -744,8 +744,23 @@ def test_overview_scores_profiles_and_insights(app, client):
     # mudar de perfil: o Investor Score passa a medir o que o perfil diz
     assert post(client, "set_profile", token, profile="active").status_code == 200
     html = client.get("/").get_data(as_text=True)
-    assert "Fator de Lucro" in html and "Corte das Perdas" in html and "Perfil: Active Trader · mudar" in html
+    assert "Fator de Lucro" in html and "Corte das Perdas" in html and "Perfil (Todas as corretoras): Active Trader · mudar" in html
     assert post(client, "set_profile", token, profile="nao-existe").status_code == 400
+    # cada corretora tem o seu perfil; o de todas as corretoras não muda
+    from portfolio_investimentos.models import Broker
+    with app.app_context():
+        b = Broker.query.order_by(Broker.id).first()
+        bid, bname = str(b.id), b.broker_name
+    assert post(client, "set_broker", token, broker=bid).status_code == 200
+    html = client.get("/").get_data(as_text=True)
+    assert f"Perfil ({bname}):" in html and "(sugerido) · mudar" in html
+    assert post(client, "set_profile", token, profile="income").status_code == 200
+    html = client.get("/").get_data(as_text=True)
+    assert f"Perfil ({bname}): Income Focus · mudar" in html
+    if "parece-se mais com" in html:  # o aviso diz que o perfil escolhido não é o sugerido
+        assert f"O perfil escolhido para <b>{bname}</b> é Income Focus" in html
+    assert post(client, "set_broker", token, broker="").status_code == 200
+    assert "Perfil (Todas as corretoras): Active Trader · mudar" in client.get("/").get_data(as_text=True)
 
 
 def test_planning_fire_page_and_settings(app, client):

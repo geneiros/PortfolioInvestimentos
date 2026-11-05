@@ -58,14 +58,29 @@ def payers(p):
     return got | yahoo
 
 
-def scores(p):
+def profile_key(broker=None):
+    """Setting do perfil de investidor escolhido: um por corretora e outro para todas as corretoras."""
+    return f"investor_profile:{broker or 'all'}"
+
+
+def chosen_profile(broker=None):
+    chosen = Setting.get(profile_key(broker))
+    if chosen is None and not broker:  # antes, um só perfil para tudo: fica o de «todas as corretoras»
+        chosen = Setting.get("investor_profile")
+    return chosen if chosen in PROFILES else None
+
+
+def scores(p, broker=None, scope=None):
+    """Notas do perfil de investidor da carteira `p` (a da corretora `broker` ou, sem ela, a de todas), com o
+    perfil escolhido para essa corretora (`scope` é o nome dela, para os textos)."""
     scorer = Scorer(p, countries(p), payers(p), risk_free=data.risk_free())
     if not scorer.ok:
         return None
     suggested, why = scorer.suggest()
-    chosen = Setting.get("investor_profile")
-    profile = chosen if chosen in PROFILES else suggested
-    return {"profile": profile, "profile_name": PROFILES[profile][0], "chosen": chosen in PROFILES,
+    chosen = chosen_profile(broker)
+    profile = chosen or suggested
+    return {"profile": profile, "profile_name": PROFILES[profile][0], "chosen": chosen is not None,
+            "scope": scope or "Todas as corretoras", "per_broker": bool(broker),
             "suggested": suggested, "suggested_name": PROFILES[suggested][0], "why": why,
             "investor": scorer.investor(profile), "portfolio": scorer.portfolio(), "profiles": profile_list()}
 

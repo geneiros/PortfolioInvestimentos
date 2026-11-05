@@ -128,8 +128,11 @@ def set_profile(profile):
     from .engine.scores import PROFILES
     if profile not in PROFILES:
         raise ApiError("Perfil desconhecido.")
-    Setting.set("investor_profile", profile)
-    return f"Perfil: {PROFILES[profile][0]}."
+    from .services import insights
+    broker = data.selected_broker()
+    Setting.set(insights.profile_key(broker), profile)
+    where = _get(Broker, broker).broker_name if broker else "todas as corretoras"
+    return f"Perfil para {where}: {PROFILES[profile][0]}."
 
 
 @action

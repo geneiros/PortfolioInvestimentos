@@ -44,7 +44,7 @@
   <div class="col-12">
     <div class="alert alert-primary d-flex align-items-center gap-3 flex-wrap mb-0 small">
       <i class="bi bi-person-badge fs-5"></i>
-      <div class="flex-grow-1">A tua carteira parece-se mais com <b>{{ sc.suggested_name }}</b>: {{ sc.why }}</div>
+      <div style="flex: 1 1 18rem; min-width: 0">{% if sc.chosen %}O perfil escolhido para <b>{{ sc.scope }}</b> é {{ sc.profile_name }}, mas a{% else %}A{% endif %} carteira {{ 'desta corretora' if sc.per_broker else 'de todas as corretoras' }} parece-se mais com <b>{{ sc.suggested_name }}</b>: {{ sc.why }}</div>
       <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#profileModal">Ver os perfis</button>
     </div>
   </div>
@@ -52,18 +52,18 @@
   <div class="col-xl-6">{{ score_card("Investor Score", "Como investes, medido pelo teu perfil de investidor (escolhe-o em «Perfil»). Notas de 0 a 100, nos últimos 3 anos; uma leitura indicativa, não uma recomendação.", sc.investor, sc.profile_name) }}</div>
   <div class="col-xl-6">{{ score_card("Portfolio Score", "Como está a tua carteira hoje: concentração, diversificação, volatilidade, custos e proximidade ao índice (igual para todos os perfis).", sc.portfolio) }}</div>
   <div class="col-12 d-flex justify-content-end mt-n2">
-    <button class="btn btn-link btn-sm p-0" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-person-badge"></i> Perfil: {{ sc.profile_name }}{% if not sc.chosen %} (sugerido){% endif %} · mudar</button>
+    <button class="btn btn-link btn-sm p-0" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-person-badge"></i> Perfil ({{ sc.scope }}): {{ sc.profile_name }}{% if not sc.chosen %} (sugerido){% endif %} · mudar</button>
   </div>
 
   </div></div>
 
   <div class="modal fade" id="profileModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">Perfil de investidor</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+      <div class="modal-header"><h5 class="modal-title">Perfil de investidor · {{ sc.scope }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
       <div class="modal-body">
         <span class="badge text-bg-primary bg-opacity-25 text-primary-emphasis mb-2">SUGERIDO PELA TUA CARTEIRA</span>
         <p class="mb-1"><b>{{ sc.suggested_name }}</b>: {{ sc.why }}</p>
-        <p class="text-secondary small">O perfil decide como medimos o teu sucesso. O Investor Score recalcula-se quando mudas.</p>
+        <p class="text-secondary small">O perfil decide como medimos o teu sucesso. O Investor Score recalcula-se quando mudas. Cada corretora tem o seu perfil, e «Todas as corretoras» também{% if sc.per_broker %}; este é o de {{ sc.scope }}{% endif %}.</p>
         <div class="row g-3">
           <div class="col-lg-5 d-flex flex-column gap-2">
             {% for pr in sc.profiles %}

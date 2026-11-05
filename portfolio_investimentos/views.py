@@ -120,7 +120,7 @@ def overview():
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
                       ("Mais tarde", [e for e in events if e.date > two][:10])],
         instruments=instruments, fired=check_alerts(p), perf=ctx.js_json(perf_payload(p, "YTD")),
-        benchmarks=p.benchmarks, scores=insights.scores(p),
+        benchmarks=p.benchmarks, scores=insights.scores(p, c["broker"], c["broker_doc"].broker_name if c["broker_doc"] else None),
         networth=networth.summary(data.load_portfolio(None)) if networth.assets() else None,
         networth_late=len(networth.reminder()),
         insights_data=ctx.js_json({"wr": insights.weight_return(p), "alloc": insights.allocation(p, c["broker"])}),

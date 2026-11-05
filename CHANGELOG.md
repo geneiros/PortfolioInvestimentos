@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Visão Geral: perfil de investidor por corretora**  
+  Cada corretora tem o seu perfil de investidor, e «Todas as corretoras» também (o perfil escolhido antes passa a ser o de todas). As notas usam a carteira da corretora selecionada e o perfil dela; o aviso aparece quando o perfil escolhido (ou, sem escolha, o sugerido) não é o que a carteira dessa corretora sugere, e o link e a janela do perfil dizem a que corretora se referem.
 - **Mudar a ordem dos cartões em todas as páginas; gráfico da Visão Geral abre em YTD**  
   O clique longo e arrastar passa da Visão Geral a todos os cartões de todas as páginas: os cartões e as grelhas encontram-se sozinhos (cada cartão muda de lugar dentro da sua grelha; títulos e avisos ficam onde estão) e a ordem fica guardada por página na aplicação, aplicada antes de a página desenhar os gráficos. Em Definições → Ordem dos cartões, repor a ordem de cada página ou de todas. O gráfico «Retorno total / Valor total» da Visão Geral abre com o período YTD.
 - **Visão Geral: mudar a ordem dos widgets arrastando**  
