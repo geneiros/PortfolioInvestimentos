@@ -1,6 +1,7 @@
 """Cópias de segurança automáticas da base de dados (API de backup do SQLite, consistente com escritas em curso).
 
-As cópias ficam em `<pasta dos dados>/copias/portfolio-AAAAMMDD-HHMMSS-<motivo>.db`; guardam-se as últimas 10.
+As cópias ficam em `<pasta dos dados>/copias/portfolio-AAAAMMDD-HHMMSS-<motivo>.db`; guardam-se as últimas 2 (a mais
+antiga é apagada quando se faz uma nova).
 """
 import re
 import sqlite3
@@ -8,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
-KEEP = 10
+KEEP = 2
 _NAME = re.compile(r"^portfolio-(\d{8})-(\d{6})-([a-z0-9-]+)\.db$")
 REASONS = {
     "importar": "Antes de importar", "apagar-tudo": "Antes de apagar tudo", "demonstracao": "Antes da demonstração",
@@ -21,8 +22,8 @@ def folder(db_path):
     return Path(db_path).parent / "copias"
 
 
-def make_backup(db_path, reason="manual", keep=KEEP):
-    """Grava uma cópia consistente e apaga as mais antigas; devolve o caminho."""
+def make_backup(db_path, reason="manual", keep=KEEP, protect=None):
+    """Grava uma cópia consistente e apaga as mais antigas (nunca `protect`); devolve o caminho."""
     dest_dir = folder(db_path)
     dest_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -41,8 +42,10 @@ def make_backup(db_path, reason="manual", keep=KEEP):
     finally:
         src.close()
         dst.close()
+    protect = Path(protect).resolve() if protect else None
     for old in _ordered(dest_dir)[:-keep]:
-        old.unlink(missing_ok=True)
+        if old.resolve() != protect:
+            old.unlink(missing_ok=True)
     return dest
 
 
@@ -87,7 +90,7 @@ def restore(db_path, name):
         probe.execute('SELECT 1 FROM "transaction" LIMIT 1')
     finally:
         probe.close()
-    make_backup(db_path, "restaurar")
+    make_backup(db_path, "restaurar", protect=src_path)  # com poucas cópias, não apagar a que se vai restaurar
     src, dst = sqlite3.connect(src_path), sqlite3.connect(db_path)
     try:
         src.backup(dst)

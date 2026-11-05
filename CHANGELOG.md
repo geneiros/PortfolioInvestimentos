@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
-- **Aviso de cotações antigas e eliminar cópias de segurança**  
+- **Cópias de segurança: no máximo 2**  
+  Cada cópia nova (automática, manual ou antes de restaurar ou de atualizar a base de dados) apaga as mais antigas, para ficarem só as últimas 2 (eram 10). A cópia feita antes de restaurar nunca apaga a que se está a restaurar.
+- **Aviso de cotações antigas e eliminar cópias de segurança** `3f7cb2a`  
   Quando as cotações das posições abertas não são atualizadas há mais de 5 dias (configurável em Definições → Dados de mercado; 0 desliga), aparece uma faixa no topo de todas as páginas com o botão «Atualizar posições abertas»; fechada, fica escondida até ao fim da sessão do browser. Em Definições, cada cópia automática tem um botão «Eliminar» a seguir a «Restaurar».
 
 ## 2026-11-01

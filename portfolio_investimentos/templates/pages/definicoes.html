@@ -116,7 +116,7 @@
       </div>
       <hr>
       <div class="pm-label mb-1">Cópias automáticas</div>
-      <p class="small text-body-secondary mb-2">Antes de importar, apagar dados, carregar a demonstração ou atualizar a base de dados, a aplicação guarda uma cópia (as últimas 10) na pasta <code>copias</code>, ao lado da base de dados.</p>
+      <p class="small text-body-secondary mb-2">Antes de importar, apagar dados, carregar a demonstração ou atualizar a base de dados, a aplicação guarda uma cópia (as últimas 2; a mais antiga é apagada quando se faz uma nova) na pasta <code>copias</code>, ao lado da base de dados.</p>
       {% for b in backups %}
         <div class="d-flex align-items-center gap-2 small py-1 border-bottom">
           <span class="flex-grow-1"><b>{{ b.when.strftime('%d/%m/%Y %H:%M') }}</b> · {{ b.label }} <span class="text-body-secondary">({{ (b.size / 1024)|round|int }} KB)</span></span>

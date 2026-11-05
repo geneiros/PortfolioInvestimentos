@@ -1500,14 +1500,33 @@ def test_automatic_backups_before_destructive_actions_and_restore(app, client):
     assert post(client, "restore_backup", token, name="portfolio-20200101-000000-x.db").status_code == 400
 
 
-def test_backups_keep_only_the_latest_ten(tmp_path):
+def test_backups_keep_only_the_latest_two(tmp_path):
     import sqlite3
     from portfolio_investimentos.services import backups
     db_path = tmp_path / "portfolio.db"
     sqlite3.connect(db_path).execute("CREATE TABLE t (x)").connection.close()
-    for _ in range(13):
-        backups.make_backup(db_path, "manual")
-    assert len(backups.list_backups(db_path)) == backups.KEEP
+    made = [backups.make_backup(db_path, "manual").name for _ in range(5)]
+    assert backups.KEEP == 2
+    assert [b.name for b in backups.list_backups(db_path)] == made[::-1][:2]  # as 2 mais recentes
+
+
+def test_restore_oldest_backup_is_not_pruned_first(app, client):
+    """Com só 2 cópias, a cópia feita antes de restaurar não pode apagar a que se vai restaurar."""
+    from portfolio_investimentos.services import backups
+    path = app.config["DB_PATH"]
+    with app.app_context():
+        db.session.add(Transaction(date=date(2026, 1, 2), type="DEPOSIT", amount=111.0, currency="EUR"))
+        db.session.commit()
+    oldest = backups.make_backup(path, "manual").name  # com o depósito de 111
+    with app.app_context():
+        db.session.add(Transaction(date=date(2026, 1, 3), type="DEPOSIT", amount=222.0, currency="EUR"))
+        db.session.commit()
+    backups.make_backup(path, "manual")
+    assert len(backups.list_backups(path)) == 2
+    token = csrf(client)
+    assert post(client, "restore_backup", token, name=oldest).status_code == 200
+    with app.app_context():
+        assert [t.amount for t in Transaction.query.order_by(Transaction.date)] == [111.0]
 
 
 def test_networth_other_assets(app, client):
