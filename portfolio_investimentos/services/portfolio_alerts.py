@@ -38,4 +38,6 @@ def rows():
     """Alertas guardados, para a lista no painel."""
     names = {b.id: b.broker_name for b in Broker.query.all()}
     return [{"id": a.id, "scope": _scope_name(a, names), "threshold": a.threshold, "direction": a.direction,
-             "active": a.active} for a in PortfolioAlert.query.order_by(PortfolioAlert.id).all()]
+             "active": a.active, "last_up": a.last_up, "last_down": a.last_down,
+             "last": max([d for d in (a.last_up, a.last_down) if d], default=None)}
+            for a in PortfolioAlert.query.order_by(PortfolioAlert.id).all()]

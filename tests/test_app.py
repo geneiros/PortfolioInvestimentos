@@ -2142,3 +2142,20 @@ def test_market_indices_and_portfolio_alerts(app, client):
     assert post(client, "reset_data", token, confirm="APAGAR").status_code == 200
     with app.app_context():
         assert PortfolioAlert.query.count() == 0
+
+
+def test_portfolio_alerts_on_radar(client):
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    assert "Ainda não tens alertas da carteira" in client.get("/radar").get_data(as_text=True)
+    assert post(client, "add_portfolio_alert", token, threshold="2", direction="down").status_code == 200
+    html = client.get("/radar").get_data(as_text=True)
+    section = html.split('id="portfolioAlerts"', 1)[1]
+    assert "Toda a carteira" in section and "Descer <b>2%</b> num dia" in section and "Ativo" in section
+    aid = re.search(r'data-portfolio-alert-row="(\d+)"', html).group(1)
+    assert post(client, "toggle_portfolio_alert", token, name=aid, active="0").status_code == 200
+    assert "Pausado" in client.get("/radar").get_data(as_text=True).split('id="portfolioAlerts"', 1)[1]
+    assert post(client, "toggle_portfolio_alert", token, name=aid, active="1").status_code == 200
+    assert post(client, "toggle_portfolio_alert", token, name="999", active="1").status_code == 400
+    assert post(client, "delete_portfolio_alert", token, name=aid).status_code == 200
+    assert "Ainda não tens alertas da carteira" in client.get("/radar").get_data(as_text=True)

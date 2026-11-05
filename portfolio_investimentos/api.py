@@ -324,6 +324,14 @@ def add_portfolio_alert(threshold, direction="down", broker=""):
 
 
 @action
+def toggle_portfolio_alert(name, active):
+    a = _get(PortfolioAlert, name)
+    a.active = str(active) in ("1", "true", "True")
+    db.session.commit()
+    return "Alerta reativado." if a.active else "Alerta pausado."
+
+
+@action
 def delete_portfolio_alert(name):
     db.session.delete(_get(PortfolioAlert, name))
     db.session.commit()

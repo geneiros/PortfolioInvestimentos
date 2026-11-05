@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}{% autoescape true %}
 {% from "macros.html" import help %}
+{% include "pages/_portfolio_fired.html" %}
 {% for a in fired_now %}<div class="alert alert-warning"><i class="bi bi-bell-fill"></i> Alerta disparado agora: <b>{{ a.instrument }}</b> — {{ kinds[a.kind]|lower }} {{ a.threshold|number(2) }}.</div>{% endfor %}
 <div class="row g-3">
   <div class="col-xl-6"><div class="pm-card">
@@ -23,6 +24,23 @@
             <button class="btn btn-sm btn-pm" data-pm-action="toggle_alert" data-args='{"name": "{{ a.name }}", "active": {{ 0 if a.active else 1 }}}' title="{{ 'Pausar' if a.active else 'Reativar' }}"><i class="bi {{ 'bi-pause' if a.active else 'bi-play' }}"></i></button>
             <button class="btn btn-sm btn-outline-danger" data-pm-action="delete_alert" data-args='{"name": "{{ a.name }}"}' data-confirm="Apagar alerta?"><i class="bi bi-trash"></i></button></td></tr>
       {% else %}<tr><td colspan="4" class="text-secondary">Ainda não tens alertas.</td></tr>{% endfor %}</tbody>
+    </table>
+    <div class="d-flex align-items-center gap-2 mt-4 mb-2" id="portfolioAlerts">
+      <span class="pm-label">Alertas da carteira {{ help("A variação do dia de toda a carteira ou de uma corretora. Disparam no máximo uma vez por dia e por sentido; os depósitos e levantamentos não contam. Criam-se na Carteira, no cartão «Carteira vs mercado» (o sino).") }}</span>
+      <a class="small ms-auto" href="/carteira">Criar na Carteira <i class="bi bi-chevron-right"></i></a>
+    </div>
+    <table class="table pm-table">
+      <thead><tr><th>Carteira ou conta</th><th>Condição</th><th>Estado</th><th></th></tr></thead>
+      <tbody>{% for r in portfolio_alert_rows %}
+        <tr class="{{ 'opacity-50' if not r.active }}" data-portfolio-alert-row="{{ r.id }}">
+          <td><b>{{ r.scope }}</b></td>
+          <td>{{ {'up': 'Subir', 'down': 'Descer', 'both': 'Subir ou descer'}[r.direction] }} <b>{{ (r.threshold * 100)|round|int }}%</b> num dia</td>
+          <td>{% if r.active %}<span class="badge text-bg-success">Ativo</span>{% else %}<span class="badge text-bg-secondary">Pausado</span>{% endif %}
+            {% if r.last %}<span class="badge text-bg-warning">Disparado {{ r.last.strftime('%d/%m') }}</span>{% endif %}</td>
+          <td class="text-end text-nowrap">
+            <button class="btn btn-sm btn-pm" data-pm-action="toggle_portfolio_alert" data-args='{"name": "{{ r.id }}", "active": {{ 0 if r.active else 1 }}}' title="{{ 'Pausar' if r.active else 'Reativar' }}"><i class="bi {{ 'bi-pause' if r.active else 'bi-play' }}"></i></button>
+            <button class="btn btn-sm btn-outline-danger" data-pm-action="delete_portfolio_alert" data-args='{"name": "{{ r.id }}"}' data-confirm="Apagar alerta da carteira?"><i class="bi bi-trash"></i></button></td></tr>
+      {% else %}<tr><td colspan="4" class="text-secondary">Ainda não tens alertas da carteira. <a href="/carteira">Criar na Carteira</a></td></tr>{% endfor %}</tbody>
     </table>
   </div></div>
   <div class="col-xl-6"><div class="pm-card">

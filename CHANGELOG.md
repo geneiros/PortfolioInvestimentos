@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Radar e alertas: os alertas da carteira**  
+  Os alertas criados na Carteira («Carteira vs mercado» → sino) aparecem também em Radar e alertas, numa secção «Alertas da carteira» por baixo dos alertas de preço: carteira ou conta, condição, estado (ativo ou pausado e o último disparo) e botões para pausar, reativar e apagar. O aviso de um alerta disparado aparece também nesta página.
 - **Carteira: escolher os índices da «Carteira vs mercado» e alertas da variação da carteira**  
   Dois botões no cartão «Carteira vs mercado». «Gerir índices» escolhe até 5 índices (Global: MSCI World; EUA: S&P 500, Dow Jones, Nasdaq 100, Russell 2000, Bitcoin; Europa: FTSE 100, CAC 40, DAX, Euro STOXX 50, AEX, Euronext 100); um índice novo recebe as cotações na atualização seguinte. «Alerta da carteira» cria alertas da variação do dia de toda a carteira ou de uma corretora (1, 2, 3 ou 5%; a subir, a descer ou os dois), com a variação de hoje à vista; disparam no máximo uma vez por dia e por sentido, sem contar depósitos e levantamentos, e o aviso aparece no topo da Visão Geral e da Carteira.
 - **Visão Geral: perfil de investidor por corretora**  

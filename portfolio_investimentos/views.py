@@ -446,6 +446,7 @@ def radar():
                                      price=price, change=change, currency=inst.currency if inst else "EUR",
                                      distance=(price / w.target_price - 1) if price and w.target_price else None))
     c.update(fired_now=fired, watch=watch, kinds=ALERT_KINDS,
+             portfolio_fired=portfolio_alerts.check(), portfolio_alert_rows=portfolio_alerts.rows(),
              alerts=Alert.query.order_by(Alert.active.desc(), Alert.creation.desc()).all(),
              instruments=Instrument.query.filter(Instrument.kind != "index").order_by(Instrument.ticker).all())
     return render_template("pages/radar.html", **c)
