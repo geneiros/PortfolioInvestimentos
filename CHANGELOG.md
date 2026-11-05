@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Visão Geral: mudar a ordem dos widgets arrastando**  
+  Carregar 2 segundos no fundo de um cartão (rato ou toque; não conta em texto, botões, links ou gráficos, e mexer antes cancela) levanta o widget, que se arrasta para outro lugar; um marcador tracejado mostra onde cai, a página desliza perto das margens e Esc cancela. Os cartões altos encolhem enquanto se arrastam. A ordem fica guardada na aplicação (igual em todos os dispositivos) e repõe-se em Definições → Ordem dos widgets.
 - **Visão Geral: Investor Score e Portfolio Score a seguir ao gráfico**  
   As notas do perfil de investidor passam para baixo do gráfico «Retorno total / Valor total».
 - **README: link para o Buy Me a Coffee**  

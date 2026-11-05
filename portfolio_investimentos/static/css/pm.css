@@ -228,3 +228,13 @@ html.pm-private [data-pm-toggle=private] .bi-eye::before { content: "\f340"; }
   .pm-main > .navbar { flex-wrap: nowrap; }
   .pm-broker-btn { max-width: calc(100vw - 8.5rem); }
 }
+
+/* ------------------------------------------------------------------ mudar a ordem dos widgets (clique longo e arrastar) */
+@keyframes pm-arm { from { box-shadow: 0 0 0 0 transparent; } to { box-shadow: 0 0 0 3px var(--bs-primary); } }
+.pm-widget-arming { animation: pm-arm 2s linear forwards; }
+.pm-widget-dragging > .pm-card, .pm-widget-dragging .pm-card:first-child { box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, .25); opacity: .92; }
+.pm-widget-dragging { cursor: grabbing; }
+.pm-widget-placeholder { border: 2px dashed var(--bs-primary); border-radius: var(--bs-border-radius-lg); background: rgba(var(--bs-primary-rgb), .06); }
+body.pm-widget-drag-on { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+@media (prefers-reduced-motion: reduce) { .pm-widget-arming { animation-duration: .01s; animation-delay: 1.99s; } }
+body.pm-widget-drag-on .tooltip { display: none; }

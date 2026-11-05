@@ -39,6 +39,7 @@
 
 {% macro scores_row(sc) -%}
 {% if sc %}
+  <div class="col-12" data-widget="notas"><div class="row g-3">
   {% if sc.suggested != sc.profile %}
   <div class="col-12">
     <div class="alert alert-primary d-flex align-items-center gap-3 flex-wrap mb-0 small">
@@ -53,6 +54,8 @@
   <div class="col-12 d-flex justify-content-end mt-n2">
     <button class="btn btn-link btn-sm p-0" data-bs-toggle="modal" data-bs-target="#profileModal"><i class="bi bi-person-badge"></i> Perfil: {{ sc.profile_name }}{% if not sc.chosen %} (sugerido){% endif %} · mudar</button>
   </div>
+
+  </div></div>
 
   <div class="modal fade" id="profileModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
@@ -98,7 +101,7 @@
 
 {% macro charts_row(wr_count) -%}
   <!-- Peso vs retorno -->
-  <div class="col-xl-6">
+  <div class="col-xl-6" data-widget="peso">
     <div class="pm-card h-100">
       <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
         <span class="pm-label">Peso vs retorno {{ help("Cada posição aberta: a área (ou o eixo horizontal) é o peso na carteira e a cor (ou o eixo vertical) é o retorno total, com dividendos.") }}</span>
@@ -114,7 +117,7 @@
     </div>
   </div>
   <!-- Alocação -->
-  <div class="col-xl-6">
+  <div class="col-xl-6" data-widget="alocacao">
     <div class="pm-card h-100">
       <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
         <span class="pm-label">Alocação {{ help("Valor das posições abertas por setor, país, classe e corretora. O país é o do domicílio (pelo ISIN) ou, sem ISIN, o da bolsa.") }}</span>

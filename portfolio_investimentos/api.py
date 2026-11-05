@@ -564,6 +564,27 @@ def core_ack(step):
     return "Aviso fechado."
 
 
+# ------------------------------------------------------------------ ordem dos widgets
+@action
+def save_widget_order(page, order):
+    """Ordem dos widgets de uma página (arrastados com um clique longo); `order`: nomes separados por vírgulas."""
+    from .views import WIDGETS
+    known = WIDGETS.get(page)
+    if known is None:
+        raise ApiError("Página desconhecida.")
+    names = order if isinstance(order, list) else [x for x in str(order).split(",") if x]
+    if len(set(names)) != len(names) or any(n not in known for n in names):
+        raise ApiError("Ordem inválida.")
+    Setting.set(f"widgets_{page}", json.dumps(names))
+    return "Ordem guardada."
+
+
+@action
+def reset_widget_order(page="overview"):
+    Setting.set(f"widgets_{page}", None)
+    return "Ordem dos widgets reposta."
+
+
 @action
 def delete_backup(name):
     path = current_app.config["DB_PATH"]

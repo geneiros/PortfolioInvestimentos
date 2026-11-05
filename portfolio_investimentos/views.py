@@ -124,8 +124,22 @@ def overview():
         networth=networth.summary(data.load_portfolio(None)) if networth.assets() else None,
         networth_late=len(networth.reminder()),
         insights_data=ctx.js_json({"wr": insights.weight_return(p), "alloc": insights.allocation(p, c["broker"])}),
+        widget_order=widget_order("overview"),
     )
     return render_template("pages/index.html", **c)
+
+
+WIDGETS = {"overview": ("carteira", "grafico", "notas", "movers", "eventos", "peso", "alocacao")}
+
+
+def widget_order(page):
+    """A ordem dos widgets guardada para a página (lista vazia = a ordem de omissão)."""
+    import json
+    try:
+        order = json.loads(Setting.get(f"widgets_{page}") or "[]")
+    except ValueError:
+        return []
+    return [w for w in order if w in WIDGETS.get(page, ())] if isinstance(order, list) else []
 
 
 def _mover_chart(p, pos, days=365):
@@ -471,7 +485,7 @@ def definicoes():
              db_path=current_app.config["DB_PATH"], backups=backups.list_backups(current_app.config["DB_PATH"]),
              yfinance=yfinance_available(),
              risk_free_pct=round(data.risk_free() * 100, 2), last_refresh=Setting.get("last_refresh"), refresh_report=Setting.get("refresh_report"),
-             stale_days=ctx.stale_days(), core_plan=cerne.plan(),
+             stale_days=ctx.stale_days(), core_plan=cerne.plan(), widget_custom=bool(widget_order("overview")),
              password_env=bool(auth.env_password()))
     return render_template("pages/definicoes.html", **c)
 

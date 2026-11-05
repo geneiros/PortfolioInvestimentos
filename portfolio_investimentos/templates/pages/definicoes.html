@@ -76,6 +76,15 @@
       </form>
     </div>
 
+    <div class="pm-card mb-3" id="widgetsCard">
+      <div class="pm-label mb-2">Ordem dos widgets</div>
+      <p class="small text-body-secondary mb-2">Na Visão Geral, carrega 2 segundos no fundo de um cartão (com o rato ou o dedo) e arrasta-o para outro lugar. A ordem fica guardada na aplicação, igual em todos os dispositivos; Esc cancela.</p>
+      <div class="d-flex flex-wrap gap-2 align-items-center small">
+        <button class="btn btn-sm btn-outline-secondary" data-pm-action="reset_widget_order" data-args='{"page": "overview"}' {{ 'disabled' if not widget_custom }}><i class="bi bi-arrow-counterclockwise"></i> Repor a ordem da Visão Geral</button>
+        <span class="text-body-secondary">{{ 'Com uma ordem tua.' if widget_custom else 'Na ordem de omissão.' }}</span>
+      </div>
+    </div>
+
     <div class="pm-card mb-3">
       <div class="pm-label mb-2">Disponível offline {% if offline_enabled %}<span class="badge text-bg-success ms-1">Ligado</span>{% endif %}</div>
       <p class="small text-body-secondary">Guarda neste dispositivo uma cópia das páginas de consulta (Visão Geral, Carteira,

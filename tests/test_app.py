@@ -2056,3 +2056,22 @@ def test_core_portfolio_missing_etfs_in_demo(client):
     assert post(client, "load_demo", csrf(client)).status_code == 200
     html = client.get("/carteira").get_data(as_text=True)
     assert "Não encontrei" in html.split('id="coreCard"', 1)[1][:1500] and 'id="coreBanner"' not in html
+
+
+def test_overview_widget_order(client):
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    html = client.get("/").get_data(as_text=True)
+    assert 'data-pm-widgets="overview"' in html and "js/widgets.js" in html
+    names = re.findall(r'data-widget="(\w+)"', html)
+    assert names == ["carteira", "grafico", "notas", "movers", "eventos", "peso", "alocacao"]
+    assert "const grid = document.getElementById(\"overviewGrid\"), order = [];" in html
+    assert post(client, "save_widget_order", token, page="overview", order="movers,carteira").status_code == 200
+    html = client.get("/").get_data(as_text=True)
+    assert 'order = ["movers", "carteira"];' in html
+    assert "Com uma ordem tua." in client.get("/definicoes").get_data(as_text=True)
+    for bad in ("movers,movers", "nada", "carteira,<script>"):
+        assert post(client, "save_widget_order", token, page="overview", order=bad).status_code == 400, bad
+    assert post(client, "save_widget_order", token, page="outra", order="carteira").status_code == 400
+    assert post(client, "reset_widget_order", token, page="overview").status_code == 200
+    assert "order = [];" in client.get("/").get_data(as_text=True)

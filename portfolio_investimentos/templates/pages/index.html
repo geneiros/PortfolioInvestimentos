@@ -13,9 +13,9 @@
   <a href="/radar" class="ms-auto">Ver alertas</a></div>
 {% endfor %}
 
-<div class="row g-3">
+<div class="row g-3" id="overviewGrid" data-pm-widgets="overview">
   <!-- Carteira -->
-  <div class="col-12">
+  <div class="col-12" data-widget="carteira">
     <div class="pm-card accent-top">
       <div class="position-relative">
       <div class="pm-hero-chart"><canvas id="heroSpark"></canvas></div>
@@ -58,7 +58,7 @@
   </div>
 
   <!-- Gráfico de desempenho -->
-  <div class="col-12">
+  <div class="col-12" data-widget="grafico">
     <div class="pm-card">
       <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
         <div class="pm-seg" id="modeSeg"><button class="active" data-mode="gain">Retorno total</button><button data-mode="value">Valor total</button></div>
@@ -82,7 +82,7 @@
   {{ ins.scores_row(scores) }}
 
   <!-- Movers -->
-  <div class="col-xl-8">
+  <div class="col-xl-8" data-widget="movers">
     <div class="pm-card">
       <div class="row">
         <div class="col-12">
@@ -107,7 +107,7 @@
   </div>
 
   <!-- Eventos -->
-  <div class="col-xl-4">
+  <div class="col-xl-4" data-widget="eventos">
     <div class="pm-card">
       <div class="d-flex align-items-center mb-2">
         <span class="pm-label">Próximos eventos {{ help("Resultados e dividendos das tuas posições. Os marcados com ~ são estimados pelo histórico.") }}</span>
@@ -139,6 +139,16 @@
 
   {{ ins.charts_row() }}
 </div>
+<script>
+  // a ordem guardada dos widgets, aplicada antes de a página aparecer (sem saltos)
+  (function () {
+    const grid = document.getElementById("overviewGrid"), order = {{ widget_order|tojson }};
+    if (!order.length) return;
+    const items = [...grid.querySelectorAll(":scope > [data-widget]")];
+    const rank = (el, i) => { const k = order.indexOf(el.dataset.widget); return k < 0 ? order.length + i : k; };
+    items.map((el, i) => [rank(el, i), el]).sort((a, b) => a[0] - b[0]).forEach(([, el]) => grid.appendChild(el));
+  })();
+</script>
 <script type="application/json" id="insightsData">{{ insights_data|safe }}</script>
 {% endif %}
 {% endautoescape %}{% endblock %}
@@ -147,6 +157,7 @@
 {% if has_data %}
 <script src="{{ url_for('static', filename='js/insights.js') }}"></script>
 <script src="{{ url_for('static', filename='js/movers.js') }}"></script>
+<script src="{{ url_for('static', filename='js/widgets.js') }}"></script>
 <script>
 (function () {
   const spark = {{ hero_spark|safe }};
