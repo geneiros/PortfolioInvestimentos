@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **README e capturas de ecrã atualizados**  
+  Todas as capturas (claro e escuro) refeitas com a versão atual; novas capturas 25 (alerta da carteira) e 26 (gerir índices) da Carteira; README com os alertas da carteira, os índices à escolha, a ordem dos cartões e o intervalo da carteira cerne em Definições.
 - **Radar e alertas: os alertas da carteira**  
   Os alertas criados na Carteira («Carteira vs mercado» → sino) aparecem também em Radar e alertas, numa secção «Alertas da carteira» por baixo dos alertas de preço: carteira ou conta, condição, estado (ativo ou pausado e o último disparo) e botões para pausar, reativar e apagar. O aviso de um alerta disparado aparece também nesta página.
 - **Carteira: escolher os índices da «Carteira vs mercado» e alertas da variação da carteira**  
