@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **README: link para o Buy Me a Coffee**  
+  Badge no topo e botão na secção nova «Apoiar o projeto», a ligar a buymeacoffee.com/geneiros.
 - **Visão Geral: o gráfico de fundo do cartão Carteira mostra o último ano**  
   Mostrava os últimos 120 dias úteis (cerca de 6 meses); passa a mostrar o valor das posições abertas no último ano, e o «?» do cartão diz o período.
 - **Visão Geral: sem o cartão «Máximo histórico»**  

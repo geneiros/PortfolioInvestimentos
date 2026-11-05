@@ -1,6 +1,6 @@
 # Portfolio Investimentos
 
-[![Testes](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml/badge.svg)](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml)
+[![Testes](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml/badge.svg)](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml) [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/geneiros)
 
 Gestor de carteira de investimentos local: desempenho, dividendos, fiscalidade (PT) e importação de extratos da Trading 212, XTB e Trade Republic. **Corre no teu computador**, com alertas de preço e lista de observação.
 
@@ -291,6 +291,12 @@ python -m portfolio_investimentos
 - Parsers para DEGIRO, IBKR, Revolut e eToro.
 - Análise da sobreposição de ETFs (as mesmas empresas em vários fundos); no Planeamento, simulações com os anos reais dos mercados e o efeito de vender ou comprar.
 - Executável único (PyInstaller) para quem não quer instalar o Python.
+
+## Apoiar o projeto
+
+Se a aplicação te é útil, podes pagar-me um café:
+
+<a href="https://buymeacoffee.com/geneiros"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="45"></a>
 
 ## Licença
 
