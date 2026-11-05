@@ -15,7 +15,7 @@
 
 <div class="row g-3">
   <!-- Carteira -->
-  <div class="col-xl-8">
+  <div class="col-12">
     <div class="pm-card accent-top">
       <div class="position-relative">
       <div class="pm-hero-chart"><canvas id="heroSpark"></canvas></div>
@@ -54,36 +54,6 @@
           <div><div class="pm-label">Juros da conta</div><div class="pm-fact">{{ signed(p.interest_eur) }}</div></div>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- Máximo histórico -->
-  <div class="col-xl-4">
-    <div class="pm-card accent-top">
-      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
-        <div class="pm-label mt-2">Máximo histórico {{ help("Valor mais alto alguma vez atingido.") }}</div>
-        <div class="pm-seg small" id="athSeg"><button class="active" data-mode="value">Carteira</button><button data-mode="return">Retorno total</button></div>
-      </div>
-      {% for mode, a in ath.items() %}
-      <div class="ath-panel {{ 'd-none' if mode != 'value' }}" data-mode="{{ mode }}">
-        {% if a %}
-        <div class="row mt-4">
-          <div class="col-7">
-            <div class="pm-big money">{{ a.value|money }} <small class="fs-6 text-secondary fw-normal">· {{ a.date|ddmmyyyy }}</small></div>
-            {% if a.previous %}<div class="small text-secondary mt-1">anterior <span class="money">{{ a.previous[0]|money }}</span> · {{ a.previous[1]|ddmmyyyy }}</div>{% endif %}
-          </div>
-          <div class="col-5 border-start" style="border-color:var(--pm-border)!important">
-            <div class="pm-label">Face ao máximo</div>
-            <div class="pm-mid {{ a.vs_ath_pct|tone }}">{{ a.vs_ath_pct|pct(2) }}</div>
-            <div class="pm-label mt-2">Falta recuperar</div>
-            <div class="pm-mid money">{{ a.to_recover|money }}</div>
-          </div>
-        </div>
-        <div class="d-flex justify-content-between small mt-4"><span>Posição vs máximo</span><span>{{ a.position_pct|pct(2, sign=False) }}</span></div>
-        <div class="pm-progress mt-1"><div style="width: {{ [[a.position_pct * 100, 0]|max, 100]|min }}%"></div></div>
-        {% endif %}
-      </div>
-      {% endfor %}
     </div>
   </div>
 
@@ -200,10 +170,6 @@
       options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } } },
     });
 
-    document.querySelectorAll("#athSeg button").forEach((b) => b.addEventListener("click", () => {
-      document.querySelectorAll("#athSeg button").forEach((x) => x.classList.toggle("active", x === b));
-      document.querySelectorAll(".ath-panel").forEach((p) => p.classList.toggle("d-none", p.dataset.mode !== b.dataset.mode));
-    }));
     document.querySelectorAll("#modeSeg button").forEach((b) => b.addEventListener("click", () => {
       document.querySelectorAll("#modeSeg button").forEach((x) => x.classList.toggle("active", x === b));
       mode = b.dataset.mode; draw();

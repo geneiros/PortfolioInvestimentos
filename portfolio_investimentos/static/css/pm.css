@@ -70,6 +70,7 @@ body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
 .pm-fact { font-weight: 600; font-size: 1.05rem; }
 .pm-fact > *, .pm-fact.money { white-space: nowrap; }
 .pm-fact small { font-size: .8em; }
+@media (min-width: 992px) { .pm-facts-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 @media (max-width: 575.98px) { .pm-facts-grid { grid-template-columns: 1fr 1fr; } }
 .pm-progress { height: 6px; background: var(--bs-secondary-bg); border-radius: var(--bs-border-radius-pill); overflow: hidden; }
 .pm-progress > div { height: 100%; background: var(--bs-success); }

@@ -114,7 +114,6 @@ def overview():
     instruments = {i.ticker: i for i in Instrument.query.filter(Instrument.ticker.in_({e.instrument for e in events} or {""}))}
     c.update(
         hero_spark=ctx.js_json(p.series.holdings[-120:]), ytd=p.year_to_date(),
-        ath={"value": p.all_time_high("value"), "return": p.all_time_high("return")},
         movers=movers, events_total=len(events),
         mover_charts={m.asset.ticker: ctx.js_json(_mover_chart(p, m)) for m in movers},
         event_groups=[("Próxima semana", [e for e in events if e.date <= week]),

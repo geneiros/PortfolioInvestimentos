@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Visão Geral: sem o cartão «Máximo histórico»**  
+  O cartão sai e o cartão Carteira passa a ocupar a largura toda; os resultados e a conta ficam em 5 colunas alinhadas. A queda face ao máximo (drawdown) continua em Desempenho.
 - **Visão Geral: resultados e conta no cartão Carteira**  
   Os valores do cartão «Resultados / Conta» (não realizado, dividendos, realizado, comissões, custo base, depositado, caixa, valor total e juros da conta) passam para uma faixa por baixo dos valores do primeiro cartão, Carteira. O cartão antigo sai e o gráfico de evolução passa a ocupar a largura toda.
 - **Carteira: carteira cerne (ERNX · FWIA · XEON) com escalões quando o FWIA cai**  
