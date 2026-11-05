@@ -146,6 +146,19 @@ class PortfolioAlert(db.Model):
     creation = db.Column(db.DateTime, default=utcnow)
 
 
+class Logo(db.Model):
+    """Logótipo de um ativo, descarregado uma vez (na atualização de cotações) ou carregado à mão.
+
+    `source`: "site:<domínio>" (procurado pelo site da empresa ou do emitente do ETF), "manual" (imagem carregada),
+    "off" (sem logótipo, por escolha) ou "none" (procurado e não encontrado; tenta-se de novo ao fim de 30 dias).
+    """
+    ticker = db.Column(db.String(32), db.ForeignKey("instrument.ticker", ondelete="CASCADE"), primary_key=True)
+    mime = db.Column(db.String(32))
+    data = db.Column(db.LargeBinary)
+    source = db.Column(db.String(80))
+    fetched = db.Column(db.DateTime, default=utcnow)
+
+
 class DividendHistory(db.Model):
     """Dividendos por ação de um ativo segundo o Yahoo (data ex-dividendo), para projetar posições recentes."""
     id = db.Column(db.Integer, primary_key=True)

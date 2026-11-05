@@ -103,6 +103,8 @@ def create_app(config=None):
 
     from .services.importer import broker_logo
     app.jinja_env.globals["broker_logo"] = broker_logo
+    from .services import logos as _logos
+    app.jinja_env.globals["logo_url"] = _logos.url
     app.jinja_env.filters.update(
         money=formatting.money, pct=formatting.pct, number=formatting.number, tone=formatting.tone,
         ddmmyyyy=formatting.ddmmyyyy, ddmm=formatting.ddmm, month_label=formatting.month_label,

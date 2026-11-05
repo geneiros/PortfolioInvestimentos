@@ -176,6 +176,23 @@ def _market_alerts(c):
             "rows": portfolio_alerts.rows()}
 
 
+@bp.route("/logo/<path:ticker>")
+def logo(ticker):
+    from .models import Logo
+    from .services import logos
+    row = db.session.get(Logo, ticker)
+    if row is None or not row.data:
+        abort(404)
+    tag = logos.etag(row)
+    if request.if_none_match and tag in request.if_none_match:
+        return Response(status=304)
+    resp = Response(row.data, mimetype=row.mime or "image/png")
+    resp.set_etag(tag)
+    resp.headers["Cache-Control"] = "private, max-age=604800"
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'"  # SVG sem scripts
+    return resp
+
+
 @bp.route("/carteira")
 def carteira():
     c = ctx.build("carteira", "Carteira")

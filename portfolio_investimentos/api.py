@@ -338,6 +338,53 @@ def delete_portfolio_alert(name):
     return "Alerta apagado."
 
 
+# ------------------------------------------------------------------ logótipos
+def _logo_instrument(ticker):
+    inst = db.session.get(Instrument, ticker or "")
+    if inst is None:
+        raise ApiError("Ativo desconhecido.")
+    return inst
+
+
+@action
+def set_logo_site(ticker, site):
+    """Procura o logótipo pelo site indicado (ex.: apple.com) e guarda-o."""
+    from .services import logos
+    _logo_instrument(ticker)
+    try:
+        logos.set_site(ticker, site)
+    except ValueError as exc:
+        raise ApiError(str(exc)) from exc
+    return "Logótipo guardado."
+
+
+@action
+def upload_logo(ticker):
+    from .services import logos
+    _logo_instrument(ticker)
+    f = request.files.get("file")
+    if f is None:
+        raise ApiError("Escolhe uma imagem.")
+    mime = (f.mimetype or "").lower()
+    try:
+        logos.set_image(ticker, mime, f.read(logos.MAX_BYTES + 1))
+    except ValueError as exc:
+        raise ApiError(str(exc)) from exc
+    return "Logótipo guardado."
+
+
+@action
+def remove_logo(ticker, auto=""):
+    """Tira o logótipo (fica com as iniciais) ou, com `auto`, volta a procurá-lo na próxima atualização."""
+    from .services import logos
+    _logo_instrument(ticker)
+    if str(auto) in ("1", "true"):
+        logos.reset(ticker)
+        return "O logótipo volta a ser procurado na próxima atualização de cotações."
+    logos.remove(ticker)
+    return "Logótipo retirado."
+
+
 @action
 def set_market_indices(tickers=""):
     """Índices da «Carteira vs mercado» (até 5), separados por vírgulas."""
@@ -704,8 +751,8 @@ def reset_data(confirm=""):
     if confirm != "APAGAR":
         raise ApiError('Escreve APAGAR para confirmar.')
     _backup("apagar-tudo")
-    from .models import Fundamental
-    for model in (Transaction, ImportBatch, Alert, PortfolioAlert, WatchItem, Event, DividendHistory, Price, FxRate,
+    from .models import Fundamental, Logo
+    for model in (Logo, Transaction, ImportBatch, Alert, PortfolioAlert, WatchItem, Event, DividendHistory, Price, FxRate,
                   OtherAssetValue, OtherAsset, Fundamental):
         model.query.delete()
     Broker.query.delete()

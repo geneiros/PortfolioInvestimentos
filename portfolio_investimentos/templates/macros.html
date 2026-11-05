@@ -13,7 +13,9 @@
 {%- endmacro %}
 
 {% macro logo(asset) -%}
-<span class="pm-logo" style="background: {{ asset.color or '#64748b' }}">{{ asset.ticker.replace('DEMO-', '').replace('^', '')[:3] }}</span>
+{%- set src = logo_url(asset.ticker) -%}
+{%- if src -%}<span class="pm-logo pm-logo-img"><img src="{{ src }}" alt="" loading="lazy" decoding="async"></span>
+{%- else -%}<span class="pm-logo" style="background: {{ asset.color or '#64748b' }}">{{ asset.ticker.replace('DEMO-', '').replace('^', '')[:3] }}</span>{%- endif -%}
 {%- endmacro %}
 
 {% macro signed(value, decimals=0, pct=None, pct_decimals=2) -%}

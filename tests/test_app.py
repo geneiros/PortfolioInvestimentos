@@ -2159,3 +2159,63 @@ def test_portfolio_alerts_on_radar(client):
     assert post(client, "toggle_portfolio_alert", token, name="999", active="1").status_code == 400
     assert post(client, "delete_portfolio_alert", token, name=aid).status_code == 200
     assert "Ainda não tens alertas da carteira" in client.get("/radar").get_data(as_text=True)
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 200
+
+
+def test_logos_service_and_pages(app, client, monkeypatch):
+    from portfolio_investimentos.models import Instrument, Logo
+    from portfolio_investimentos.services import logos
+    assert logos.domain_of("https://www.apple.com/pt/") == "apple.com" and logos.domain_of("apple") is None
+    assert logos.issuer_domain("iShares Core MSCI World UCITS ETF") == "ishares.com"
+    assert logos.issuer_domain("Vanguard FTSE All-World") == "vanguard.com" and logos.issuer_domain("Apple Inc.") is None
+    calls = []
+
+    def fake(url):
+        calls.append(url)
+        if "nada.pt" in url:
+            raise OSError("404")
+        return "image/png", PNG
+    monkeypatch.setattr(logos, "_download", fake)
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    with app.app_context():
+        inst = Instrument.query.filter(Instrument.kind == "stock").first()
+        etf = Instrument(ticker="IWDA", currency="EUR", kind="etf", instrument_name="iShares Core MSCI World")
+        db.session.add(etf)
+        db.session.commit()
+        tk = inst.ticker
+        assert logos.needs(tk)
+        assert logos.update(inst, "https://www.apple.com", download=fake)
+        assert logos.update(etf, None, download=fake) and "ishares.com" in calls[-1]
+        none = Instrument(ticker="XYZ1", currency="EUR", kind="stock")
+        db.session.add(none)
+        db.session.commit()
+        assert not logos.update(none, None, download=fake)
+        db.session.commit()
+        assert not logos.needs(tk) and not logos.needs("XYZ1")  # não encontrado: só ao fim de 30 dias
+    html = client.get("/carteira").get_data(as_text=True)
+    assert f'src="/logo/{tk}?v=' in html and "pm-logo-img" in html
+    r = client.get(f"/logo/{tk}")
+    assert r.status_code == 200 and r.mimetype == "image/png" and r.data == PNG
+    assert client.get(f"/logo/{tk}", headers={"If-None-Match": r.headers["ETag"]}).status_code == 304
+    assert client.get("/logo/XYZ1").status_code == 404
+    # à mão: site, imagem, iniciais e voltar ao automático
+    assert post(client, "set_logo_site", token, ticker="XYZ1", site="nada.pt").status_code == 400
+    assert post(client, "set_logo_site", token, ticker="XYZ1", site="exemplo.pt").status_code == 200
+    r = client.post("/api/upload_logo", headers={"X-CSRF-Token": token},
+                    data={"ticker": tk, "file": (io.BytesIO(PNG), "logo.png", "image/png")})
+    assert r.status_code == 200
+    r = client.post("/api/upload_logo", headers={"X-CSRF-Token": token},
+                    data={"ticker": tk, "file": (io.BytesIO(b"x"), "a.txt", "text/plain")})
+    assert r.status_code == 400
+    assert post(client, "remove_logo", token, ticker=tk).status_code == 200
+    assert f'src="/logo/{tk}?v=' not in client.get("/carteira").get_data(as_text=True)
+    with app.app_context():
+        assert db.session.get(Logo, tk).source == "off" and not logos.needs(tk)
+    assert post(client, "remove_logo", token, ticker=tk, auto="1").status_code == 200
+    with app.app_context():
+        assert logos.needs(tk)
+    assert 'id="logoModal"' in client.get("/definicoes").get_data(as_text=True)
+    assert post(client, "remove_logo", token, ticker="NAOHA").status_code == 400

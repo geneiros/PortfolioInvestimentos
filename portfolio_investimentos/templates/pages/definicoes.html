@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% from "macros.html" import logo %}
 <div class="row g-3">
   <div class="col-xl-5">
     <div class="pm-card mb-3">
@@ -202,11 +203,66 @@
         <input name="data_symbol" value="{{ i.data_symbol or '' }}" class="form-control form-control-sm" placeholder="Símbolo">
         <input type="color" name="color" value="{{ i.color or '#64748b' }}" class="form-control form-control-color form-control-sm">
         <button class="btn btn-sm btn-outline-secondary" type="submit" title="Guardar"><i class="bi bi-check"></i></button>
+        <button class="btn btn-sm btn-outline-secondary p-0 border-0 bg-transparent" type="button" data-bs-toggle="modal" data-bs-target="#logoModal"
+                data-logo-ticker="{{ i.ticker }}" data-logo-src="{{ logo_url(i.ticker) or '' }}" title="Logótipo">{{ logo(i) }}</button>
       </form>
     {% else %}<p class="text-body-secondary">Sem ativos.</p>{% endfor %}
   </div></div>
+
+<div class="modal fade" id="logoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Logótipo · <span data-logo-title></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+    <div class="modal-body small">
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <span class="pm-logo pm-logo-img" style="width: 56px; height: 56px; flex-basis: 56px"><img data-logo-preview alt=""></span>
+        <span class="text-body-secondary" data-logo-none>Sem logótipo: aparecem as iniciais.</span>
+      </div>
+      <p class="text-body-secondary">Os logótipos procuram-se na atualização de cotações (o site da empresa no Yahoo ou, num ETF, o do emitente) e ficam guardados na aplicação: as páginas não fazem pedidos a outros sites.</p>
+      <form class="d-flex gap-2 mb-2" data-logo-site>
+        <input name="site" class="form-control form-control-sm" placeholder="Site, ex.: apple.com" required>
+        <button class="btn btn-sm btn-primary text-nowrap" type="submit">Procurar</button>
+      </form>
+      <div class="d-flex gap-2 align-items-center mb-3">
+        <input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,image/x-icon" class="form-control form-control-sm" data-logo-file>
+        <span class="text-body-secondary text-nowrap">até 200 KB</span>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-logo-remove="0">Ficar com as iniciais</button>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-logo-remove="1">Procurar automaticamente</button>
+      </div>
+    </div>
+  </div></div>
+</div>
 </div>
 <script>
+// logótipo de cada ativo: site, imagem carregada ou as iniciais
+document.addEventListener("DOMContentLoaded", () => {
+  const modal = document.getElementById("logoModal");
+  if (!modal) return;
+  let ticker = null;
+  modal.addEventListener("show.bs.modal", (e) => {
+    const btn = e.relatedTarget;
+    ticker = btn.dataset.logoTicker;
+    modal.querySelector("[data-logo-title]").textContent = ticker;
+    const img = modal.querySelector("[data-logo-preview]"), src = btn.dataset.logoSrc;
+    img.parentElement.classList.toggle("d-none", !src);
+    modal.querySelector("[data-logo-none]").classList.toggle("d-none", !!src);
+    if (src) img.src = src;
+  });
+  const done = (msg) => { pm.toast(msg); setTimeout(() => location.reload(), 600); };
+  modal.querySelector("[data-logo-site]").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try { done(await pm.call("set_logo_site", { ticker, site: e.target.site.value })); } catch (err) { /* já mostrado */ }
+  });
+  modal.querySelector("[data-logo-file]").addEventListener("change", async (e) => {
+    if (!e.target.files.length) return;
+    const fd = new FormData(); fd.append("ticker", ticker); fd.append("file", e.target.files[0]);
+    try { done(await pm.call("upload_logo", fd)); } catch (err) { /* já mostrado */ }
+  });
+  modal.querySelectorAll("[data-logo-remove]").forEach((b) => b.addEventListener("click", async () => {
+    try { done(await pm.call("remove_logo", { ticker, auto: b.dataset.logoRemove })); } catch (err) { /* já mostrado */ }
+  }));
+});
 document.addEventListener("DOMContentLoaded", () => {
   // ativos: por omissão só as posições abertas; a pesquisa procura em todos (?ativo=XXX abre a pesquisa)
   const rows = [...document.querySelectorAll("[data-asset-row]")], box = document.getElementById("assetSearch");

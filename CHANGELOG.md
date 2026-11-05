@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Logótipos das empresas e dos ETF**  
+  Na atualização de cotações, cada posição aberta sem logótipo recebe o ícone do site da empresa (o site vem dos dados da empresa no Yahoo) ou, num ETF, o do emitente reconhecido pelo nome (iShares, Vanguard, Xtrackers, Invesco, Amundi/Lyxor, SPDR, WisdomTree, VanEck, …). A imagem fica guardada na base de dados (tabela nova Logo) e é servida pela própria aplicação, por isso as páginas não fazem pedidos a outros sites e funcionam offline; sem logótipo ficam as iniciais, e um não encontrado volta a procurar-se ao fim de 30 dias. Em Definições → Ativos, clicar no logótipo abre o editor: procurar por um site, carregar uma imagem (até 200 KB), ficar com as iniciais ou voltar à procura automática.
 - **README e capturas de ecrã atualizados**  
   Todas as capturas (claro e escuro) refeitas com a versão atual; novas capturas 25 (alerta da carteira) e 26 (gerir índices) da Carteira; README com os alertas da carteira, os índices à escolha, a ordem dos cartões e o intervalo da carteira cerne em Definições.
 - **Radar e alertas: os alertas da carteira**  

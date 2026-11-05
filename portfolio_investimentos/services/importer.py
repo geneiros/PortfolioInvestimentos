@@ -141,6 +141,8 @@ def merge_instruments(old, new):
     from ..models import DividendHistory, Event, WatchItem
     for model in (Price, Event, WatchItem, DividendHistory):
         model.query.filter(model.instrument == old.ticker).delete(synchronize_session=False)
+    from ..models import Logo
+    Logo.query.filter(Logo.ticker == old.ticker).delete(synchronize_session=False)
     new.isin = new.isin or old.isin
     if old.sector and not new.sector:
         new.sector = old.sector

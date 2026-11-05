@@ -430,6 +430,7 @@ def refresh_all(start=None, progress=None, only_open=False):
             _beat()
             step_started = _time.monotonic()
             t = yf.Ticker(inst.data_symbol or inst.ticker)
+            info = None
             if not inst.sector and inst.kind == "etf":
                 inst.sector = "ETF"  # o Yahoo não tem "dados fundamentais" de ETF: o pedido só dava erro
             elif inst.kind != "etf" and (not inst.sector or _fundamentals_due(inst.ticker)):
@@ -449,6 +450,19 @@ def refresh_all(start=None, progress=None, only_open=False):
                     except Exception as exc:  # informação opcional (valor de cada ação)
                         db.session.rollback()
                         note(f"{inst.ticker} dados fundamentais: erro ({str(exc)[:120]})")
+            try:  # logótipo: uma vez por ativo (o site da empresa ou o emitente do ETF)
+                from . import logos
+                if logos.needs(inst.ticker):
+                    if inst.kind != "etf" and info is None:
+                        try:
+                            info = t.info or {}
+                        except Exception:
+                            info = {}
+                    logos.update(inst, (info or {}).get("website"))
+                    db.session.commit()
+            except Exception as exc:  # opcional
+                db.session.rollback()
+                note(f"{inst.ticker} logótipo: erro ({str(exc)[:120]})")
             try:
                 _store_calendar(inst.ticker, t.calendar or {})
             except Exception as exc:

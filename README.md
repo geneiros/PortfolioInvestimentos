@@ -8,6 +8,7 @@ Gestor de carteira de investimentos local: desempenho, dividendos, fiscalidade (
 - **Abre-se com um duplo clique.** O script de arranque prepara tudo na primeira vez e abre o browser.
 - **Interface Bootstrap 5.3 nativa**, com modo claro, escuro ou automático (segue o sistema operativo).
 - **Cartões à tua medida:** em todas as páginas, um clique longo (2 segundos no fundo de um cartão, com o rato ou o dedo) levanta o cartão para o arrastar para outro lugar; a ordem fica guardada na aplicação, igual em todos os dispositivos, e repõe-se em Definições.
+- **Logótipos das empresas e ETF:** procurados uma vez na atualização de cotações (o site da empresa, pelo Yahoo, ou o emitente do ETF: iShares, Vanguard, Xtrackers, Invesco, Amundi, SPDR, …) e guardados na aplicação, por isso as páginas não fazem pedidos a outros sites; em Definições → Ativos, clica no logótipo para indicar o site, carregar uma imagem ou ficar com as iniciais.
 - **Esconder valores** (botão do olho, no topo): cada valor em euros passa a «€ ••••», na cor do valor, em todas as páginas; o botão fica selecionado enquanto o modo está ligado e a escolha fica guardada no dispositivo.
 
 ## Como usar
@@ -194,7 +195,7 @@ O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro o
 | **Fiscal** | Por ano: mais-valias pelo método FIFO resumidas por ativo (as linhas de cada lote abrem a pedido e vão todas no CSV), dividendos com o crédito de imposto estrangeiro limitado a cada dividendo, juros e estimativa de imposto a 28% (Portugal). |
 | **Importar** | Extratos da Trading 212 (CSV), XTB (XLSX), Trade Republic (CSV) e CSV genérico, com deduplicação (podes carregar o mesmo ficheiro várias vezes) e histórico de extratos. Antes de importar fica uma cópia automática da base de dados. |
 | **Transações** | Lista filtrável, inserção manual (com validação da quantidade detida nas vendas) e exportação CSV. |
-| **Definições** | Corretoras; ativos com filtro (posições abertas, sem cotações, todos), pesquisa, último fecho e «Juntar» para o mesmo título com dois tickers; atualização de cotações (todas ou só as posições abertas, com o progresso ativo a ativo); taxa sem risco; aviso de cotações antigas (os dias configuram-se; 5 por omissão, 0 desliga); intervalo dos escalões da carteira cerne; repor a ordem dos cartões (por página ou todas); disponível offline; cópias de segurança automáticas com «Restaurar» e «Eliminar»; demonstração e limpeza de dados. |
+| **Definições** | Corretoras; ativos com filtro (posições abertas, sem cotações, todos), pesquisa, último fecho e «Juntar» para o mesmo título com dois tickers; logótipo de cada ativo (site, imagem ou iniciais); atualização de cotações (todas ou só as posições abertas, com o progresso ativo a ativo); taxa sem risco; aviso de cotações antigas (os dias configuram-se; 5 por omissão, 0 desliga); intervalo dos escalões da carteira cerne; repor a ordem dos cartões (por página ou todas); disponível offline; cópias de segurança automáticas com «Restaurar» e «Eliminar»; demonstração e limpeza de dados. |
 
 Também há um seletor de corretora (todas ou uma conta específica) e um botão com um olho que esconde os valores.
 
