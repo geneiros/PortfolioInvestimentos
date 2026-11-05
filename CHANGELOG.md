@@ -4,7 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
-- **Carteira: ROI % do total com a mesma base das linhas; «?» no 1D**  
+- **Visão Geral verificada; posição de abertura estimada por corretora**  
+  Confirmados os cartões da Visão Geral (carteira, retorno total = soma das partes, variação diária, ano corrente, máximo histórico, resultados, conta, peso vs retorno, alocação). A alocação por corretora não batia com o total: uma venda numa corretora sem o histórico completo consumia as ações de outra corretora na vista consolidada. A posição de abertura estimada passa a ser por corretora e ativo, por isso o consolidado é a soma das corretoras. A demonstração deixa de vender numa corretora ações que só existiam na outra.
+- **Carteira: ROI % do total com a mesma base das linhas; «?» no 1D** `c1da696`  
   Confirmados os totais da tabela (cada coluna é a soma das linhas). O ROI % do total passava a dividir pelo investido só nas posições abertas, enquanto as linhas dividem por tudo o que se investiu no ativo (incluindo partes já vendidas, de onde vem o realizado); o total passa a usar a mesma base. A coluna 1D ganha um «?»: a % é a do preço na moeda do ativo e o valor em euros inclui o câmbio.
 - **Cópias de segurança: no máximo 2** `6da949b`  
   Cada cópia nova (automática, manual ou antes de restaurar ou de atualizar a base de dados) apaga as mais antigas, para ficarem só as últimas 2 (eram 10). A cópia feita antes de restaurar nunca apaga a que se está a restaurar.

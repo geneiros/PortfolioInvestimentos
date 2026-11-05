@@ -602,3 +602,21 @@ def test_price_book_recent():
     assert book.recent("ACME", 3) == [(d0 + timedelta(days=7), 17.0), (d0 + timedelta(days=8), 18.0),
                                       (d0 + timedelta(days=9), 19.0)]
     assert book.recent("NADA", 3) == [] and len(book.recent("ACME", 50)) == 10
+
+
+def test_opening_positions_are_estimated_per_broker():
+    """Uma venda numa corretora sem o histórico completo não consome as ações de outra corretora:
+    a carteira consolidada continua a ser a soma das corretoras."""
+    d0 = date(2026, 1, 5)
+    prices = {"ACME": [(d0, 10.0), (date(2026, 3, 2), 12.0)]}
+    txs = [
+        Tx(d0, "DEPOSIT", amount=2000, broker="A"),
+        Tx(d0, "BUY", ACME, quantity=100, price=10, broker="A"),
+        # na corretora B só há a venda (as compras são anteriores ao extrato importado)
+        Tx(date(2026, 2, 2), "SELL", ACME, quantity=30, price=11, result=60.0, broker="B"),
+    ]
+    both = Portfolio(txs, PriceBook(prices), as_of=date(2026, 3, 2))
+    only_a = Portfolio([t for t in txs if t.broker == "A"], PriceBook(prices), as_of=date(2026, 3, 2))
+    assert both.positions["ACME"].qty == pytest.approx(100)  # as 100 da A ficam: a B tinha as suas 30
+    assert only_a.positions["ACME"].qty == pytest.approx(100)
+    assert any("já existiam antes" in w for w in both.warnings)

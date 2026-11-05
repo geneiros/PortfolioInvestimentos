@@ -263,7 +263,9 @@ class Portfolio:
         for t in txs:
             if not t.asset:
                 continue
-            k = t.asset.ticker
+            # por corretora: uma venda numa corretora sem o histórico completo não pode consumir as ações de outra
+            # (senão a carteira consolidada deixa de ser a soma das corretoras)
+            k = (t.broker, t.asset.ticker)
             if t.type in ("BUY", "TRANSFER_IN", "CONVERT_IN"):
                 held[k] += t.quantity
             elif t.type in ("SELL", "TRANSFER_OUT", "CONVERT_OUT"):
@@ -277,26 +279,27 @@ class Portfolio:
                         cps = cost_eur / t.quantity * fx_start
                     else:
                         cps = t.price * fx_start / fx_sale
-                    o = openings.setdefault(k, [t.asset, 0.0, 0.0, t.currency])
+                    o = openings.setdefault(k, [t.asset, 0.0, 0.0, t.currency, t.broker])
                     o[1] += short
                     o[2] += short * max(cps, 0.0)
                     held[k] = 0.0
                 else:
                     held[k] -= t.quantity
             elif t.type == "DIVIDEND":
-                dividend_tickers.add(k)
-        out = [Tx(start, "BUY", a, q, cost / q, currency=cur, opening=True)
-               for a, q, cost, cur in openings.values() if q > 0]
+                dividend_tickers.add(t.asset.ticker)
+        out = [Tx(start, "BUY", a, q, cost / q, currency=cur, broker=broker, opening=True)
+               for a, q, cost, cur, broker in openings.values() if q > 0]
         if out:
-            names = ", ".join(sorted(t.asset.ticker for t in out))
+            tickers = sorted({t.asset.ticker for t in out})
+            names = ", ".join(tickers)
             self.warnings.append(
-                f"{len(out)} posições já existiam antes do primeiro movimento importado ({names}). "
+                f"{len(tickers)} posições já existiam antes do primeiro movimento importado ({names}). "
                 "O custo foi estimado a partir do resultado indicado pela corretora nas vendas. "
                 "Importa os extratos dos anos anteriores para teres o histórico completo.")
         # dividendos recebidos depois de vender tudo são normais (data ex-dividendo anterior à venda);
         # só falta histórico se o ativo nunca foi comprado
         ever_held = {t.asset.ticker for t in txs if t.asset and t.type in ("BUY", "TRANSFER_IN", "CONVERT_IN")}
-        missing = dividend_tickers - ever_held - set(openings)
+        missing = dividend_tickers - ever_held - {k[1] for k in openings}
         if missing:
             self.warnings.append(
                 f"Recebeste dividendos de ativos sem compras no histórico ({', '.join(sorted(missing))}). "

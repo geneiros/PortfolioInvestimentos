@@ -107,6 +107,7 @@ def create_demo(seed=42):
 
     fx_map = dict(fx)
     holdings = {t[0]: 0.0 for t in INSTRUMENTS}
+    in_broker = {(b, t[0]): 0.0 for b in brokers.values() for t in INSTRUMENTS}  # ações em cada corretora
     meta = {t[0]: t for t in INSTRUMENTS}
     month = date(START.year, START.month, 1)
     first = True
@@ -131,14 +132,16 @@ def create_demo(seed=42):
                 continue
             tx(broker=broker, date=d, type="BUY", instrument=ticker, quantity=qty, price=p, fees=1.0, currency=cur)
             holdings[ticker] += qty
-        # venda ocasional para gerar mais/menos-valias
+            in_broker[(broker, ticker)] += qty
+        # venda ocasional para gerar mais/menos-valias (cada corretora só vende o que lá tem)
         if month.month in (3, 11) and month.year < today.year:
-            ticker = max(holdings, key=holdings.get)
-            qty = round(holdings[ticker] * 0.3, 3)
+            ticker = max(holdings, key=lambda t: in_broker[(broker, t)])
+            qty = round(in_broker[(broker, ticker)] * 0.3, 3)
             if qty > 0:
                 tx(broker=broker, date=d + timedelta(days=7), type="SELL", instrument=ticker, quantity=qty,
                    price=price_on(ticker, d + timedelta(days=7)), fees=1.0, currency=meta[ticker][4])
                 holdings[ticker] -= qty
+                in_broker[(broker, ticker)] -= qty
         # dividendos trimestrais
         if month.month in (3, 6, 9, 12):
             pay = d + timedelta(days=14)
