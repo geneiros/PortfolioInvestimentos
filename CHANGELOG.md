@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Visão Geral: Investor Score e Portfolio Score a seguir ao gráfico**  
+  As notas do perfil de investidor passam para baixo do gráfico «Retorno total / Valor total».
 - **README: link para o Buy Me a Coffee**  
   Badge no topo e botão na secção nova «Apoiar o projeto», a ligar a buymeacoffee.com/geneiros.
 - **Visão Geral: o gráfico de fundo do cartão Carteira mostra o último ano**  
