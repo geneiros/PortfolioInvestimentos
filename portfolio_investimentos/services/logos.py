@@ -19,8 +19,8 @@ from flask import g
 from ..models import Logo, db
 
 RETRY_DAYS = 7
-NOT_FOUND = "none4"  # procurado e não encontrado (com as fontes desta versão)
-LEGACY_NOT_FOUND = ("none", "none2", "none3")  # de versões anteriores, com menos fontes: procuram-se já
+NOT_FOUND = "none5"  # procurado e não encontrado (com as fontes desta versão)
+LEGACY_NOT_FOUND = ("none", "none2", "none3", "none4")  # de versões anteriores, com menos fontes: procuram-se já
 # outros sites do mesmo emitente, para quando o serviço de ícones não tem o do principal
 ALT_DOMAINS = {"xtrackers.com": ["dws.com", "etf.dws.com"], "ssga.com": ["statestreet.com"],
                "amundi.com": ["amundietf.com"], "ishares.com": ["blackrock.com"], "invesco.com": ["invescoetf.com"]}
@@ -54,6 +54,8 @@ ICON_URLS = [
     ("google64", "https://www.google.com/s2/favicons?domain={d}&sz=64"),
     ("gstatic", "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://{d}&size=128"),
     ("duckduckgo", "https://icons.duckduckgo.com/ip3/{d}.ico"),
+    ("duckduckgo2", "https://icons.duckduckgo.com/ip2/{d}.ico"),  # às vezes vazio num e com ícone no outro
+    ("duckduckgo-ext", "https://external-content.duckduckgo.com/ip3/{d}.ico"),
     ("site", "https://{d}/apple-touch-icon.png"),
     ("site-ico", "https://{d}/favicon.ico"),
 ]
