@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **README e capturas de ecrã atualizados**  
+  Todas as capturas (claro e escuro) refeitas com os logótipos e as iniciais de 36 px e o gráfico da Visão Geral em YTD; README com os logótipos só à mão.
 - **Logótipos maiores e mais arredondados**  
   Os logótipos e as iniciais dos ativos passam de 28 para 36 px, com cantos de 10 px, como nas apps das corretoras.
 - **Logótipos a preencher o quadrado**  

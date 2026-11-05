@@ -205,6 +205,8 @@ As cotações, os câmbios, os eventos (resultados e dividendos), o histórico d
 
 Os dados fundamentais (lucro por ação, valor contabilístico, cash flow livre, crescimento, owner earnings, resultado operacional, dívida e caixa), usados em **Carteira → O valor de cada ação**, são pedidos no máximo uma vez por semana por ação. Vêm do resumo do Yahoo e, para o que faltar, das demonstrações financeiras, também da cotação principal da empresa (pelo ISIN), convertidos para a moeda da cotação. Podes corrigi-los à mão no próprio cartão; `python -m portfolio_investimentos --testar-yahoo` mostra o que cada fonte devolve. Confirma em **Definições → Ativos** o *símbolo de dados* de cada ativo (código do Yahoo Finance, ex.: `VWCE.DE`, `IWDA.AS`, `AAPL`).
 
+A atualização de cotações não descarrega logótipos: escolhe-os em **Definições → Ativos**, clicando nas iniciais de cada ativo (uma imagem tua ou o ícone do site da empresa).
+
 O símbolo é escolhido automaticamente pelo ISIN e pelo ticker. Só é aceite um símbolo cotado na moeda do ativo e com preços perto dos das transações. Assim, uma ação americana comprada em euros (ex.: Apple na Xetra, `APC.DE`) não fica com a cotação em dólares, e as cotações de Londres em pence são convertidas para libras.
 
 ## Importação: Trading 212
