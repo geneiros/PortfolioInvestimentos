@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Logótipos a preencher o quadrado**  
+  A imagem do logótipo passa a ocupar o quadrado todo, sem margem nem borda, com os cantos arredondados como as iniciais.
 - **Logótipos só à mão**  
   A atualização de cotações deixa de procurar logótipos (no PythonAnywhere quase todos os serviços de ícones estão bloqueados e o Yahoo limita os pedidos). Em Definições → Ativos, clicar nas iniciais de um ativo permite carregar uma imagem, procurar o ícone pelo site indicado ou tirar o logótipo; os já guardados ficam.
 - **Logótipos: variantes do site e servidores bloqueados**  
