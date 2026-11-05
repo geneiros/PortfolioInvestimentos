@@ -113,7 +113,7 @@ def overview():
     week, two = today + timedelta(days=7), today + timedelta(days=14)
     instruments = {i.ticker: i for i in Instrument.query.filter(Instrument.ticker.in_({e.instrument for e in events} or {""}))}
     c.update(
-        hero_spark=ctx.js_json(p.series.holdings[-120:]), ytd=p.year_to_date(),
+        hero_spark=ctx.js_json(_hero_spark(p)), ytd=p.year_to_date(),
         movers=movers, events_total=len(events),
         mover_charts={m.asset.ticker: ctx.js_json(_mover_chart(p, m)) for m in movers},
         event_groups=[("Próxima semana", [e for e in events if e.date <= week]),
@@ -139,6 +139,12 @@ def _mover_chart(p, pos, days=365):
     return {"s": start.isoformat(), "o": [(d - start).days for d, _ in rows],
             "v": [float(f"{v:.5g}") for _, v in rows],
             "avg": round(pos.avg_price, 4) if pos.avg_price else None, "cur": pos.asset.currency}
+
+
+def _hero_spark(p):
+    """Valor das posições abertas no último ano (o fundo do cartão Carteira na Visão Geral)."""
+    since = p.as_of - timedelta(days=365)
+    return [float(f"{v:.5g}") for d, v in zip(p.series.dates, p.series.holdings) if d > since]
 
 
 @bp.route("/carteira")

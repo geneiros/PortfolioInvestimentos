@@ -21,7 +21,7 @@
       <div class="pm-hero-chart"><canvas id="heroSpark"></canvas></div>
       <div class="row position-relative">
         <div class="col-md-7">
-          <div class="pm-label">Carteira {{ help("Valor de mercado das posições abertas, em euros.") }}</div>
+          <div class="pm-label">Carteira {{ help("Valor de mercado das posições abertas, em euros. O gráfico de fundo é a evolução desse valor no último ano.") }}</div>
           <div class="pm-hero-value money my-3">{{ p.holdings_value|money }}</div>
           {% if networth %}<a href="/patrimonio" class="small text-secondary text-decoration-none d-inline-block mt-n2" id="netWorthLink">Património líquido <span class="money">{{ networth.total|money }}</span> · disponível <span class="money">{{ networth.available|money }}</span>{% if networth_late %} <span class="badge text-bg-warning" title="Valores do Património sem atualizar há mais de um mês"><i class="bi bi-calendar-check"></i> {{ networth_late }} por atualizar</span>{% endif %} <i class="bi bi-chevron-right"></i></a>{% endif %}
           <div class="pm-label mt-4">Variação diária · {{ p.as_of|ddmm }} {{ help("Variação do valor desde o fecho anterior, sem contar depósitos.") }}</div>

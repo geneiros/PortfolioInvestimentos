@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-05
 
+- **Visão Geral: o gráfico de fundo do cartão Carteira mostra o último ano**  
+  Mostrava os últimos 120 dias úteis (cerca de 6 meses); passa a mostrar o valor das posições abertas no último ano, e o «?» do cartão diz o período.
 - **Visão Geral: sem o cartão «Máximo histórico»**  
   O cartão sai e o cartão Carteira passa a ocupar a largura toda; os resultados e a conta ficam em 5 colunas alinhadas. A queda face ao máximo (drawdown) continua em Desempenho.
 - **Visão Geral: resultados e conta no cartão Carteira**  
