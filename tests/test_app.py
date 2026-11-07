@@ -1685,6 +1685,12 @@ def test_networth_growth_by_year(app, client):
         now = {part["key"]: part["value"] for part in years[0]["parts"]}
         assert now == {"savings": 0, "market": 0, "financial": 2000, "property": 10000, "debt": 6000}
         assert years[0]["partial"] and years[0]["end"] == 8000 + 210000 - 140000
+        # rendimento de cada parte sobre a sua base; a poupança não tem %; sem corretoras, sem % do mercado
+        pct = {part["key"]: part["pct"] for part in years[0]["parts"]}
+        assert pct["savings"] is None and pct["market"] is None
+        assert abs(pct["property"] - 10000 / 200000) < 1e-9 and abs(pct["debt"] - 6000 / 146000) < 1e-9
+        assert abs(pct["financial"] - 2000 / 6000) < 1e-9
+        assert years[0]["gain"] == years[0]["change"] and abs(years[0]["gain_pct"] - years[0]["change"] / years[0]["start"]) < 1e-9
         before = {part["key"]: part["value"] for part in years[1]["parts"]}
         # registar não é crescer: a conta conta 5000 desde o início do ano, a casa e o crédito desde junho
         assert before == {"savings": 0, "market": 0, "financial": 1000, "property": 0, "debt": 4000}
@@ -1701,6 +1707,18 @@ def test_networth_growth_by_year(app, client):
         years = networth.growth(data_portfolio())
         assert years and all(abs(sum(p["value"] for p in y["parts"]) - y["change"]) < 0.05 for y in years)
         assert any(p["key"] == "savings" and p["value"] > 0 for y in years for p in y["parts"])
+        # a % do mercado é o TWR das corretoras no ano; o ganho é a variação sem a poupança
+        from bisect import bisect_right
+        pf = data_portfolio()
+        dates, twr = pf.series.dates, pf.series.twr
+        for y in years:
+            i0 = max(bisect_right(dates, date(y["year"] - 1, 12, 31)) - 1, 0)
+            i1 = bisect_right(dates, min(date(y["year"], 12, 31), today)) - 1
+            parts = {p["key"]: p for p in y["parts"]}
+            assert abs(parts["market"]["pct"] - (twr[i1] / twr[i0] - 1)) < 1e-9
+            assert abs(y["gain"] - (y["change"] - parts["savings"]["value"])) < 0.05
+    html = client.get("/patrimonio").get_data(as_text=True)
+    assert "Ganho sem a poupança" in html and "das corretoras · TWR" in html
 
 
 def test_networth_monthly_update_and_reminder(app, client):

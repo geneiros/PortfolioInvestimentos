@@ -137,13 +137,20 @@
       <div class="pm-growth-year {{ '' if loop.first else 'd-none' }}" data-year="{{ g.year }}">
         <div class="mb-2"><span class="pm-big money {{ g.change|tone }}">{{ g.change|money(sign=True) }}</span>
           <div class="small text-secondary"><span class="money">{{ g.start|money }}</span> → <span class="money">{{ g.end|money }}</span>
-            {% if g.start > 0 %}({{ (g.change / g.start)|pct(1) }}){% endif %}</div></div>
+            {% if g.start > 0 %}({{ (g.change / g.start)|pct(1) }}){% endif %}</div>
+          <div class="small mt-1" data-growth-gain>Ganho sem a poupança: <b class="money {{ g.gain|tone }}">{{ g.gain|money(sign=True) }}</b>
+            {% if g.gain_pct is not none %}<b class="{{ g.gain_pct|tone }}">({{ g.gain_pct|pct(1) }})</b>{% endif %}
+            {{ help("A variação do património sem o dinheiro novo posto nas corretoras (a poupança investida), sobre o património no início do ano. É o que o património rendeu" ~ (", até hoje (não anualizado)." if g.partial else " no ano.")) }}</div></div>
         {% set biggest = g.parts|map(attribute="value")|map("abs")|max %}
         <table class="table pm-table mb-0"><tbody>
           {% for part in g.parts %}
           <tr><td class="pm-nw-name"><span class="pm-nw-dot" style="background: {{ part.color }}"></span>{{ part.name }} {{ help(part.help) }}</td>
             <td class="w-25"><div class="pm-scorebar"><div style="width: {{ (part.value|abs / biggest * 100) if biggest else 0 }}%; background: {{ part.color if part.value >= 0 else 'var(--pm-down)' }}"></div></div></td>
-            <td class="text-end money {{ part.value|tone }}">{{ part.value|money(sign=True) }}</td></tr>
+            <td class="text-end text-nowrap"><span class="money {{ part.value|tone }}">{{ part.value|money(sign=True) }}</span>
+              {% if part.pct is not none %}<div class="small d-sm-none {{ part.pct|tone }}">{{ part.pct|pct(1) }}</div>{% endif %}</td>
+            <td class="text-end text-nowrap pm-growth-pct d-none d-sm-table-cell" data-part-pct="{{ part.key }}">{% if part.pct is not none %}<span class="{{ part.pct|tone }}">{{ part.pct|pct(1) }}</span>
+              <div class="sub">{{ {'market': 'das corretoras · TWR', 'financial': 'destes ativos', 'property': 'dos imóveis', 'debt': 'da dívida'}[part.key] }}</div>
+              {% else %}<span class="text-secondary">—</span>{% endif %}</td></tr>
           {% endfor %}
         </tbody></table>
       </div>

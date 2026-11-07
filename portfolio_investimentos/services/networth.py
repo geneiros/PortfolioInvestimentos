@@ -246,16 +246,22 @@ def _records(items):
 # componentes do crescimento: chave → (nome, cor, explicação)
 GROWTH_PARTS = {
     "savings": ("Poupança investida", "#22c55e",
-                "Dinheiro novo nas corretoras: depósitos menos levantamentos no ano."),
+                "Dinheiro novo nas corretoras: depósitos menos levantamentos no ano. Não é rendimento, por isso não "
+                "tem %."),
     "market": ("Valorização do mercado", "#3b82f6",
-               "Ganho ou perda das corretoras no ano (cotações, dividendos e câmbio), sem o dinheiro novo."),
+               "Ganho ou perda das corretoras no ano (cotações, dividendos e câmbio), sem o dinheiro novo. A % é o "
+               "rendimento ponderado pelo tempo (TWR) das corretoras no ano, como em Desempenho: os depósitos a meio "
+               "do ano não a distorcem."),
     "financial": ("Contas, depósitos, certificados e PPR", "#14b8a6",
                   "Variação dos outros ativos financeiros: o que lá puseste mais os juros ou a valorização "
-                  "(os valores indicados à mão não separam as duas coisas)."),
+                  "(os valores indicados à mão não separam as duas coisas). A % é a variação sobre o valor no "
+                  "início do ano, por isso inclui também o que lá puseste."),
     "property": ("Imóveis", "#f59e0b",
-                 "Variação do valor de mercado estimado dos imóveis (já com o desconto de venda, se o usas)."),
+                 "Variação do valor de mercado estimado dos imóveis (já com o desconto de venda, se o usas). A % é "
+                 "a variação sobre o valor no início do ano."),
     "debt": ("Amortização da dívida", "#a855f7",
-             "Quanto as dívidas desceram no ano (se subiram, por um crédito novo, conta a negativo)."),
+             "Quanto as dívidas desceram no ano (se subiram, por um crédito novo, conta a negativo). A % é a parte "
+             "da dívida do início do ano que se pagou."),
 }
 
 
@@ -281,6 +287,13 @@ def growth(p):
     def brokers_at(d):
         i = bisect_right(sdates, d) - 1
         return (p.series.value[i], p.series.net_deposits[i]) if i >= 0 else (0.0, 0.0)
+
+    def twr_at(d):  # índice do rendimento ponderado pelo tempo (antes da 1.ª data: o primeiro, 1 = início)
+        i = bisect_right(sdates, d) - 1
+        return p.series.twr[max(i, 0)] if sdates else None
+
+    def ratio(num, base):
+        return num / base if base and base > 1e-9 else None
 
     def others_at(d):
         out = {"financial": 0.0, "property": 0.0, "debt": 0.0}
@@ -309,10 +322,20 @@ def growth(p):
                  "debt": o0["debt"] - o1["debt"]}
         total0 = b0 + o0["financial"] + o0["property"] - o0["debt"]
         total1 = b1 + o1["financial"] + o1["property"] - o1["debt"]
+        # rendimento de cada parte, sobre a sua própria base (no ano corrente: até hoje, não anualizado)
+        t0, t1 = twr_at(start), twr_at(end)
+        market_pct = (t1 / t0 - 1) if t0 and t1 and (b0 > 0 or b1 > 0) else None
+        pcts = {"savings": None, "market": market_pct,
+                "financial": ratio(parts["financial"], o0["financial"]),
+                "property": ratio(parts["property"], o0["property"]),
+                "debt": ratio(parts["debt"], o0["debt"])}
+        gain = (total1 - total0) - parts["savings"]  # o crescimento sem o dinheiro novo das corretoras
         years.append({"year": year, "partial": end < date(year, 12, 31), "start": round(total0, 2),
                       "end": round(total1, 2), "change": round(total1 - total0, 2),
+                      "gain": round(gain, 2), "gain_pct": ratio(gain, total0),
                       "parts": [{"key": k, "name": GROWTH_PARTS[k][0], "color": GROWTH_PARTS[k][1],
-                                 "help": GROWTH_PARTS[k][2], "value": round(v, 2)} for k, v in parts.items()]})
+                                 "help": GROWTH_PARTS[k][2], "value": round(v, 2), "pct": pcts[k]}
+                                for k, v in parts.items()]})
     return list(reversed(years))
 
 

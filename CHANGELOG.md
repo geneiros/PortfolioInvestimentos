@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-07
 
+- **Património: % de ganho em «De onde veio o crescimento»**  
+  Cada ano mostra o ganho sem a poupança (a variação do património menos o dinheiro novo posto nas corretoras), em € e em % do património no início do ano, e a % de cada parte sobre a sua própria base: a valorização do mercado pelo rendimento ponderado pelo tempo (TWR) das corretoras, como em Desempenho; os outros ativos financeiros e os imóveis sobre o valor no início do ano; a amortização sobre a dívida do início do ano. A poupança investida não tem % (não é rendimento). No ano corrente as % são até hoje, não anualizadas; no telemóvel a % aparece por baixo do valor.
+
 - **Performance: contar posições sem calcular carteiras, faixa da carteira cerne em cache e cache que já não se perde sem razão (#45, #46, #49)**  
   Medido com dados do tamanho de uma carteira real (5 corretoras, 2 100 transações, 293 ativos, 416 mil cotações): o seletor de corretoras deixa de calcular a carteira de cada corretora só para contar as posições (`brokers()` de ~800 ms para ~6 ms; a primeira Definições depois de uma mudança de ~1,4 s para ~0,9 s); a faixa da carteira cerne passa de 12–20 ms em todas as páginas para ~1 ms (lê só o máximo e o último fecho e fica em cache); operações noutras tabelas (ex.: cada login) já não deitam fora as carteiras calculadas (a página seguinte de ~1,4 s para ~0,1 s); e o pré-aquecimento em segundo plano calcula também as carteiras de cada corretora, por isso depois de uma atualização a Visão Geral e a Carteira abrem em ~45–80 ms.
 
