@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-07
 
+- **Segurança: o cookie de sessão deixa de levar um hash da palavra-passe (#42)**  
+  Com a palavra-passe em `PORTFOLIO_PASSWORD`, o cookie de sessão (assinado, mas legível) guardava parte de um SHA-256 sem sal da palavra-passe, que permitia testá-la offline a quem tivesse o cookie. Passa a guardar um HMAC com a chave secreta do servidor. As sessões abertas terminam uma vez: é preciso voltar a entrar.
+
 - **Importação: o ativo do ISIN passa ao ticker real sem perder dados; carteira cerne volta à base ao mudar o ETF de crescimento (#36, #37)**  
   Quando um ativo criado com o ISIN (ex.: Trade Republic) passa ao ticker real, ou quando se juntam dois tickers do mesmo título, passam também o logótipo, os dados fundamentais (ao juntar, só as correções à mão, porque os do Yahoo estão na moeda da outra cotação), o TER e o setor, sem apagar o que o ativo novo já tiver. Na carteira cerne, escolher outro ETF para o papel «Crescimento» volta ao alvo base: o escalão atingido era do ETF anterior.
 

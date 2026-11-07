@@ -15,7 +15,7 @@ import secrets
 import time
 from urllib.parse import urlsplit
 
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .models import LoginFailure, Setting, db
@@ -53,9 +53,15 @@ def clear_password():
 
 
 def _version():
-    """Identifica a palavra-passe atual: ao mudá-la, as sessões abertas noutros dispositivos terminam."""
+    """Identifica a palavra-passe atual: ao mudá-la, as sessões abertas noutros dispositivos terminam.
+
+    Vai no cookie de sessão, que é assinado mas legível: por isso é um HMAC com a chave secreta do servidor, e não
+    um hash simples da palavra-passe (com PORTFOLIO_PASSWORD, um sha256 sem sal deixava testar palavras-passe
+    offline a quem tivesse o cookie)."""
     source = env_password() or Setting.get("password_hash") or ""
-    return hashlib.sha256(source.encode()).hexdigest()[:16]
+    key = current_app.secret_key
+    key = key.encode() if isinstance(key, str) else key
+    return hmac.new(key, source.encode(), hashlib.sha256).hexdigest()[:32]
 
 
 def is_local_request():

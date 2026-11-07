@@ -1124,6 +1124,16 @@ def test_env_password(app, monkeypatch):
     ok = c.post("/login", data={"csrf_token": t, "password": "da-variavel"}, environ_base=REMOTE)
     assert ok.status_code == 302
     assert "PORTFOLIO_PASSWORD" in c.get("/definicoes", environ_base=REMOTE).get_data(as_text=True)
+    # o cookie de sessão é legível: não pode levar um hash simples da palavra-passe (dava para a testar offline)
+    import hashlib
+    with c.session_transaction() as sess:
+        stored = sess["auth"]
+    plain = hashlib.sha256(b"da-variavel").hexdigest()
+    assert stored != plain[:16] and plain[:16] not in stored and len(stored) == 32
+    # mudar a palavra-passe no servidor termina as sessões abertas
+    monkeypatch.setenv("PORTFOLIO_PASSWORD", "outra-diferente")
+    resp = c.get("/carteira", environ_base=REMOTE)
+    assert resp.status_code == 302 and "/login" in resp.headers["Location"]
 
 
 def test_closes_undo_split_adjustment():
