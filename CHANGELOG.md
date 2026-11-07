@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-07
 
+- **Importação: o ativo do ISIN passa ao ticker real sem perder dados; carteira cerne volta à base ao mudar o ETF de crescimento (#36, #37)**  
+  Quando um ativo criado com o ISIN (ex.: Trade Republic) passa ao ticker real, ou quando se juntam dois tickers do mesmo título, passam também o logótipo, os dados fundamentais (ao juntar, só as correções à mão, porque os do Yahoo estão na moeda da outra cotação), o TER e o setor, sem apagar o que o ativo novo já tiver. Na carteira cerne, escolher outro ETF para o papel «Crescimento» volta ao alvo base: o escalão atingido era do ETF anterior.
+
 - **Desempenho: o IRR deixa de ser anualizado em períodos de menos de 1 ano (#38)**  
   Em 1M, 3M, 6M ou YTD no início do ano, o XIRR aparecia anualizado (+2% num mês davam ~+27% «por ano»). Com menos de 1 ano, o cartão passa a dizer «No período» e mostra o retorno ponderado pelo dinheiro do período, com a nota «não anualizado» e o valor anualizado no «?»; com 1 ano ou mais fica como estava («Por ano»).
 

@@ -615,6 +615,8 @@ def save_core_plan(**values):
     """Ativo de cada papel da carteira cerne (ticker_<papel>; vazio = procurar pelo código). As misturas da
     tabela não mudam aqui; o intervalo de queda entre escalões muda-se em Definições."""
     plan = cerne.plan()
+    p = data.load_portfolio(None)
+    growth_before = cerne.resolve(p, plan).get("growth")
     for a in plan["assets"]:
         ticker = (values.get(f"ticker_{a['role']}") or "").strip()
         if ticker and db.session.get(Instrument, ticker) is None:
@@ -624,6 +626,10 @@ def save_core_plan(**values):
         else:
             a.pop("ticker", None)
     cerne.save(plan)
+    # o escalão atingido (só sobe) era do ETF de crescimento anterior: com outro ETF, recomeça da base
+    if cerne.resolve(p, plan).get("growth") != growth_before:
+        cerne.reset()
+        return "Carteira cerne guardada. O ETF de crescimento mudou: a carteira cerne voltou ao alvo base."
     return "Carteira cerne guardada."
 
 

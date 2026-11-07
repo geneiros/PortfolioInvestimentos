@@ -122,13 +122,48 @@ def _guess_kind(name):
 _ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 
 
-def _rename_instrument(old, new):
-    """Passa todas as referências de um ativo para outro ticker (ex.: ISIN -> ticker real)."""
+def _rename_instrument(old, new, keep_quotes_data=True):
+    """Passa todas as referências de um ativo para outro ticker (ex.: ISIN -> ticker real).
+
+    Também o logótipo, os dados fundamentais (com as correções à mão), o TER e o setor, quando o novo ainda não os
+    tem. Com `keep_quotes_data=False` (dois tickers do mesmo título, talvez noutra moeda), dos dados fundamentais
+    só passam as correções à mão: os do Yahoo estão na moeda da cotação de `old` e voltam a obter-se.
+    """
     from ..models import Alert, DividendHistory, Event, WatchItem
     for model, col in ((Transaction, "instrument"), (Price, "instrument"), (Event, "instrument"),
                        (Alert, "instrument"), (WatchItem, "instrument"), (DividendHistory, "instrument")):
         model.query.filter(getattr(model, col) == old.ticker).update({col: new.ticker}, synchronize_session=False)
+    _carry_extras(old, new, keep_quotes_data)
     db.session.delete(old)
+    db.session.flush()
+
+
+def _carry_extras(old, new, keep_quotes_data=True):
+    """Logótipo, dados fundamentais, TER e setor de `old` para `new` (sem apagar o que `new` já tem)."""
+    from ..models import Fundamental, Logo
+    if new.ter is None and old.ter is not None:
+        new.ter = old.ter
+    if not new.sector and old.sector:
+        new.sector = old.sector
+    old_logo, new_logo = db.session.get(Logo, old.ticker), db.session.get(Logo, new.ticker)
+    if old_logo is not None:
+        if new_logo is None and old_logo.data:
+            db.session.add(Logo(ticker=new.ticker, mime=old_logo.mime, data=old_logo.data, source=old_logo.source,
+                                fetched=old_logo.fetched))
+        db.session.delete(old_logo)
+    old_f, new_f = db.session.get(Fundamental, old.ticker), db.session.get(Fundamental, new.ticker)
+    if old_f is not None:
+        if new_f is None:
+            new_f = Fundamental(ticker=new.ticker)
+            db.session.add(new_f)
+            if keep_quotes_data:
+                for col in ("eps", "eps_forward", "bvps", "fcf", "growth", "updated", "owner", "nopat", "net_cash"):
+                    setattr(new_f, col, getattr(old_f, col))
+        for col in ("manual_eps", "manual_bvps", "manual_fcf", "manual_growth", "manual_owner", "manual_nopat",
+                    "manual_net_cash"):
+            if getattr(new_f, col) is None and getattr(old_f, col) is not None:
+                setattr(new_f, col, getattr(old_f, col))
+        db.session.delete(old_f)
     db.session.flush()
 
 
@@ -141,12 +176,8 @@ def merge_instruments(old, new):
     from ..models import DividendHistory, Event, WatchItem
     for model in (Price, Event, WatchItem, DividendHistory):
         model.query.filter(model.instrument == old.ticker).delete(synchronize_session=False)
-    from ..models import Logo
-    Logo.query.filter(Logo.ticker == old.ticker).delete(synchronize_session=False)
     new.isin = new.isin or old.isin
-    if old.sector and not new.sector:
-        new.sector = old.sector
-    _rename_instrument(old, new)
+    _rename_instrument(old, new, keep_quotes_data=False)
 
 
 def _instrument(ticker, name=None, currency="EUR", isin=None, symbol=None, kind=None):

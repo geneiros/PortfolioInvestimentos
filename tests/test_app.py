@@ -2274,3 +2274,51 @@ def test_irr_card_short_period(client):
     assert short.lstrip(">").startswith("No período") and "anualizado seria" in short
     long_ = client.get("/desempenho?periodo=MAX").get_data(as_text=True).split('id="irrLabel"', 1)[1][:900]
     assert long_.lstrip(">").startswith("Por ano")
+
+
+def test_isin_to_ticker_keeps_logo_fundamentals_ter_sector(app, client):
+    from portfolio_investimentos.models import Fundamental, Instrument, Logo
+    from portfolio_investimentos.services import importer
+    isin = "US00724F1012"
+    with app.app_context():
+        db.session.add(Instrument(ticker=isin, currency="EUR", isin=isin, kind="stock", instrument_name="Adobe",
+                                  ter=0.001, sector="Tecnologia"))
+        db.session.add(Transaction(date=date(2024, 1, 3), type="BUY", instrument=isin, quantity=1, price=400,
+                                   currency="EUR"))
+        db.session.add(Logo(ticker=isin, mime="image/png", data=PNG, source="manual"))
+        db.session.add(Fundamental(ticker=isin, eps=10.0, manual_growth=0.12))
+        db.session.commit()
+        # o mesmo ISIN chega com o ticker real (ex.: extrato da XTB): o ativo do ISIN passa ao ticker
+        assert importer._instrument("ADB", "Adobe", "EUR", isin) == "ADB"
+        db.session.commit()
+        assert db.session.get(Instrument, isin) is None
+        new = db.session.get(Instrument, "ADB")
+        assert new.ter == 0.001 and new.sector == "Tecnologia"
+        assert db.session.get(Logo, "ADB").data == PNG and db.session.get(Logo, isin) is None
+        f = db.session.get(Fundamental, "ADB")
+        assert f.eps == 10.0 and f.manual_growth == 0.12 and db.session.get(Fundamental, isin) is None
+        assert Transaction.query.filter_by(instrument="ADB").count() == 1
+        # juntar dois tickers do mesmo título: passam o logótipo e as correções à mão, não os dados do Yahoo
+        db.session.add(Instrument(ticker="ADB.DE", currency="EUR", kind="stock"))
+        db.session.commit()
+        importer.merge_instruments(db.session.get(Instrument, "ADB"), db.session.get(Instrument, "ADB.DE"))
+        db.session.commit()
+        f = db.session.get(Fundamental, "ADB.DE")
+        assert f.manual_growth == 0.12 and f.eps is None
+        assert db.session.get(Logo, "ADB.DE").data == PNG and db.session.get(Instrument, "ADB.DE").ter == 0.001
+
+
+def test_core_growth_change_resets_reached_step(app, client):
+    from portfolio_investimentos.models import Setting
+    token = csrf(client)
+    _core_portfolio(app, 7.8)  # FWIA −22% → escalão 2
+    assert _core_badge(client) == "Escalão 2"
+    r = post(client, "save_core_plan", token, ticker_growth="FWIA")  # o mesmo ETF: o escalão fica
+    assert r.status_code == 200 and "voltou ao alvo base" not in r.get_json()["message"]
+    with app.app_context():
+        assert Setting.get("core_reached") == "2"
+    r = post(client, "save_core_plan", token, ticker_growth="XEON")  # outro ETF de crescimento: volta à base
+    assert r.status_code == 200 and "voltou ao alvo base" in r.get_json()["message"]
+    with app.app_context():
+        assert Setting.get("core_reached") == "0" and Setting.get("core_ack") == "0"
+    assert _core_badge(client) == "Alvo base"
