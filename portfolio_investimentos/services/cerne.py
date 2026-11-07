@@ -7,6 +7,7 @@ aviso no topo já foi visto.
 import copy
 import json
 import re
+from datetime import date
 
 from ..engine import core
 from ..models import Instrument, Price, Setting, db
@@ -72,6 +73,16 @@ def _price_eur(p, ticker):
     return row.close / p.book.fx(inst.currency if inst else "EUR", row.date)
 
 
+def _peak_and_last(ticker):
+    """[(data do máximo, máximo), (data, último fecho)]: só o que a queda face ao máximo precisa (em vez de ler o
+    histórico todo a cada página)."""
+    peak = Price.query.filter_by(instrument=ticker).order_by(Price.close.desc(), Price.date).first()
+    last = Price.query.filter_by(instrument=ticker).order_by(Price.date.desc()).first()
+    if not peak or not last:
+        return []
+    return [(peak.date, peak.close)] if peak.date == last.date else [(peak.date, peak.close), (last.date, last.close)]
+
+
 def status(p, new_money=0.0, remember=True):
     """O estado da carteira cerne (ver `core.core_status`), com os tickers de cada papel. None sem o ETF de
     crescimento e o de reserva."""
@@ -85,7 +96,7 @@ def status(p, new_money=0.0, remember=True):
     values = {role: sum(x.value_eur for x in p.open_positions if x.asset.ticker == t) if t else 0.0
               for role, t in tickers.items()}
     prices = {role: _price_eur(p, t) for role, t in tickers.items() if t}
-    closes = [(r.date, r.close) for r in Price.query.filter_by(instrument=tickers["growth"]).order_by(Price.date)]
+    closes = _peak_and_last(tickers["growth"])
     try:
         reached = int(Setting.get("core_reached") or 0)
     except ValueError:
@@ -99,12 +110,27 @@ def status(p, new_money=0.0, remember=True):
     return out
 
 
-def banner(p):
-    """O aviso no topo quando a carteira cerne está num escalão cujo aviso ainda não foi visto."""
-    try:
-        st = status(p)
-    except Exception:  # o aviso nunca pode partir uma página
-        return None
+_banner_cache = {}
+
+
+def banner(p, broker=None):
+    """O aviso no topo quando a carteira cerne está num escalão cujo aviso ainda não foi visto.
+
+    Corre em todas as páginas: o estado fica em cache até mudarem os dados (cotações, transações, ativos), o dia,
+    a corretora selecionada ou as definições da carteira cerne."""
+    from . import data
+    key = (data._state["rev"], date.today(), broker, Setting.get("core_plan"), Setting.get("core_reached"))
+    if key in _banner_cache:
+        st = _banner_cache[key]
+    else:
+        try:
+            st = status(p)
+        except Exception:  # o aviso nunca pode partir uma página
+            return None
+        # status pode ter gravado um escalão novo: a chave passa a ser a do escalão gravado
+        key = key[:4] + (Setting.get("core_reached"),)
+        _banner_cache.clear()
+        _banner_cache[key] = st
     if not st or "rows" not in st or not st.get("step"):
         return None
     try:

@@ -214,12 +214,35 @@ class Series:
 
 # tipos de transação que dizem respeito a um ativo (os restantes são só movimentos de dinheiro)
 ASSET_TYPES = {"BUY", "SELL", "DIVIDEND", "TRANSFER_IN", "TRANSFER_OUT", "CONVERT_IN", "CONVERT_OUT"}
+# ordem das transações no mesmo dia (entradas antes das saídas)
+TX_ORDER = {"DEPOSIT": 0, "INTEREST": 1, "DIVIDEND": 1, "BUY": 2, "TRANSFER_IN": 2, "CONVERT_OUT": 2.4,
+            "CONVERT_IN": 2.5, "SELL": 3, "TRANSFER_OUT": 3, "FEE": 4, "WITHDRAWAL": 5}
+IN_TYPES, OUT_TYPES = ("BUY", "TRANSFER_IN", "CONVERT_IN"), ("SELL", "TRANSFER_OUT", "CONVERT_OUT")
+
+
+def open_counts(rows):
+    """Posições abertas por corretora, sem calcular a carteira: [(corretora, ticker, tipo, quantidade, data)].
+
+    As mesmas regras do motor (`_opening_positions`): por corretora e ativo, na ordem das transações; uma saída
+    maior do que o que havia (histórico incompleto) deixa a posição a zero.
+    """
+    held = defaultdict(float)
+    for broker, ticker, kind, qty, _d in sorted(rows, key=lambda r: (r[4], TX_ORDER.get(r[2], 9))):
+        k, qty = (broker, ticker), qty or 0.0
+        if kind in IN_TYPES:
+            held[k] += qty
+        elif kind in OUT_TYPES:
+            held[k] = 0.0 if qty - held[k] > 1e-6 else held[k] - qty
+    out = defaultdict(int)
+    for (broker, _t), q in held.items():
+        if q > 1e-6:
+            out[broker] += 1
+    return dict(out)
 
 
 class Portfolio:
     def __init__(self, transactions, book, benchmarks=(), as_of=None):
-        order = {"DEPOSIT": 0, "INTEREST": 1, "DIVIDEND": 1, "BUY": 2, "TRANSFER_IN": 2, "CONVERT_OUT": 2.4,
-                 "CONVERT_IN": 2.5, "SELL": 3, "TRANSFER_OUT": 3, "FEE": 4, "WITHDRAWAL": 5}
+        order = TX_ORDER
         self.warnings = []
         # uma transação de ativo sem ativo (dado inválido) não pode bloquear a aplicação inteira
         orphans = [t for t in transactions if t.type in ASSET_TYPES and not t.asset]

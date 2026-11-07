@@ -2332,3 +2332,75 @@ def test_core_growth_change_resets_reached_step(app, client):
     with app.app_context():
         assert Setting.get("core_reached") == "0" and Setting.get("core_ack") == "0"
     assert _core_badge(client) == "Alvo base"
+
+
+def test_broker_position_counts_match_engine_without_computing(app, client):
+    from portfolio_investimentos.models import Broker
+    from portfolio_investimentos.services import data
+    assert post(client, "load_demo", csrf(client)).status_code == 200
+    with app.test_request_context():
+        calls = []
+        orig = data._compute_portfolio
+        data._compute_portfolio = lambda b: calls.append(b) or orig(b)
+        try:
+            with data._lock:
+                data._cache.clear()
+            counts = {b.id: b.positions for b in data.brokers()}
+            assert calls == []  # contar não calcula carteiras
+        finally:
+            data._compute_portfolio = orig
+        for b in Broker.query.all():  # e conta o mesmo que o motor (incl. posições de abertura estimadas)
+            assert counts[b.id] == len(data.load_portfolio(str(b.id)).open_positions), b.broker_name
+
+
+def test_open_counts_rules():
+    from datetime import date as d
+    from portfolio_investimentos.engine.portfolio import open_counts
+    rows = [(1, "A", "BUY", 10, d(2024, 1, 1)), (1, "A", "SELL", 10, d(2024, 2, 1)),   # vendida
+            (1, "B", "SELL", 5, d(2024, 1, 1)), (1, "B", "BUY", 3, d(2024, 3, 1)),     # histórico incompleto
+            (2, "A", "BUY", 1, d(2024, 1, 1)), (2, "A", "TRANSFER_OUT", 0.5, d(2024, 1, 2)),
+            (2, "C", "SELL", 2, d(2024, 1, 5)), (2, "C", "BUY", 2, d(2024, 1, 5))]       # no mesmo dia: compra antes
+    assert open_counts(rows) == {1: 1, 2: 1}
+
+
+def test_bulk_ops_on_other_tables_keep_portfolio_cache(app):
+    from portfolio_investimentos.models import LoginFailure, Price
+    from portfolio_investimentos.services import data
+    with app.app_context():
+        rev = data._state["rev"]
+        LoginFailure.query.filter(LoginFailure.since < 0).delete(synchronize_session=False)
+        db.session.commit()
+        assert data._state["rev"] == rev  # limpar as tentativas de login não deita fora as carteiras
+        Price.query.filter(Price.close < -1).delete(synchronize_session=False)
+        db.session.commit()
+        assert data._state["rev"] == rev + 1  # nas tabelas da carteira, sim
+
+
+def test_core_banner_cached_until_data_changes(app, client):
+    from portfolio_investimentos.services import cerne
+    _core_portfolio(app, 7.8)
+    calls = []
+    orig = cerne.status
+    cerne.status = lambda *a, **k: calls.append(1) or orig(*a, **k)
+    try:
+        for _ in range(3):
+            assert 'id="coreBanner"' in client.get("/radar").get_data(as_text=True)
+        assert len(calls) == 1  # calculada uma vez
+        _set_fwia(app, 7.0)  # cotação nova: volta a calcular (escalão 3)
+        html = client.get("/radar").get_data(as_text=True)
+        assert len(calls) == 2 and "escalão 3" in html.split('id="coreBanner"', 1)[1][:600]
+    finally:
+        cerne.status = orig
+
+
+def test_warm_computes_every_broker(app, client):
+    from portfolio_investimentos.models import Broker
+    from portfolio_investimentos.services import data
+    assert post(client, "load_demo", csrf(client)).status_code == 200
+    with data._lock:
+        data._cache.clear()
+    data._warm_now(app)
+    with app.app_context():
+        ids = [str(b.id) for b in Broker.query.all()]
+    keys = {k[0] for k in data._cache if isinstance(k, tuple) and len(k) == 3}
+    assert None in keys and set(ids) <= keys

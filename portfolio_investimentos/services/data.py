@@ -8,7 +8,8 @@ from flask import g
 from sqlalchemy import event, func
 from sqlalchemy.orm import Session
 
-from ..engine.portfolio import RISK_FREE, Instrument as EngineInstrument, Portfolio, PriceBook, Tx
+from ..engine.portfolio import (IN_TYPES, OUT_TYPES, RISK_FREE, Instrument as EngineInstrument, Portfolio, PriceBook, Tx,
+                                open_counts)
 from ..models import Broker, FxRate, Instrument, Price, Setting, Transaction, db
 
 
@@ -153,6 +154,14 @@ def _warm_now(app):
             broker = Setting.get("broker")
             if broker:
                 load_portfolio(broker)
+            open_position_counts()
+            # as das outras corretoras (alocação por corretora na Visão Geral, alertas e painel da Carteira),
+            # para a primeira página depois de uma atualização já as encontrar prontas
+            rev = _state["rev"]
+            for (b,) in db.session.query(Broker.id).order_by(Broker.id):
+                if _state["rev"] != rev:  # os dados mudaram entretanto: o próximo pré-aquecimento recomeça
+                    break
+                load_portfolio(str(b))
         except Exception:  # é só uma antecipação: o pedido seguinte calcula de novo se for preciso
             db.session.rollback()
 
@@ -163,10 +172,22 @@ def _mark_flush(session, _ctx):
         session.info["pm_changed"] = True
 
 
+_TRACKED_TABLES = {m.__table__.name for m in _TRACKED}
+
+
 @event.listens_for(Session, "do_orm_execute")
 def _mark_bulk(state):
-    # query.delete() / query.update() não passam pelo flush
-    if state.is_delete or state.is_update or state.is_insert:
+    # query.delete() / query.update() não passam pelo flush; só contam as tabelas da carteira (senão, por
+    # exemplo, limpar as tentativas de login a cada login deitava fora todas as carteiras calculadas)
+    if not (state.is_delete or state.is_update or state.is_insert):
+        return
+    mappers = state.all_mappers
+    if mappers:
+        changed = any(issubclass(m.class_, _TRACKED) for m in mappers)
+    else:
+        table = getattr(state.statement, "table", None)
+        changed = table is None or getattr(table, "name", None) in _TRACKED_TABLES
+    if changed:
         state.session.info["pm_changed"] = True
 
 
@@ -213,11 +234,33 @@ def _compute_portfolio(broker):
 
 
 def brokers():
-    """Corretoras com nº de posições abertas (as mesmas regras do motor) e data da primeira transação."""
+    """Corretoras com nº de posições abertas (as mesmas regras do motor) e data da primeira transação.
+
+    O nº de posições conta-se pelas quantidades, sem calcular a carteira de cada corretora (que reconstrói o
+    histórico dia a dia: depois de cada mudança nos dados, era mais de metade do tempo da primeira página).
+    """
     since = dict(db.session.query(Transaction.broker, func.min(Transaction.date)).group_by(Transaction.broker))
+    counts = open_position_counts()
     return [SimpleNamespace(name=str(b.id), id=b.id, broker_name=b.broker_name, color=b.color,
-                            since=since.get(b.id), positions=len(load_portfolio(str(b.id)).open_positions))
+                            since=since.get(b.id), positions=counts.get(b.id, 0))
             for b in Broker.query.order_by(Broker.id).all()]
+
+
+def open_position_counts():
+    """corretora → nº de posições abertas (cache até os dados mudarem)."""
+    key = ("open_counts", _state["rev"])
+    with _lock:
+        hit = _cache.get(key)
+    if hit is not None:
+        return hit
+    rows = db.session.query(Transaction.broker, Transaction.instrument, Transaction.type, Transaction.quantity,
+                            Transaction.date).filter(Transaction.instrument.isnot(None),
+                                                     Transaction.type.in_(IN_TYPES + OUT_TYPES)).all()
+    counts = open_counts(rows)
+    with _lock:
+        if key[1] == _state["rev"]:
+            _cache[key] = counts
+    return counts
 
 
 def selected_broker():

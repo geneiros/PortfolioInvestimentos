@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-07
 
+- **Performance: contar posições sem calcular carteiras, faixa da carteira cerne em cache e cache que já não se perde sem razão (#45, #46, #49)**  
+  Medido com dados do tamanho de uma carteira real (5 corretoras, 2 100 transações, 293 ativos, 416 mil cotações): o seletor de corretoras deixa de calcular a carteira de cada corretora só para contar as posições (`brokers()` de ~800 ms para ~6 ms; a primeira Definições depois de uma mudança de ~1,4 s para ~0,9 s); a faixa da carteira cerne passa de 12–20 ms em todas as páginas para ~1 ms (lê só o máximo e o último fecho e fica em cache); operações noutras tabelas (ex.: cada login) já não deitam fora as carteiras calculadas (a página seguinte de ~1,4 s para ~0,1 s); e o pré-aquecimento em segundo plano calcula também as carteiras de cada corretora, por isso depois de uma atualização a Visão Geral e a Carteira abrem em ~45–80 ms.
+
 - **Segurança: o cookie de sessão deixa de levar um hash da palavra-passe (#42)**  
   Com a palavra-passe em `PORTFOLIO_PASSWORD`, o cookie de sessão (assinado, mas legível) guardava parte de um SHA-256 sem sal da palavra-passe, que permitia testá-la offline a quem tivesse o cookie. Passa a guardar um HMAC com a chave secreta do servidor. As sessões abertas terminam uma vez: é preciso voltar a entrar.
 
