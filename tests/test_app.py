@@ -2266,3 +2266,11 @@ def test_reset_clears_data_settings(app, client):
     assert post(client, "delete_broker", token, name=str(bid)).status_code == 200
     with app.app_context():
         assert Setting.get(f"investor_profile:{bid}") is None
+
+
+def test_irr_card_short_period(client):
+    assert post(client, "load_demo", csrf(client)).status_code == 200
+    short = client.get("/desempenho?periodo=1M").get_data(as_text=True).split('id="irrLabel"', 1)[1][:900]
+    assert short.lstrip(">").startswith("No período") and "anualizado seria" in short
+    long_ = client.get("/desempenho?periodo=MAX").get_data(as_text=True).split('id="irrLabel"', 1)[1][:900]
+    assert long_.lstrip(">").startswith("Por ano")

@@ -701,3 +701,17 @@ def test_parse_number_portuguese_and_other_formats():
     for bad in ("", "abc", "nan", "inf", "1e5", "1.000,000,5", "1,2.3.4", ".", "1..2", "--1", True):
         with _pytest.raises(ValueError):
             parse_number(bad)
+
+
+def test_irr_short_period_not_annualized():
+    # +2% em ~1 mês, sem depósitos no período: o IRR mostra +2% (do período), não ~+27% ao ano
+    d0, d1 = date(2024, 1, 1), date(2024, 12, 31)
+    first = book_linear("ACME", d0, date(2024, 11, 29), 10, 10)["ACME"]
+    prices = {"ACME": first + book_linear("ACME", date(2024, 12, 2), d1, 10, 10.2)["ACME"]}
+    p = Portfolio([Tx(d0, "BUY", ACME, quantity=10, price=10)], PriceBook(prices), as_of=d1)
+    perf = p.performance("1M")
+    assert perf["years"] < 1
+    assert perf["irr"] == pytest.approx(perf["twr_total"], abs=0.003)
+    assert perf["irr"] < 0.03 and perf["irr_annual"] > 0.15
+    full = p.performance("MAX")  # 1 ano: igual ao anual
+    assert full["years"] >= 0.99 and full["irr"] == pytest.approx(full["irr_annual"])

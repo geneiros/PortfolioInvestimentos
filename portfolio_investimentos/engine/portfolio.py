@@ -952,7 +952,11 @@ class Portfolio:
         if v0 <= EPS and abs(s.flows[k0]) > EPS:
             flows.insert(0, (dates[0], -s.flows[k0]))
         flows.append((dates[-1], s.value[-1]))
-        irr = xirr(flows)
+        irr = irr_annual = xirr(flows)
+        if irr is not None and years < 1:
+            # com menos de 1 ano, o retorno ponderado pelo dinheiro do período: anualizar poucos meses exagera
+            # (+2% num mês seriam ~+27% «por ano»); o mesmo prazo (dias/365) que o xirr usa para descontar
+            irr = (1 + irr) ** ((dates[-1] - dates[0]).days / 365.0) - 1
 
         index = [1 + x for x in twr]
         monthly = period_returns(dates, index, "month")
@@ -1013,7 +1017,7 @@ class Portfolio:
             "dates": [d.isoformat() for d in dates],
             "twr": twr, "gain": gain, "value": s.value[k0:],
             "drawdown": drawdown(index),
-            "return_eur": ret_eur, "return_pct": ret_pct, "irr": irr,
+            "return_eur": ret_eur, "return_pct": ret_pct, "irr": irr, "irr_annual": irr_annual,
             "twr_total": twr_total, "cagr": cagr, "years": years,
             "monthly": monthly, "yearly": yearly,
             "best_year": best_y, "worst_year": worst_y,

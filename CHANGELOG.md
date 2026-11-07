@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-07
 
+- **Desempenho: o IRR deixa de ser anualizado em períodos de menos de 1 ano (#38)**  
+  Em 1M, 3M, 6M ou YTD no início do ano, o XIRR aparecia anualizado (+2% num mês davam ~+27% «por ano»). Com menos de 1 ano, o cartão passa a dizer «No período» e mostra o retorno ponderado pelo dinheiro do período, com a nota «não anualizado» e o valor anualizado no «?»; com 1 ano ou mais fica como estava («Por ano»).
+
 - **Números com separador de milhares e definições que sobravam depois de «Apagar tudo» (#34, #35)**  
   Os formulários passam a ler os números à portuguesa: «1.000» é mil (era 1), «1.000,50» e «1 000» também funcionam, e continuam a aceitar-se «1000,5», «1000.5» e «1,000.50»; os grupos de milhares têm de ter 3 algarismos. Os campos numéricos do browser seguem com vírgula decimal, para «2.125» não ser lido como milhares. Vale para todas as ações da API e para o «Dinheiro novo a investir» da carteira cerne. «Apagar todos os dados» passa a limpar o escalão atingido e o aviso da carteira cerne, os ativos escolhidos para cada papel e o perfil de investidor de cada corretora; apagar uma corretora apaga o perfil dela. Ficam as preferências: o intervalo dos escalões, o perfil de «todas as corretoras», a ordem dos cartões e os índices escolhidos.
 

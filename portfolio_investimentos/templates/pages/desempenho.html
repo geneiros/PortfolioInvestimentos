@@ -33,9 +33,10 @@
         <div class="text-secondary money">{{ perf.return_eur|money(sign=True) }}</div>
       </div>
       <div class="col-sm-6 border-start" style="border-color: var(--pm-border)!important">
-        <div class="pm-label">Por ano <span class="badge text-bg-secondary">IRR</span> {{ help("Taxa interna de rentabilidade anual (XIRR): a tua rentabilidade pessoal, ponderada pelo dinheiro.") }}</div>
+        {% set short = perf.years < 1 %}
+        <div class="pm-label" id="irrLabel">{{ 'No período' if short else 'Por ano' }} <span class="badge text-bg-secondary">IRR</span> {{ help("Taxa interna de rentabilidade (XIRR): a tua rentabilidade pessoal, ponderada pelo dinheiro (conta quando puseste e tiraste dinheiro)." ~ (" Com menos de 1 ano mostra-se o retorno do período, porque anualizar poucos meses exagera" ~ ((": anualizado seria " ~ perf.irr_annual|pct(2) ~ " ao ano.") if perf.irr_annual is not none else ".") if short else " Valor anual.")) }}</div>
         <div class="pm-big {{ perf.irr|tone }} mt-2">{{ perf.irr|pct(2) }}</div>
-        <div class="text-secondary">retorno pessoal</div>
+        <div class="text-secondary">{% if short %}retorno pessoal, não anualizado (menos de 1 ano){% else %}retorno pessoal{% endif %}</div>
       </div>
     </div>
   </div></div>
