@@ -275,13 +275,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const labels = h.months.map((m) => { const [y, mo] = m.split("-"); return `${mo}/${y}`; });
     const area = (label, data, color, fill) => ({ label, data, borderColor: color, backgroundColor: color + "40", fill, borderWidth: 1, pointRadius: 0, stack: "s", tension: .2 });
     const datasets = [
-      { label: "Total", data: h.total, borderColor: pm.css("--pm-text"), borderWidth: 2.5, pointRadius: 0, tension: .2, fill: false, order: -2, stack: "total" },
+      // por omissão vê-se o disponível e as camadas imediata e curto prazo; o total, o ilíquido e as dívidas
+      // ficam na legenda, por selecionar (um clique mostra-os)
+      { label: "Total", data: h.total, borderColor: pm.css("--pm-text"), borderWidth: 2.5, pointRadius: 0, tension: .2, fill: false, order: -2, stack: "total", hidden: true },
       { label: "Disponível", data: h.available, borderColor: "#3b82f6", borderDash: [6, 4], borderWidth: 2, pointRadius: 0, tension: .2, fill: false, order: -1, stack: "available" },
       area("Imediata", h.imediata, "#22c55e", "origin"),
       area("Curto prazo", h.curto, "#3b82f6", "-1"),
     ];
-    if (h.iliquido.some((v) => v)) datasets.push(area("Ilíquido", h.iliquido, "#f59e0b", "-1"));
-    if (h.debts.some((v) => v)) datasets.push(area("Dívidas", h.debts, "#ef4444", "origin"));
+    if (h.iliquido.some((v) => v)) datasets.push({ ...area("Ilíquido", h.iliquido, "#f59e0b", "-1"), hidden: true });
+    if (h.debts.some((v) => v)) datasets.push({ ...area("Dívidas", h.debts, "#ef4444", "origin"), hidden: true });
     pm.chart("nwChart", { type: "line", data: { labels, datasets },
       options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
         plugins: { legend: { position: "bottom" }, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0)}` } } },

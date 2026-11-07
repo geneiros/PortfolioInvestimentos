@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-07
 
+- **Património: na evolução mensal, por omissão só o disponível, a liquidez imediata e o curto prazo**  
+  O total, o ilíquido e as dívidas continuam na legenda do gráfico, mas por selecionar; um clique mostra-os.
+
 - **Património: % de ganho em «De onde veio o crescimento»**  
   Cada ano mostra o ganho sem a poupança (a variação do património menos o dinheiro novo posto nas corretoras), em € e em % do património no início do ano, e a % de cada parte sobre a sua própria base: a valorização do mercado pelo rendimento ponderado pelo tempo (TWR) das corretoras, como em Desempenho; os outros ativos financeiros e os imóveis sobre o valor no início do ano; a amortização sobre a dívida do início do ano. A poupança investida não tem % (não é rendimento). No ano corrente as % são até hoje, não anualizadas; no telemóvel a % aparece por baixo do valor.
 
