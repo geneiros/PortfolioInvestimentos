@@ -83,6 +83,11 @@
     if (btn) btn.disabled = true;
     try {
       const args = Object.fromEntries(new FormData(form).entries());
+      // os campos numéricos do browser usam sempre o ponto decimal («12.345» = 12,345): enviados com vírgula, para o
+      // servidor não os ler como milhares (no texto livre, «1.000» é mil, à portuguesa)
+      form.querySelectorAll("input[type=number][name]").forEach((el) => {
+        if (typeof args[el.name] === "string") args[el.name] = args[el.name].replace(".", ",");
+      });
       await pm.call(form.dataset.pmMethod, args);
       if (form.dataset.pmSuccess) pm.toast(form.dataset.pmSuccess);
       if (form.dataset.pmReload !== "false") setTimeout(() => location.reload(), form.dataset.pmSuccess ? 600 : 0);

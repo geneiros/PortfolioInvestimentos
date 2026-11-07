@@ -13,6 +13,7 @@ from flask import Blueprint, Response, abort, current_app, jsonify, request, sen
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, FxRate, ImportBatch, Instrument,
                      OtherAsset, OtherAssetValue, PortfolioAlert, Price, Setting, Transaction, WatchItem, db)
 from . import auth
+from .engine.formatting import parse_number
 from .engine.portfolio import ASSET_TYPES
 from .services import backups, cerne, data, importer, market
 
@@ -44,8 +45,11 @@ def _args():
 
 
 def _float(v):
+    """Número de um formulário, à portuguesa («1.000,50», «1 000») ou não (ver `formatting.parse_number`)."""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return 0.0
     try:
-        return float(str(v).replace(",", ".")) if v not in (None, "") else 0.0
+        return parse_number(v)
     except ValueError as exc:
         raise ApiError(f"Número inválido: {v}") from exc
 
@@ -274,6 +278,8 @@ def delete_broker(name):
     db.session.commit()
     if Setting.get("broker") == str(b.id):
         Setting.set("broker", None)
+    from .services import insights
+    Setting.set(insights.profile_key(str(b.id)), None)  # o id pode voltar a ser usado por outra corretora
 
 
 @action
@@ -761,8 +767,29 @@ def reset_data(confirm=""):
     for key in ("broker", "demo", "last_refresh", "refresh_missing", "refresh_updated", "refresh_report",
                 "refresh_status", "hide_banner"):
         Setting.set(key, None)
+    _reset_data_settings()
     db.session.commit()
     return "Todos os dados foram apagados."
+
+
+def _reset_data_settings():
+    """Definições que dependem dos dados apagados: senão passavam para os dados novos.
+
+    - carteira cerne: o escalão atingido (só sobe) e o aviso visto, e os ativos escolhidos para cada papel (podem
+      já não existir); o intervalo dos escalões e «mostrar o cartão» são preferências e ficam;
+    - o perfil de investidor de cada corretora (os ids das corretoras voltam a ser usados pelas novas); o de
+      «todas as corretoras» é uma preferência e fica.
+    A ordem dos cartões e os índices da «Carteira vs mercado» também são preferências e ficam.
+    """
+    from .services import cerne
+    cerne.reset()
+    plan = cerne.plan()
+    for a in plan["assets"]:
+        a.pop("ticker", None)
+    cerne.save(plan)
+    for row in Setting.query.filter(Setting.key.like("investor_profile:%")).all():
+        if row.key != "investor_profile:all":
+            Setting.set(row.key, None)
 
 
 @action

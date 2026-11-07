@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from flask import Blueprint, Response, abort, current_app, render_template, request
 
 from .engine import costs, stress, valuation
+from .engine.formatting import parse_number
 from .engine.portfolio import MERIT_BENCHMARK
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, Fundamental, ImportBatch,
                      Instrument, Price, Setting, Transaction, WatchItem, db)
@@ -220,7 +221,7 @@ def carteira():
 def _core(p):
     """A carteira cerne, com o dinheiro novo de ?investir= (vazio ou inválido = 0)."""
     try:
-        money = float((request.args.get("investir") or "0").replace(" ", "").replace(",", "."))
+        money = parse_number(request.args.get("investir") or "0")
     except ValueError:
         money = 0.0
     if not math.isfinite(money) or money < 0:

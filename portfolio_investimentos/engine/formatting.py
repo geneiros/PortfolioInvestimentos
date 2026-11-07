@@ -15,6 +15,59 @@ def number(value, decimals=2):
     return ("-" if value < 0 and round(abs(value), decimals) else "") + s
 
 
+_SPACES = " \u00a0\u202f\u2009'"  # espaços (também os não separáveis) e apóstrofo como separadores de milhares
+
+
+def parse_number(text):
+    """Número escrito por uma pessoa, à portuguesa ou não: «1 000», «1.000», «1.000,50», «1000,5», «1000.5»,
+    «1,000.50». Levanta ValueError se não for um número.
+
+    Regras: os espaços separam milhares; com ponto e vírgula, o último é o decimal; uma vírgula sozinha é decimal;
+    vários pontos (ou várias vírgulas) separam milhares; um ponto sozinho seguido de exatamente 3 algarismos, com
+    parte inteira diferente de 0, separa milhares («1.000» = 1000, mas «0.125» e «2.5» são decimais).
+    Os campos numéricos do browser (type=number) chegam com vírgula decimal (o pm.js converte-os), por isso um
+    «12.345» escrito num desses campos não é lido como milhares.
+    """
+    if isinstance(text, bool):
+        raise ValueError(text)
+    if isinstance(text, (int, float)):
+        return float(text)
+    s = str(text).strip()
+    for ch in _SPACES:
+        s = s.replace(ch, "")
+    if not s:
+        raise ValueError(text)
+    sign = ""
+    if s[0] in "+-−":
+        sign, s = ("-" if s[0] != "+" else ""), s[1:]
+    if not s or any(c not in "0123456789.," for c in s):
+        raise ValueError(text)
+    def ungroup(whole, sep):  # «1.234.567» → «1234567»; os grupos de milhares têm de ter 3 algarismos
+        groups = whole.split(sep)
+        if not 1 <= len(groups[0]) <= 3 or any(len(g) != 3 for g in groups[1:]):
+            raise ValueError(text)
+        return "".join(groups)
+    dots, commas = s.count("."), s.count(",")
+    if dots and commas:
+        dec = "." if s.rfind(".") > s.rfind(",") else ","
+        sep = "," if dec == "." else "."
+        if s.count(dec) > 1:
+            raise ValueError(text)
+        whole, frac = s.split(dec)
+        s = ungroup(whole, sep) + "." + frac
+    elif commas:
+        s = ungroup(s, ",") if commas > 1 else s.replace(",", ".")
+    elif dots > 1:
+        s = ungroup(s, ".")
+    elif dots == 1:
+        whole, frac = s.split(".")
+        if len(frac) == 3 and whole not in ("", "0"):
+            s = whole + frac
+    if s.count(".") > 1 or s in (".", ""):
+        raise ValueError(text)
+    return float(sign + s)
+
+
 def money(value, decimals=0, currency="EUR", sign=False):
     if value is None:
         return "—"

@@ -2215,3 +2215,54 @@ def test_logos_manual(app, client, monkeypatch):
     assert f'src="/logo/{tk}?v=' not in client.get("/carteira").get_data(as_text=True)
     assert client.get(f"/logo/{tk}").status_code == 404
     assert post(client, "remove_logo", token, ticker="NAOHA").status_code == 400
+
+
+def test_thousands_separator_in_forms(app, client):
+    from portfolio_investimentos.models import Setting
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    # carteira cerne: «1.000» de dinheiro novo são mil euros, não um
+    _core_portfolio(app, 7.8)
+    card = client.get("/carteira?investir=1.000").get_data(as_text=True).split('id="coreCard"', 1)[1]
+    assert 'value="1000"' in card
+    assert 'value="1000,5"' in client.get("/carteira?investir=1.000,50").get_data(as_text=True)
+    # na API: texto livre à portuguesa; os campos numéricos chegam com vírgula decimal (pm.js)
+    assert post(client, "set_risk_free", token, rate="2,5").status_code == 200
+    with app.app_context():
+        assert abs(float(Setting.get("risk_free")) - 2.5) < 1e-9
+    assert post(client, "set_stale_days", token, days="1.000").status_code == 400  # 1000 dias: fora do limite
+    assert post(client, "set_risk_free", token, rate="1.000,5").status_code == 400  # 1000,5%: fora do limite
+    assert post(client, "set_risk_free", token, rate="abc").status_code == 400
+
+
+def test_reset_clears_data_settings(app, client):
+    from portfolio_investimentos.models import Broker, Setting
+    from portfolio_investimentos.services import cerne
+    token = csrf(client)
+    _core_portfolio(app, 7.8)  # FWIA −22% → escalão 2
+    client.get("/carteira")
+    assert post(client, "save_core_plan", token, ticker_growth="FWIA").status_code == 200
+    assert post(client, "set_core_interval", token, percent="5").status_code == 200
+    assert post(client, "set_profile", token, profile="active").status_code == 200  # todas as corretoras
+    with app.app_context():
+        Setting.set("investor_profile:7", "income")
+        Setting.set("widgets:/carteira", '{"g-x": ["a", "b"]}')
+        assert Setting.get("core_reached") == "2"
+    assert post(client, "reset_data", token, confirm="APAGAR").status_code == 200
+    with app.app_context():
+        assert Setting.get("core_reached") == "0" and Setting.get("core_ack") == "0"
+        plan = cerne.plan()
+        assert not any(a.get("ticker") for a in plan["assets"]) and abs(plan["interval"] - 0.05) < 1e-9
+        assert Setting.get("investor_profile:7") is None
+        assert Setting.get("investor_profile:all") == "active"  # preferências ficam
+        assert Setting.get("widgets:/carteira")
+    # apagar uma corretora apaga o perfil dela
+    with app.app_context():
+        b = Broker(broker_name="Teste")
+        db.session.add(b)
+        db.session.commit()
+        bid = b.id
+        Setting.set(f"investor_profile:{bid}", "income")
+    assert post(client, "delete_broker", token, name=str(bid)).status_code == 200
+    with app.app_context():
+        assert Setting.get(f"investor_profile:{bid}") is None

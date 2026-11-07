@@ -51,7 +51,7 @@
     <div class="small text-secondary d-flex align-items-center gap-2 flex-wrap">líquido de dívida, com desconto de venda
       <select class="form-select form-select-sm w-auto py-0" id="saleDiscount" aria-label="Desconto para custos de venda">
         {% for d in discounts %}<option value="{{ d }}" {{ 'selected' if (nw.discount * 100)|round|int == d }}>{{ d }}%</option>{% endfor %}
-        {% if (nw.discount * 100)|round|int not in discounts %}<option value="{{ nw.discount * 100 }}" selected>{{ (nw.discount * 100)|number(1) }}%</option>{% endif %}
+        {% if (nw.discount * 100)|round|int not in discounts %}<option value="{{ (nw.discount * 100)|string|replace('.', ',') }}" selected>{{ (nw.discount * 100)|number(1) }}%</option>{% endif %}
       </select></div>
   </div></div>
 </div>

@@ -687,3 +687,17 @@ def test_core_status_orders_and_ratchet():
     st = core.core_status(plan, values, prices, [(1, 10.0), (2, 7.8)], new_money=1000)
     buys = {r["role"]: r["buy"] for r in st["rows"]}
     assert abs(sum(buys.values()) - 1000) < 1e-6 and buys["reserve"] == 0 and buys["growth"] > 0
+
+
+def test_parse_number_portuguese_and_other_formats():
+    import pytest as _pytest
+    from portfolio_investimentos.engine.formatting import parse_number
+    cases = {"1000": 1000, "1 000": 1000, "1 000,50": 1000.5, "1.000": 1000, "1.000,50": 1000.5,
+             "1.000.000": 1e6, "1000,5": 1000.5, "1000.5": 1000.5, "1,000.50": 1000.5, "1,000,000": 1e6,
+             "0.125": 0.125, "2.5": 2.5, "0,22": 0.22, "12,345": 12.345, "-1.250,75": -1250.75, "−3,5": -3.5,
+             "+4": 4, ",5": 0.5, 7: 7, 2.5: 2.5}
+    for text, want in cases.items():
+        assert abs(parse_number(text) - want) < 1e-9, text
+    for bad in ("", "abc", "nan", "inf", "1e5", "1.000,000,5", "1,2.3.4", ".", "1..2", "--1", True):
+        with _pytest.raises(ValueError):
+            parse_number(bad)
