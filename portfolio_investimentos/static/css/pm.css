@@ -81,6 +81,8 @@ body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
 .btn-icon { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
 .pm-seg, .pm-periods { display: inline-flex; border: var(--bs-border-width) solid var(--bs-border-color); border-radius: var(--bs-border-radius); overflow: hidden; }
 .pm-periods { display: flex; }
+#periods { background: var(--bs-body-bg); }
+@media (max-width: 575.98px) { .pm-periods button { padding: .3rem .25rem; min-width: 0; } }
 .pm-seg button, .pm-periods button { border: 0; background: transparent; color: var(--bs-body-color); padding: .3rem .8rem; white-space: nowrap; }
 .pm-periods button { flex: 1; }
 .pm-seg button + button, .pm-periods button + button { border-left: var(--bs-border-width) solid var(--bs-border-color); }

@@ -2438,6 +2438,9 @@ def test_overview_carteira_widget_follows_period(app, client):
         perf = data_portfolio().performance("3M")
     assert abs(m3["summary"]["twr"] - perf["twr_total"]) < 1e-9
     assert abs(m3["summary"]["gain"] - round(perf["return_eur"], 2)) < 0.01
+    # a barra de períodos fica entre o cartão Carteira e o do gráfico, fora dos dois
+    i_cart, i_bar, i_graf = html.index('data-widget="carteira"'), html.index('id="periods"'), html.index('data-widget="grafico"')
+    assert i_cart < i_bar < i_graf and "periods" not in html[i_graf:html.index("perfChart")]
 
 
 def test_overview_compares_only_four_indices(app, client):

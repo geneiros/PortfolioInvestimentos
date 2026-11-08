@@ -59,15 +59,19 @@
     </div>
   </div>
 
+  <!-- Período: filtra o cartão Carteira e o gráfico (não é um cartão: não se arrasta e fica neste lugar) -->
+  <div class="col-12">
+    <div class="pm-periods" id="periods" title="Período do cartão Carteira e do gráfico">
+      {% for k in ["1M", "3M", "6M", "YTD", "1A", "3A", "5A", "MAX"] %}<button data-p="{{ k }}" class="{{ 'active' if k == 'YTD' }}">{{ 'Max' if k == 'MAX' else k }}</button>{% endfor %}
+    </div>
+  </div>
+
   <!-- Gráfico de desempenho -->
   <div class="col-12" data-widget="grafico">
     <div class="pm-card">
       <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
         <div class="pm-seg" id="modeSeg"><button class="active" data-mode="gain">Retorno total</button><button data-mode="value">Valor total</button></div>
         <div class="ms-auto text-end"><div class="pm-label">Período</div><b id="periodLabel" class="small"></b></div>
-      </div>
-      <div class="pm-periods mb-3" id="periods">
-        {% for k in ["1M", "3M", "6M", "YTD", "1A", "3A", "5A", "MAX"] %}<button data-p="{{ k }}" class="{{ 'active' if k == 'YTD' }}">{{ 'Max' if k == 'MAX' else k }}</button>{% endfor %}
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap small mb-2">
         <span class="text-secondary">Comparar com:</span>

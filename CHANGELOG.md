@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Visão Geral: a barra de períodos entre o cartão Carteira e o gráfico**  
+  A barra 1M · 3M · 6M · YTD · 1A · 3A · 5A · Max sai do cartão «Retorno total / Valor total» e fica sozinha entre os dois cartões, porque filtra ambos. Não é um cartão: não se arrasta e fica nesse lugar quando se muda a ordem dos cartões.
 - **Notícias: o Google só traz notícias que falam do ativo**  
   A pesquisa do Google Notícias encontra o nome em qualquer sítio da página: para a Adobe vinham receitas do Estadão (com fotografias com o crédito «Adobe Stock») e, para os ETF, páginas de cotações de outras empresas com o nome do índice. Agora: a pesquisa leva contexto de bolsa (ações, bolsa, resultados ou o símbolo dos EUA); só ficam as notícias cujo título tem o nome do ativo, o símbolo dos EUA ou o ticker (com 4 ou mais letras: «ADB» sozinho também é o banco asiático); os ETF e os índices deixam de se pesquisar no Google. As notícias do Google já guardadas que não passam este filtro apagam-se na próxima atualização. O Google Finance não tem API nem feed de notícias: as que mostra são as do Google Notícias para a empresa.
 - **Notícias: o Google Notícias volta a ser fonte**  
