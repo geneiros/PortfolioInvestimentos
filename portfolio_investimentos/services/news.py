@@ -1,8 +1,7 @@
-"""Notícias dos ativos da carteira e do mercado, de três fontes:
+"""Notícias dos ativos da carteira e do mercado, de duas fontes (ambas com chave gratuita):
 
 - **Finnhub** (finnhub.io, com a chave em Definições ou na variável FINNHUB_API_KEY): no plano gratuito só tem
   notícias de empresas cotadas nos EUA e no Canadá (o símbolo encontra-se pelo ISIN);
-- **Yahoo Finance**, pelo yfinance que já se usa para as cotações (sem chave; também ações europeias e alguns ETF);
 - **Marketaux** (marketaux.com, com a chave em Definições ou na variável MARKETAUX_API_KEY): no plano gratuito
   são 100 pedidos por dia e 3 notícias por pedido, por isso as do Marketaux reaproveitam-se durante 6 horas.
 
@@ -23,7 +22,7 @@ from ..models import Instrument, NewsItem, Setting, db
 
 API = "https://finnhub.io/api/v1"
 MARKETAUX = "https://api.marketaux.com/v1/news/all"
-PROVIDERS = {"finnhub": "Finnhub", "yahoo": "Yahoo Finance", "marketaux": "Marketaux"}
+PROVIDERS = {"finnhub": "Finnhub", "marketaux": "Marketaux"}  # o Yahoo e o Google Notícias foram retirados
 KEYED = {"finnhub", "marketaux"}  # fontes que só contam com a chave
 TTL = timedelta(hours=1)
 TTL_BY = {"marketaux": timedelta(hours=6)}  # o plano gratuito do Marketaux tem 100 pedidos por dia
@@ -131,59 +130,6 @@ def _finnhub(inst, now, get=None):
             for r in rows]
 
 
-def _yahoo_rows(raw):
-    out = []
-    for r in raw or []:
-        c = r.get("content") if isinstance(r.get("content"), dict) else None
-        if c:
-            url = (c.get("canonicalUrl") or {}).get("url") or (c.get("clickThroughUrl") or {}).get("url")
-            ts = _parse_iso(c.get("pubDate"))
-            out.append(_row(c.get("title"), url, (c.get("provider") or {}).get("displayName"), ts, c.get("summary")))
-        else:
-            out.append(_row(r.get("title"), r.get("link"), r.get("publisher"), r.get("providerPublishTime")))
-    return out
-
-
-def _yahoo(inst, now, client=None):
-    """Notícias do Yahoo Finance pelo yfinance (os dois formatos: o antigo e o de 2025).
-
-    O Yahoo quase não tem notícias nas cotações europeias de empresas americanas (ex.: ADB.DE): tenta primeiro o
-    símbolo dos EUA (o que o Finnhub encontrou pelo ISIN), depois o do Yahoo e o ticker; em cada um, as notícias
-    do ativo e, se vierem vazias, a pesquisa de notícias do yfinance."""
-    if client is None:
-        try:
-            import yfinance as client
-        except ImportError:
-            return []  # sem yfinance (ex.: Android): ficam o Finnhub e o Marketaux
-    if inst is None:
-        symbols = ["^GSPC"]
-    else:
-        try:
-            us = _json_setting("finnhub_symbols").get(inst.ticker)
-        except RuntimeError:  # fora da aplicação (testes do motor)
-            us = None
-        symbols = list(dict.fromkeys(s for s in (us, inst.data_symbol, inst.ticker) if s))
-    failures = []
-    for symbol in symbols:
-        try:
-            raw = client.Ticker(symbol).news or []
-        except Exception as exc:
-            failures.append(str(exc)[:100])
-            raw = []
-        if not raw and hasattr(client, "Search"):
-            try:
-                raw = client.Search(symbol, news_count=10).news or []
-            except Exception as exc:  # o acesso direto (yahoo.py) não tem notícias na pesquisa
-                failures.append(str(exc)[:100])
-                raw = []
-        rows = _yahoo_rows(raw)
-        if rows:
-            return rows
-    if failures and len(failures) >= len(symbols):
-        raise NewsError(f"Yahoo Finance: {failures[0]}")
-    return []
-
-
 def _marketaux(inst, now, fetch=None):
     """Marketaux: notícias do ativo (pelo símbolo dos EUA, se o Finnhub o encontrou, ou pelo do Yahoo) ou, sem
     ativo, do mercado. O Marketaux só aceita a chave no endereço (api_token): o endereço não se mostra nem regista."""
@@ -256,7 +202,7 @@ def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET, market
 
     `fetchers`: {fonte: função(inst ou None, agora)} para os testes."""
     now = now or datetime.now()
-    fetchers = fetchers or {"finnhub": _finnhub, "yahoo": _yahoo, "marketaux": _marketaux}
+    fetchers = fetchers or {"finnhub": _finnhub, "marketaux": _marketaux}
     fetched = _json_setting("news_fetched")
     errors, t0 = {}, time.monotonic()
     blocked = set()  # fontes que falharam por chave ou limite: não adianta insistir nesta visita
@@ -292,7 +238,7 @@ def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET, market
                     continue
             fetched[f"{provider}:{ticker}"] = now.isoformat(timespec="seconds")
     NewsItem.query.filter(NewsItem.published < now - timedelta(days=KEEP_DAYS)).delete(synchronize_session=False)
-    # fontes retiradas (o Google Notícias): as notícias delas deixam de aparecer
+    # fontes retiradas (o Google Notícias e o Yahoo Finance): as notícias delas deixam de aparecer
     NewsItem.query.filter(NewsItem.provider.notin_(list(PROVIDERS))).delete(synchronize_session=False)
     Setting.set("news_fetched", json.dumps(fetched))
     if last:

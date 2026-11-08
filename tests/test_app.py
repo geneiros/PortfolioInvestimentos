@@ -2512,14 +2512,14 @@ def test_news_sources_store_dedupe_cache_and_page(app, client, monkeypatch):
             {"symbol": "ADB.DE", "type": "Common Stock"}, {"symbol": "ADBE", "type": "Common Stock"}]})
         return [news._row(f"{sym} lança produto", "https://ex.com/a1", "CNBC", ts, "Resumo")] if sym else []
 
-    def yah(inst, n):
-        calls.append(("yahoo", inst.ticker if inst else ""))
+    def mx(inst, n):
+        calls.append(("marketaux", inst.ticker if inst else ""))
         if inst and inst.ticker == "ADB":  # a mesma notícia (título igual) noutra fonte não se repete
-            return [news._row("ADBE lança produto", "https://yahoo.com/x", "Yahoo", ts),
-                    news._row("Adobe sobe 3%", "https://yahoo.com/y", "Yahoo", ts)]
+            return [news._row("ADBE lança produto", "https://mx.com/x", "Marketaux", ts),
+                    news._row("Adobe sobe 3%", "https://mx.com/y", "Marketaux", ts)]
         return []
 
-    F = {"finnhub": fin, "yahoo": yah}
+    F = {"finnhub": fin, "marketaux": mx}
     with app.app_context():
         db.session.add_all([
             Instrument(ticker="ADB", currency="EUR", isin="US00724F1012", data_symbol="ADB.DE", instrument_name="Adobe"),
@@ -2527,10 +2527,11 @@ def test_news_sources_store_dedupe_cache_and_page(app, client, monkeypatch):
             Transaction(date=date(2026, 1, 5), type="BUY", instrument="ADB", quantity=1, price=300, currency="EUR"),
             Transaction(date=date(2026, 1, 5), type="BUY", instrument="FWIA", quantity=10, price=7, currency="EUR")])
         db.session.commit()
-        # sem chave: só o Yahoo
-        assert news.enabled() == ["yahoo"]
+        # sem chaves não há fontes (o Yahoo foi retirado)
+        assert news.enabled() == []
         Setting.set("finnhub_key", "abcdef123456")
-        assert news.enabled() == ["finnhub", "yahoo"]
+        Setting.set("marketaux_key", "mx_key_123456")
+        assert news.enabled() == ["finnhub", "marketaux"]
         errors = news.refresh(["ADB", "FWIA"], now=now, fetchers=F)
         assert errors == {}
         assert json.loads(Setting.get("finnhub_symbols"))["ADB"] == "ADBE"  # o símbolo dos EUA, pelo ISIN
@@ -2564,9 +2565,9 @@ def test_news_settings_and_reset(app, client):
     assert post(client, "set_finnhub_key", token, key="abcdef123456").status_code == 200
     html = client.get("/definicoes").get_data(as_text=True)
     assert 'id="newsSettings"' in html and "guardada" in html and "abcdef123456" not in html  # a chave não aparece
-    assert post(client, "set_news_sources", token, source_yahoo="1", source_finnhub="0", source_marketaux="0").status_code == 200
+    assert post(client, "set_news_sources", token, source_yahoo="1", source_finnhub="0", source_marketaux="1").status_code == 200
     with app.app_context():
-        assert Setting.get("news_sources") == "yahoo"
+        assert Setting.get("news_sources") == "marketaux"  # o Yahoo já não é fonte
     assert post(client, "set_news_sources", token).status_code == 400
     assert post(client, "set_finnhub_key", token, key="").status_code == 200
     with app.app_context():
@@ -2579,21 +2580,6 @@ def test_news_settings_and_reset(app, client):
     assert post(client, "reset_data", token, confirm="APAGAR").status_code == 200
     with app.app_context():
         assert NewsItem.query.count() == 0
-
-
-def test_yahoo_news_parser():
-    from portfolio_investimentos.services import news
-    inst = type("I", (), {"instrument_name": "Adobe Inc.", "ticker": "ADB", "kind": "stock", "data_symbol": "ADB.DE"})()
-
-    class Yf:
-        class Ticker:
-            def __init__(self, s):
-                self.news = [{"content": {"title": "Novo", "summary": "s", "pubDate": "2026-11-07T10:00:00Z",
-                                          "canonicalUrl": {"url": "https://finance.yahoo.com/n"},
-                                          "provider": {"displayName": "Reuters"}}},
-                             {"title": "Antigo", "link": "https://y.com/o", "publisher": "AP", "providerPublishTime": 1762500000}]
-    rows = news._yahoo(inst, None, client=Yf)
-    assert [r["headline"] for r in rows] == ["Novo", "Antigo"] and rows[0]["source"] == "Reuters" and rows[0]["datetime"]
 
 
 def test_marketaux_source(app, client, monkeypatch):
@@ -2627,15 +2613,16 @@ def test_marketaux_source(app, client, monkeypatch):
         except news.NewsError as exc:
             assert "limite diário" in str(exc) and "mx_key_123456" not in str(exc)  # a chave não aparece no erro
         # as do Marketaux reaproveitam-se 6 horas (as das outras fontes, 1 hora)
-        Setting.set("news_sources", "yahoo,marketaux")
+        Setting.set("finnhub_key", "abcdef123456")
+        Setting.set("news_sources", "finnhub,marketaux")
         calls = []
-        F = {"yahoo": lambda i, n: calls.append("yahoo") or [],
+        F = {"finnhub": lambda i, n: calls.append("finnhub") or [],
              "marketaux": lambda i, n: calls.append("marketaux") or [news._row("Adobe x", "https://mx.com/b", "mx", n.timestamp())]}
         news.refresh(["ADB"], now=now, fetchers=F)
         assert calls.count("marketaux") == 2 and NewsItem.query.filter_by(provider="marketaux").count() == 2  # mercado e ADB
         calls.clear()
         news.refresh(["ADB"], now=now + timedelta(hours=2), fetchers=F)
-        assert "yahoo" in calls and "marketaux" not in calls
+        assert "finnhub" in calls and "marketaux" not in calls
         calls.clear()
         news.refresh(["ADB"], now=now + timedelta(hours=7), fetchers=F)
         assert "marketaux" in calls
@@ -2667,46 +2654,33 @@ def test_news_refresh_in_steps(app, client, monkeypatch):
     assert "data-pm-news-refresh" in html
 
 
-def test_google_news_removed(app):
+def test_google_and_yahoo_news_removed(app, client):
     from datetime import datetime
     from portfolio_investimentos.models import NewsItem
     from portfolio_investimentos.services import news
-    assert "google" not in news.PROVIDERS
-    with app.app_context():  # as notícias guardadas dessa fonte deixam de aparecer e apagam-se na atualização
+    from portfolio_investimentos.models import Setting
+    assert "google" not in news.PROVIDERS and "yahoo" not in news.PROVIDERS
+    with app.app_context():  # as notícias guardadas dessas fontes deixam de aparecer e apagam-se na atualização
         db.session.add_all([NewsItem(ticker="", headline="g", url="https://news.google.com/x", published=datetime.now(), provider="google"),
-                            NewsItem(ticker="", headline="y", url="https://y.com/x", published=datetime.now(), provider="yahoo")])
+                            NewsItem(ticker="", headline="y", url="https://y.com/x", published=datetime.now(), provider="yahoo"),
+                            NewsItem(ticker="", headline="f", url="https://f.com/x", published=datetime.now(), provider="finnhub")])
+        Setting.set("news_sources", "yahoo")  # escolhido antes: deixa de contar
         db.session.commit()
-        assert [n.headline for n in news.items(market=True)] == ["y"]
-        news.refresh([], fetchers={"yahoo": lambda i, n: []})
-        assert NewsItem.query.filter_by(provider="google").count() == 0
+        assert news.enabled() == []
+        assert [n.headline for n in news.items(market=True)] == ["f"]
+        news.refresh([], fetchers={})
+        assert NewsItem.query.filter(NewsItem.provider.in_(["google", "yahoo"])).count() == 0
+    token = csrf(client)
+    post(client, "load_demo", token)
+    html = client.get("/noticias").get_data(as_text=True)
+    assert "Sem fontes de notícias ligadas" in html and "Yahoo" not in html
 
 
-def test_yahoo_news_uses_us_symbol_and_search_fallback(app):
-    import json
+def test_news_last_results_per_source(app):
     from datetime import datetime
     from portfolio_investimentos.models import Setting
     from portfolio_investimentos.services import news
-    asked = []
-
-    class Yf:
-        class Ticker:
-            def __init__(self, s):
-                asked.append(("ticker", s))
-                self.news = [{"title": "Adobe news", "link": "https://y.com/a", "publisher": "AP",
-                              "providerPublishTime": 1762500000}] if s == "ADBE" else []
-
-        class Search:
-            def __init__(self, q, news_count=10):
-                asked.append(("search", q))
-                self.news = [{"title": "Found by search", "link": "https://y.com/s", "publisher": "AP",
-                              "providerPublishTime": 1762500000}] if q == "FWIA.DE" else []
-    with app.app_context():
-        Setting.set("finnhub_symbols", json.dumps({"ADB": "ADBE"}))
-        adb = type("I", (), {"ticker": "ADB", "data_symbol": "ADB.DE", "kind": "stock"})()
-        assert [r["headline"] for r in news._yahoo(adb, None, client=Yf)] == ["Adobe news"]
-        assert asked[0] == ("ticker", "ADBE")  # primeiro o símbolo dos EUA
-        etf = type("I", (), {"ticker": "FWIA", "data_symbol": "FWIA.DE", "kind": "etf"})()
-        assert [r["headline"] for r in news._yahoo(etf, None, client=Yf)] == ["Found by search"]
-        # o resultado da atualização fica por fonte (para Definições)
-        news.refresh([], now=datetime(2026, 11, 8, 12), fetchers={"yahoo": lambda i, n: []})
-        assert news.last_results()["yahoo"]["asked"] == 1 and news.last_results()["yahoo"]["found"] == 0
+    with app.app_context():  # o resultado da atualização fica por fonte (para Definições)
+        Setting.set("finnhub_key", "abcdef123456")
+        news.refresh([], now=datetime(2026, 11, 8, 12), fetchers={"finnhub": lambda i, n: []})
+        assert news.last_results()["finnhub"]["asked"] == 1 and news.last_results()["finnhub"]["found"] == 0

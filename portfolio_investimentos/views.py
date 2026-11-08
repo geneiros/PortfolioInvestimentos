@@ -482,7 +482,7 @@ def _news_sources():
 
 @bp.route("/noticias")
 def noticias():
-    """Notícias dos ativos da carteira selecionada no topo (ou de todas) e do mercado: Finnhub, Yahoo Finance e Marketaux."""
+    """Notícias dos ativos da carteira selecionada no topo (ou de todas) e do mercado: Finnhub e Marketaux."""
     from .services import news
     c = ctx.build("noticias", "Notícias")
     p = c["p"]

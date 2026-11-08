@@ -25,14 +25,17 @@
     <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-mine">Os meus ativos <span class="badge text-bg-light ms-1">{{ news_rows|length }}</span></button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-market">Mercado <span class="badge text-bg-secondary ms-1">{{ market_rows|length }}</span></button></li>
   </ul>
-  <span class="small text-secondary ms-auto">Fontes: {% for p in news_enabled %}{{ news_providers[p] }}{{ ", " if not loop.last }}{% endfor %}
-    {{ help("As notícias dos últimos 7 dias, de cada fonte ligada em Definições → Dados de mercado: o Finnhub (com a tua chave; no plano gratuito só empresas cotadas nos EUA e no Canadá), o Yahoo Finance e o Marketaux (com a tua chave). Ficam guardadas 1 hora (6 no Marketaux); «Atualizar notícias» pede-as outra vez. As notícias abrem no site de origem; a página não carrega imagens de outros sites.") }}</span>
+  <span class="small text-secondary ms-auto">Fontes: {% for p in news_enabled %}{{ news_providers[p] }}{{ ", " if not loop.last }}{% else %}nenhuma{% endfor %}
+    {{ help("As notícias dos últimos 7 dias, de cada fonte ligada em Definições → Dados de mercado: o Finnhub (no plano gratuito só empresas cotadas nos EUA e no Canadá) e o Marketaux, cada um com a tua chave gratuita. Ficam guardadas 1 hora (6 no Marketaux); «Atualizar notícias» pede-as outra vez. As notícias abrem no site de origem; a página não carrega imagens de outros sites.") }}</span>
   <button class="btn btn-sm btn-outline-secondary" data-pm-news-refresh><i class="bi bi-arrow-repeat"></i> Atualizar notícias</button>
 </div>
 
-{% if not news_has_key %}
+{% if not news_enabled %}
 <div class="alert alert-info small d-flex gap-2 align-items-start"><i class="bi bi-key"></i>
-  <div>Sem a chave do Finnhub, as notícias vêm só do Yahoo Finance (e do Marketaux, se tiveres a chave dele). Com uma chave gratuita de <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">finnhub.io</a>, junta-se o Finnhub: indica-a em <a href="/definicoes#newsSettings">Definições → Dados de mercado</a>.</div></div>
+  <div>Sem fontes de notícias ligadas. As notícias vêm do Finnhub e do Marketaux, que precisam de uma chave gratuita (<a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">finnhub.io</a>, <a href="https://www.marketaux.com/register" target="_blank" rel="noopener noreferrer">marketaux.com</a>): indica-a em <a href="/definicoes#newsSettings">Definições → Dados de mercado</a>.</div></div>
+{% elif not news_has_key %}
+<div class="alert alert-info small d-flex gap-2 align-items-start"><i class="bi bi-key"></i>
+  <div>Com uma chave gratuita de <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">finnhub.io</a>, juntam-se as notícias do Finnhub: indica-a em <a href="/definicoes#newsSettings">Definições → Dados de mercado</a>.</div></div>
 {% endif %}
 {% if news_errors %}
 <div class="alert alert-warning small"><b>Algumas notícias não vieram:</b>

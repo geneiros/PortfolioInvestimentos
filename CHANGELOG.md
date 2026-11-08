@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Notícias: o Yahoo Finance deixa de ser fonte**  
+  No PythonAnywhere gratuito, o yfinance pede as notícias a um servidor do Yahoo que não está na lista de sites permitidos (as cotações usam outro, que está), e a resposta bloqueada não é JSON; a versão antiga do yfinance instalada no sistema também não tem a pesquisa. As notícias vêm agora só do Finnhub e do Marketaux, ambos com chave gratuita; as notícias guardadas do Yahoo apagam-se na próxima atualização e uma escolha antiga «só Yahoo» em Definições deixa de contar. Sem nenhuma chave, a página Notícias explica onde obter e pôr as chaves. As cotações continuam a vir do Yahoo Finance.
 - **Notícias: sem Google Notícias, progresso no botão e diagnóstico do Yahoo Finance**  
   O Google Notícias deixa de ser fonte (as notícias já guardadas dele apagam-se). «Atualizar todas as fontes», em Definições, e «Atualizar notícias» atualizam ativo a ativo, com o progresso no botão («A atualizar notícias… 3/12 · ADB.DE»), que só volta ao normal quando acaba. O Yahoo Finance pede primeiro pelo símbolo dos EUA (o que o Finnhub encontra pelo ISIN, ex.: ADB.DE → ADBE), depois pelo símbolo de dados e pelo ticker, e, quando o yfinance não devolve nada, tenta a pesquisa do Yahoo; antes, um símbolo europeu ou um ETF dava uma lista vazia sem erro. Na tabela das fontes, em Definições, a coluna nova «Última atualização» diz quantas notícias cada fonte encontrou, em quantos pedidos, quantas eram novas e quantos pedidos falharam.
 - **Notícias: Marketaux como quarta fonte**  
