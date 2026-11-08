@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Notícias: o Google Notícias volta a ser fonte**  
+  O Google Notícias (RSS, sem chave) junta-se outra vez ao Finnhub e ao Marketaux: procura pelo nome do ativo, em português, nos últimos 7 dias, e o mercado pelos termos de bolsa. É a fonte que dá notícias das ações europeias (ex.: Stellantis) sem chave. Sem chaves, fica ligada só esta fonte. O nome deixa de levar «N.V»/«S.A» na pesquisa (antes «Stellantis N.V.» procurava «Stellantis N.V»). No PythonAnywhere gratuito só funciona se news.google.com estiver na lista de sites permitidos; senão, o erro aparece na página e em Definições.
 - **Notícias: o Yahoo Finance deixa de ser fonte**  
   No PythonAnywhere gratuito, o yfinance pede as notícias a um servidor do Yahoo que não está na lista de sites permitidos (as cotações usam outro, que está), e a resposta bloqueada não é JSON; a versão antiga do yfinance instalada no sistema também não tem a pesquisa. As notícias vêm agora só do Finnhub e do Marketaux, ambos com chave gratuita; as notícias guardadas do Yahoo apagam-se na próxima atualização e uma escolha antiga «só Yahoo» em Definições deixa de contar. Sem nenhuma chave, a página Notícias explica onde obter e pôr as chaves. As cotações continuam a vir do Yahoo Finance.
 - **Notícias: sem Google Notícias, progresso no botão e diagnóstico do Yahoo Finance**  

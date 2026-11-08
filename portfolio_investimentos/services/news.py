@@ -1,7 +1,8 @@
-"""Notícias dos ativos da carteira e do mercado, de duas fontes (ambas com chave gratuita):
+"""Notícias dos ativos da carteira e do mercado, de três fontes:
 
 - **Finnhub** (finnhub.io, com a chave em Definições ou na variável FINNHUB_API_KEY): no plano gratuito só tem
   notícias de empresas cotadas nos EUA e no Canadá (o símbolo encontra-se pelo ISIN);
+- **Google Notícias** (RSS, sem chave), pelo nome do ativo, em português;
 - **Marketaux** (marketaux.com, com a chave em Definições ou na variável MARKETAUX_API_KEY): no plano gratuito
   são 100 pedidos por dia e 3 notícias por pedido, por isso as do Marketaux reaproveitam-se durante 6 horas.
 
@@ -9,6 +10,7 @@ Obtêm-se ao abrir a página Notícias, guardam-se na base de dados e reaproveit
 notícias» força um pedido novo). Cada pedido tem um limite de tempo e a página no total também: o que ficar por
 pedir pede-se na visita seguinte. A chave do Finnhub vai num cabeçalho, nunca no endereço.
 """
+import email.utils
 import json
 import os
 import re
@@ -16,13 +18,15 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 
 from ..models import Instrument, NewsItem, Setting, db
 
 API = "https://finnhub.io/api/v1"
 MARKETAUX = "https://api.marketaux.com/v1/news/all"
-PROVIDERS = {"finnhub": "Finnhub", "marketaux": "Marketaux"}  # o Yahoo e o Google Notícias foram retirados
+GOOGLE_RSS = "https://news.google.com/rss/search"
+PROVIDERS = {"finnhub": "Finnhub", "google": "Google Notícias", "marketaux": "Marketaux"}  # o Yahoo foi retirado
 KEYED = {"finnhub", "marketaux"}  # fontes que só contam com a chave
 TTL = timedelta(hours=1)
 TTL_BY = {"marketaux": timedelta(hours=6)}  # o plano gratuito do Marketaux tem 100 pedidos por dia
@@ -130,6 +134,34 @@ def _finnhub(inst, now, get=None):
             for r in rows]
 
 
+def _google(inst, now, fetch=None):
+    """Google Notícias (RSS) pelo nome do ativo, dos últimos 7 dias; o mercado pelos termos de bolsa."""
+    if inst is None:
+        query = "bolsa OR mercados OR ações"
+    else:
+        name = re.sub(r"\b(Inc|Corp|Corporation|S\.?A|N\.?V|plc|AG|SE|Ltd|Holdings?|Group|UCITS ETF.*)\b\.?",
+                      "", inst.instrument_name or "", flags=re.I).strip(" ,.-")
+        query = f'"{name}"' if len(name) >= 3 else (inst.ticker or "")
+    params = {"q": f"{query} when:{DAYS}d", "hl": "pt-PT", "gl": "PT", "ceid": "PT:pt-150"}
+    try:
+        xml = (fetch or _http)(f"{GOOGLE_RSS}?{urllib.parse.urlencode(params)}", limit=2_000_000)
+        root = ET.fromstring(xml)
+    except (urllib.error.URLError, OSError, ET.ParseError, ValueError) as exc:
+        raise NewsError(f"Google Notícias: {str(getattr(exc, 'reason', exc))[:100]}") from exc
+    out = []
+    for it in list(root.iter("item"))[:40]:
+        title = (it.findtext("title") or "").strip()
+        source = (it.findtext("source") or "").strip()
+        if source and title.endswith(f" - {source}"):
+            title = title[: -len(source) - 3]
+        try:
+            ts = email.utils.parsedate_to_datetime(it.findtext("pubDate") or "").timestamp()
+        except (TypeError, ValueError):
+            ts = None
+        out.append(_row(title, it.findtext("link"), source, ts))
+    return out
+
+
 def _marketaux(inst, now, fetch=None):
     """Marketaux: notícias do ativo (pelo símbolo dos EUA, se o Finnhub o encontrou, ou pelo do Yahoo) ou, sem
     ativo, do mercado. O Marketaux só aceita a chave no endereço (api_token): o endereço não se mostra nem regista."""
@@ -202,7 +234,7 @@ def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET, market
 
     `fetchers`: {fonte: função(inst ou None, agora)} para os testes."""
     now = now or datetime.now()
-    fetchers = fetchers or {"finnhub": _finnhub, "marketaux": _marketaux}
+    fetchers = fetchers or {"finnhub": _finnhub, "google": _google, "marketaux": _marketaux}
     fetched = _json_setting("news_fetched")
     errors, t0 = {}, time.monotonic()
     blocked = set()  # fontes que falharam por chave ou limite: não adianta insistir nesta visita
@@ -238,7 +270,7 @@ def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET, market
                     continue
             fetched[f"{provider}:{ticker}"] = now.isoformat(timespec="seconds")
     NewsItem.query.filter(NewsItem.published < now - timedelta(days=KEEP_DAYS)).delete(synchronize_session=False)
-    # fontes retiradas (o Google Notícias e o Yahoo Finance): as notícias delas deixam de aparecer
+    # fontes retiradas (o Yahoo Finance): as notícias delas deixam de aparecer
     NewsItem.query.filter(NewsItem.provider.notin_(list(PROVIDERS))).delete(synchronize_session=False)
     Setting.set("news_fetched", json.dumps(fetched))
     if last:

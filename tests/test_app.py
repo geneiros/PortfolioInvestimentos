@@ -2527,11 +2527,11 @@ def test_news_sources_store_dedupe_cache_and_page(app, client, monkeypatch):
             Transaction(date=date(2026, 1, 5), type="BUY", instrument="ADB", quantity=1, price=300, currency="EUR"),
             Transaction(date=date(2026, 1, 5), type="BUY", instrument="FWIA", quantity=10, price=7, currency="EUR")])
         db.session.commit()
-        # sem chaves não há fontes (o Yahoo foi retirado)
-        assert news.enabled() == []
+        # sem chaves só o Google Notícias (o Yahoo foi retirado)
+        assert news.enabled() == ["google"]
         Setting.set("finnhub_key", "abcdef123456")
         Setting.set("marketaux_key", "mx_key_123456")
-        assert news.enabled() == ["finnhub", "marketaux"]
+        assert news.enabled() == ["finnhub", "google", "marketaux"]
         errors = news.refresh(["ADB", "FWIA"], now=now, fetchers=F)
         assert errors == {}
         assert json.loads(Setting.get("finnhub_symbols"))["ADB"] == "ADBE"  # o símbolo dos EUA, pelo ISIN
@@ -2654,26 +2654,50 @@ def test_news_refresh_in_steps(app, client, monkeypatch):
     assert "data-pm-news-refresh" in html
 
 
-def test_google_and_yahoo_news_removed(app, client):
+def test_yahoo_news_removed_google_kept(app, client):
     from datetime import datetime
     from portfolio_investimentos.models import NewsItem
     from portfolio_investimentos.services import news
     from portfolio_investimentos.models import Setting
-    assert "google" not in news.PROVIDERS and "yahoo" not in news.PROVIDERS
-    with app.app_context():  # as notícias guardadas dessas fontes deixam de aparecer e apagam-se na atualização
+    assert "yahoo" not in news.PROVIDERS and "google" in news.PROVIDERS
+    with app.app_context():  # as notícias guardadas do Yahoo deixam de aparecer e apagam-se na atualização
         db.session.add_all([NewsItem(ticker="", headline="g", url="https://news.google.com/x", published=datetime.now(), provider="google"),
                             NewsItem(ticker="", headline="y", url="https://y.com/x", published=datetime.now(), provider="yahoo"),
                             NewsItem(ticker="", headline="f", url="https://f.com/x", published=datetime.now(), provider="finnhub")])
         Setting.set("news_sources", "yahoo")  # escolhido antes: deixa de contar
         db.session.commit()
         assert news.enabled() == []
-        assert [n.headline for n in news.items(market=True)] == ["f"]
+        assert sorted(n.headline for n in news.items(market=True)) == ["f", "g"]
         news.refresh([], fetchers={})
-        assert NewsItem.query.filter(NewsItem.provider.in_(["google", "yahoo"])).count() == 0
+        assert NewsItem.query.filter_by(provider="yahoo").count() == 0
+        assert NewsItem.query.filter_by(provider="google").count() == 1
     token = csrf(client)
     post(client, "load_demo", token)
     html = client.get("/noticias").get_data(as_text=True)
     assert "Sem fontes de notícias ligadas" in html and "Yahoo" not in html
+
+
+def test_google_news_parser():
+    import urllib.error
+    from portfolio_investimentos.services import news
+    inst = type("I", (), {"instrument_name": "Stellantis N.V.", "ticker": "STLAP", "kind": "stock"})()
+    rss = b"""<?xml version="1.0"?><rss><channel>
+      <item><title>Stellantis sobe na bolsa - Jornal de Negocios</title><link>https://news.google.com/a</link>
+        <pubDate>Sat, 07 Nov 2026 10:00:00 GMT</pubDate><source url="https://jn.pt">Jornal de Negocios</source></item>
+      <item><title>Sem fonte</title><link>https://news.google.com/b</link></item></channel></rss>"""
+    seen = []
+    rows = news._google(inst, None, fetch=lambda url, **k: seen.append(url) or rss)
+    assert [r["headline"] for r in rows] == ["Stellantis sobe na bolsa", "Sem fonte"]
+    assert rows[0]["source"] == "Jornal de Negocios" and rows[0]["datetime"] and rows[1]["datetime"] is None
+    assert "%22Stellantis%22" in seen[0] and "hl=pt-PT" in seen[0]  # pelo nome, sem «N.V.»
+
+    def down(url, **k):
+        raise urllib.error.URLError("sem rede")
+    try:
+        news._google(inst, None, fetch=down)
+        raise AssertionError("devia falhar")
+    except news.NewsError as exc:
+        assert str(exc).startswith("Google Notícias:")
 
 
 def test_news_last_results_per_source(app):
