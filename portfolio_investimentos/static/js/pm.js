@@ -194,7 +194,7 @@
     pm.driveRefresh(!!btn.dataset.onlyOpen, true);
   });
 
-  // «Atualizar todas as fontes» / «Atualizar notícias»: um passo por pedido (o mercado e cada ativo), com o
+  // «Atualizar todas as fontes» (Definições): um passo por pedido (o mercado e cada ativo), com o
   // progresso no botão («A atualizar notícias… 3/9 · ADB») até terminar
   document.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-pm-news-refresh]");

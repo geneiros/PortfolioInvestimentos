@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Notícias: sem o botão «Atualizar notícias»**  
+  O botão sai da página Notícias. As notícias continuam a atualizar-se ao abrir a página quando têm mais de 1 hora (6 no Marketaux), e «Atualizar todas as fontes», em Definições → Dados de mercado, pede-as já.
 - **Notícias: fontes selecionáveis na página**  
   No topo da página Notícias, cada fonte com notícias tem uma pastilha com o número de notícias. Todas aparecem ligadas; desligar uma esconde as notícias dessa fonte em todos os separadores (Os meus ativos, Mercado e Radar), sem as apagar nem deixar de as pedir. A escolha fica lembrada neste browser. Para deixar de pedir notícias a uma fonte, continua a ser em Definições → Dados de mercado.
 - **Notícias: o Yahoo Finance volta, pelo feed RSS**  
