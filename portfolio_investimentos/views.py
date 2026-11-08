@@ -482,7 +482,7 @@ def _news_sources():
 
 @bp.route("/noticias")
 def noticias():
-    """Notícias dos ativos da carteira selecionada no topo (ou de todas) e do mercado: Finnhub, Yahoo e Google."""
+    """Notícias dos ativos da carteira selecionada no topo (ou de todas) e do mercado: Finnhub, Yahoo Finance e Marketaux."""
     from .services import news
     c = ctx.build("noticias", "Notícias")
     p = c["p"]
@@ -552,7 +552,7 @@ def definicoes():
              stale_days=ctx.stale_days(), core_plan=cerne.plan(), widget_pages=widgets.customized(),
              finnhub_env=news_svc.key_from_env(), finnhub_saved=bool(Setting.get("finnhub_key")),
              marketaux_env=news_svc.marketaux_from_env(), marketaux_saved=bool(Setting.get("marketaux_key")),
-             news_providers=news_svc.PROVIDERS, news_sources=_news_sources(), news_stats=news_svc.stats(),
+             news_providers=news_svc.PROVIDERS, news_sources=_news_sources(), news_stats=news_svc.stats(), news_last=news_svc.last_results(),
              password_env=bool(auth.env_password()))
     return render_template("pages/definicoes.html", **c)
 

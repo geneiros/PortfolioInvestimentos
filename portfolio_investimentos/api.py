@@ -604,14 +604,35 @@ def refresh_step(only_open="", restart=""):
     return res
 
 
+def _news_tickers():
+    return [pos.asset.ticker for pos in data.load_portfolio(data.selected_broker()).open_positions
+            if not pos.asset.ticker.startswith("DEMO-")]
+
+
 @action
 def refresh_news():
-    """Pede outra vez as notícias (sem esperar pela hora de cache)."""
+    """Pede outra vez todas as notícias (sem esperar pela validade) num só pedido."""
     from .services import news
-    insts = [pos.asset for pos in data.load_portfolio(data.selected_broker()).open_positions]
-    errors = news.refresh([a.ticker for a in insts if not a.ticker.startswith("DEMO-")], force=True)
+    errors = news.refresh(_news_tickers(), force=True)
     return "Notícias atualizadas." if not errors else "Notícias atualizadas, com falhas: " + "; ".join(
         f"{k}: {v}" for k, v in list(errors.items())[:3])
+
+
+@action
+def news_plan():
+    """Os passos de «Atualizar todas as fontes»: o mercado e cada ativo da carteira selecionada."""
+    return {"steps": ["", *_news_tickers()]}
+
+
+@action
+def refresh_news_step(ticker=""):
+    """Um passo de «Atualizar todas as fontes»: as notícias do mercado (ticker vazio) ou de um ativo, de todas as
+    fontes ligadas, sem esperar pela validade. A página mostra o progresso entre passos."""
+    from .services import news
+    if ticker and ticker not in _news_tickers():
+        raise ApiError("Ativo fora da carteira selecionada.")
+    errors = news.refresh([ticker] if ticker else [], force=True, market=not ticker)
+    return {"errors": [f"{k}: {v}" for k, v in errors.items()]}
 
 
 @action

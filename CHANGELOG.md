@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Notícias: sem Google Notícias, progresso no botão e diagnóstico do Yahoo Finance**  
+  O Google Notícias deixa de ser fonte (as notícias já guardadas dele apagam-se). «Atualizar todas as fontes», em Definições, e «Atualizar notícias» atualizam ativo a ativo, com o progresso no botão («A atualizar notícias… 3/12 · ADB.DE»), que só volta ao normal quando acaba. O Yahoo Finance pede primeiro pelo símbolo dos EUA (o que o Finnhub encontra pelo ISIN, ex.: ADB.DE → ADBE), depois pelo símbolo de dados e pelo ticker, e, quando o yfinance não devolve nada, tenta a pesquisa do Yahoo; antes, um símbolo europeu ou um ETF dava uma lista vazia sem erro. Na tabela das fontes, em Definições, a coluna nova «Última atualização» diz quantas notícias cada fonte encontrou, em quantos pedidos, quantas eram novas e quantos pedidos falharam.
 - **Notícias: Marketaux como quarta fonte**  
   Com a chave em Definições → Dados de mercado (ou na variável MARKETAUX_API_KEY), as notícias do Marketaux juntam-se às do Finnhub, do Yahoo Finance e do Google Notícias, pelo símbolo dos EUA quando existe (o mesmo que o Finnhub encontra pelo ISIN) ou pelo do Yahoo. O plano gratuito tem 100 pedidos por dia e 3 notícias por pedido: as do Marketaux reaproveitam-se durante 6 horas (as outras, 1 hora), com a validade agora contada por fonte. A API só aceita a chave no endereço, que a aplicação não mostra nem regista (os erros não o incluem).
 

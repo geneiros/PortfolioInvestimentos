@@ -194,6 +194,41 @@
     pm.driveRefresh(!!btn.dataset.onlyOpen, true);
   });
 
+  // «Atualizar todas as fontes» / «Atualizar notícias»: um passo por pedido (o mercado e cada ativo), com o
+  // progresso no botão («A atualizar notícias… 3/9 · ADB») até terminar
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-pm-news-refresh]");
+    if (!btn || btn.disabled) return;
+    e.preventDefault();
+    const label = btn.innerHTML;
+    const show = (text) => {
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
+      btn.append(document.createTextNode(text));  // texto (não HTML): o ticker vem dos dados
+    };
+    btn.disabled = true;
+    show("A atualizar notícias…");
+    const errors = [];
+    try {
+      const { steps } = await pm.call("news_plan");
+      for (let i = 0; i < steps.length; i++) {
+        show(`A atualizar notícias… ${i + 1}/${steps.length} · ${steps[i] || "mercado"}`);
+        const res = await pm.call("refresh_news_step", { ticker: steps[i] }, { silent: true });
+        errors.push(...(res.errors || []));
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = label;
+      pm.toast("A atualização das notícias parou: " + (err.message || err), "warning");
+      return;
+    }
+    btn.disabled = false;
+    btn.innerHTML = label;
+    pm.toast(errors.length ? `Notícias atualizadas, com ${errors.length} ${errors.length === 1 ? "falha" : "falhas"}.` : "Notícias atualizadas.",
+             errors.length ? "warning" : "success");
+    if (errors.length) pm.toast(errors.slice(0, 3).join(" · "), "warning");
+    setTimeout(() => location.reload(), 1800);
+  });
+
   // avisos: ao fechar um, lembra-o (só os 50 mais recentes, para a lista não crescer sem fim)
   document.addEventListener("close.bs.alert", (e) => {
     const text = e.target.dataset?.pmWarning;

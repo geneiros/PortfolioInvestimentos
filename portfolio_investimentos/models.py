@@ -158,7 +158,7 @@ class Logo(db.Model):
 
 class NewsItem(db.Model):
     """Notícia de um ativo (`ticker`) ou do mercado em geral (`ticker` vazio), do Finnhub, do Yahoo Finance ou do
-    Google Notícias (`provider`)."""
+    Marketaux (`provider`)."""
     __table_args__ = (db.UniqueConstraint("ticker", "url"),)
     id = db.Column(db.Integer, primary_key=True)
     ticker = db.Column(db.String(32), nullable=False, default="", index=True)
@@ -168,7 +168,7 @@ class NewsItem(db.Model):
     url = db.Column(db.String(1000), nullable=False)
     published = db.Column(db.DateTime, nullable=False, index=True)
     finnhub_id = db.Column(db.BigInteger)
-    provider = db.Column(db.String(16))  # finnhub | yahoo | google
+    provider = db.Column(db.String(16))  # finnhub | yahoo | marketaux
 
 
 class DividendHistory(db.Model):

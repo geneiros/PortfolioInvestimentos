@@ -3,7 +3,6 @@
 - **Finnhub** (finnhub.io, com a chave em Definições ou na variável FINNHUB_API_KEY): no plano gratuito só tem
   notícias de empresas cotadas nos EUA e no Canadá (o símbolo encontra-se pelo ISIN);
 - **Yahoo Finance**, pelo yfinance que já se usa para as cotações (sem chave; também ações europeias e alguns ETF);
-- **Google Notícias**, por RSS, pesquisando pelo nome do ativo (sem chave; notícias em português e em inglês);
 - **Marketaux** (marketaux.com, com a chave em Definições ou na variável MARKETAUX_API_KEY): no plano gratuito
   são 100 pedidos por dia e 3 notícias por pedido, por isso as do Marketaux reaproveitam-se durante 6 horas.
 
@@ -11,7 +10,6 @@ Obtêm-se ao abrir a página Notícias, guardam-se na base de dados e reaproveit
 notícias» força um pedido novo). Cada pedido tem um limite de tempo e a página no total também: o que ficar por
 pedir pede-se na visita seguinte. A chave do Finnhub vai num cabeçalho, nunca no endereço.
 """
-import email.utils
 import json
 import os
 import re
@@ -19,15 +17,13 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 
 from ..models import Instrument, NewsItem, Setting, db
 
 API = "https://finnhub.io/api/v1"
-GOOGLE_RSS = "https://news.google.com/rss/search"
 MARKETAUX = "https://api.marketaux.com/v1/news/all"
-PROVIDERS = {"finnhub": "Finnhub", "yahoo": "Yahoo Finance", "google": "Google Notícias", "marketaux": "Marketaux"}
+PROVIDERS = {"finnhub": "Finnhub", "yahoo": "Yahoo Finance", "marketaux": "Marketaux"}
 KEYED = {"finnhub", "marketaux"}  # fontes que só contam com a chave
 TTL = timedelta(hours=1)
 TTL_BY = {"marketaux": timedelta(hours=6)}  # o plano gratuito do Marketaux tem 100 pedidos por dia
@@ -135,20 +131,9 @@ def _finnhub(inst, now, get=None):
             for r in rows]
 
 
-def _yahoo(inst, now, client=None):
-    """Notícias do Yahoo Finance pelo yfinance (os dois formatos: o antigo e o de 2025)."""
-    if client is None:
-        try:
-            import yfinance as client
-        except ImportError:
-            return []  # sem yfinance (ex.: Android): fica o Google Notícias
-    symbol = "^GSPC" if inst is None else (inst.data_symbol or inst.ticker)
-    try:
-        raw = client.Ticker(symbol).news or []
-    except Exception as exc:
-        raise NewsError(f"Yahoo Finance: {str(exc)[:100]}") from exc
+def _yahoo_rows(raw):
     out = []
-    for r in raw:
+    for r in raw or []:
         c = r.get("content") if isinstance(r.get("content"), dict) else None
         if c:
             url = (c.get("canonicalUrl") or {}).get("url") or (c.get("clickThroughUrl") or {}).get("url")
@@ -159,32 +144,44 @@ def _yahoo(inst, now, client=None):
     return out
 
 
-def _google(inst, now, fetch=None):
-    """Google Notícias (RSS) pelo nome do ativo, dos últimos 7 dias; o mercado pelos termos de bolsa."""
-    if inst is None:
-        query = "bolsa OR mercados OR ações"
-    else:
-        name = re.sub(r"\b(Inc|Corp|Corporation|SA|S\.A\.|NV|N\.V\.|plc|AG|SE|Ltd|Holdings?|Group|UCITS ETF.*)\b\.?",
-                      "", inst.instrument_name or "", flags=re.I).strip(" ,.-")
-        query = f'"{name}"' if len(name) >= 3 else (inst.ticker or "")
-    params = {"q": f"{query} when:{DAYS}d", "hl": "pt-PT", "gl": "PT", "ceid": "PT:pt-150"}
-    try:
-        xml = (fetch or _http)(f"{GOOGLE_RSS}?{urllib.parse.urlencode(params)}", limit=2_000_000)
-        root = ET.fromstring(xml)
-    except (urllib.error.URLError, OSError, ET.ParseError, ValueError) as exc:
-        raise NewsError(f"Google Notícias: {str(getattr(exc, 'reason', exc))[:100]}") from exc
-    out = []
-    for it in list(root.iter("item"))[:40]:
-        title = (it.findtext("title") or "").strip()
-        source = (it.findtext("source") or "").strip()
-        if source and title.endswith(f" - {source}"):
-            title = title[: -len(source) - 3]
+def _yahoo(inst, now, client=None):
+    """Notícias do Yahoo Finance pelo yfinance (os dois formatos: o antigo e o de 2025).
+
+    O Yahoo quase não tem notícias nas cotações europeias de empresas americanas (ex.: ADB.DE): tenta primeiro o
+    símbolo dos EUA (o que o Finnhub encontrou pelo ISIN), depois o do Yahoo e o ticker; em cada um, as notícias
+    do ativo e, se vierem vazias, a pesquisa de notícias do yfinance."""
+    if client is None:
         try:
-            ts = email.utils.parsedate_to_datetime(it.findtext("pubDate") or "").timestamp()
-        except (TypeError, ValueError):
-            ts = None
-        out.append(_row(title, it.findtext("link"), source, ts))
-    return out
+            import yfinance as client
+        except ImportError:
+            return []  # sem yfinance (ex.: Android): ficam o Finnhub e o Marketaux
+    if inst is None:
+        symbols = ["^GSPC"]
+    else:
+        try:
+            us = _json_setting("finnhub_symbols").get(inst.ticker)
+        except RuntimeError:  # fora da aplicação (testes do motor)
+            us = None
+        symbols = list(dict.fromkeys(s for s in (us, inst.data_symbol, inst.ticker) if s))
+    failures = []
+    for symbol in symbols:
+        try:
+            raw = client.Ticker(symbol).news or []
+        except Exception as exc:
+            failures.append(str(exc)[:100])
+            raw = []
+        if not raw and hasattr(client, "Search"):
+            try:
+                raw = client.Search(symbol, news_count=10).news or []
+            except Exception as exc:  # o acesso direto (yahoo.py) não tem notícias na pesquisa
+                failures.append(str(exc)[:100])
+                raw = []
+        rows = _yahoo_rows(raw)
+        if rows:
+            return rows
+    if failures and len(failures) >= len(symbols):
+        raise NewsError(f"Yahoo Finance: {failures[0]}")
+    return []
 
 
 def _marketaux(inst, now, fetch=None):
@@ -253,24 +250,25 @@ def _store(ticker, provider, rows):
     return n
 
 
-def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET):
+def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET, market=True):
     """Pede as notícias (das fontes ligadas) dos ativos e do mercado cujo último pedido a essa fonte já passou da
     validade (1 hora; 6 no Marketaux). Devolve {"ativo · fonte": erro}.
 
     `fetchers`: {fonte: função(inst ou None, agora)} para os testes."""
     now = now or datetime.now()
-    fetchers = fetchers or {"finnhub": _finnhub, "yahoo": _yahoo, "google": _google, "marketaux": _marketaux}
+    fetchers = fetchers or {"finnhub": _finnhub, "yahoo": _yahoo, "marketaux": _marketaux}
     fetched = _json_setting("news_fetched")
     errors, t0 = {}, time.monotonic()
     blocked = set()  # fontes que falharam por chave ou limite: não adianta insistir nesta visita
     sources = [p for p in enabled() if p in fetchers]
+    last = {}  # por fonte, nesta atualização: pedidos, notícias encontradas, novas e erros
 
     def due(provider, ticker):
         try:
             return force or now - datetime.fromisoformat(fetched[f"{provider}:{ticker}"]) > TTL_BY.get(provider, TTL)
         except (KeyError, ValueError):
             return True
-    for ticker in [""] + list(tickers):
+    for ticker in ([""] if market else []) + list(tickers):
         inst = None if ticker == "" else db.session.get(Instrument, ticker)
         if ticker and inst is None:
             continue
@@ -280,23 +278,44 @@ def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET):
         if time.monotonic() - t0 > budget:  # o resto fica para a visita seguinte
             break
         for provider in todo:
+            st = last.setdefault(provider, {"new": 0, "found": 0, "asked": 0, "errors": 0})
+            st["asked"] += 1
             try:
-                _store(ticker, provider, fetchers[provider](inst, now))
+                rows = fetchers[provider](inst, now)
+                st["found"] += len(rows or [])
+                st["new"] += _store(ticker, provider, rows)
             except NewsError as exc:
+                st["errors"] += 1
                 errors[f"{ticker or 'Mercado'} · {PROVIDERS[provider]}"] = str(exc)
                 if any(w in str(exc) for w in ("inválida", "limitou", "sem ligação", "falta a chave")):
                     blocked.add(provider)
                     continue
             fetched[f"{provider}:{ticker}"] = now.isoformat(timespec="seconds")
     NewsItem.query.filter(NewsItem.published < now - timedelta(days=KEEP_DAYS)).delete(synchronize_session=False)
+    # fontes retiradas (o Google Notícias): as notícias delas deixam de aparecer
+    NewsItem.query.filter(NewsItem.provider.notin_(list(PROVIDERS))).delete(synchronize_session=False)
     Setting.set("news_fetched", json.dumps(fetched))
+    if last:
+        saved = _json_setting("news_last")
+        for provider, st in last.items():
+            prev = saved.get(provider) if saved.get(provider, {}).get("batch") == now.strftime("%Y-%m-%dT%H:%M") else None
+            if prev:  # vários passos da mesma atualização (botão): somam
+                st = {k: st[k] + prev.get(k, 0) for k in st}
+            saved[provider] = {**st, "batch": now.strftime("%Y-%m-%dT%H:%M"), "at": now.isoformat(timespec="seconds")}
+        Setting.set("news_last", json.dumps(saved))
     db.session.commit()
     return errors
 
 
 def items(tickers=None, market=False, limit=LIMIT):
     q = NewsItem.query.filter(NewsItem.ticker == "") if market else NewsItem.query.filter(NewsItem.ticker.in_(tickers or [""]))
+    q = q.filter(NewsItem.provider.in_(list(PROVIDERS)))
     return q.order_by(NewsItem.published.desc()).limit(limit).all()
+
+
+def last_results():
+    """Por fonte, o resultado da última atualização (para Definições): pedidos, encontradas, novas, erros."""
+    return _json_setting("news_last")
 
 
 def stats():
