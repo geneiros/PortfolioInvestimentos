@@ -2438,6 +2438,7 @@ def test_overview_carteira_widget_follows_period(app, client):
         perf = data_portfolio().performance("3M")
     assert abs(m3["summary"]["twr"] - perf["twr_total"]) < 1e-9
     assert abs(m3["summary"]["gain"] - round(perf["return_eur"], 2)) < 0.01
+    assert 'pm.call("performance", { period, benchmarks: BENCH }, { progress: false })' in html  # sem barra no topo
     assert m3["summary"]["twr_annual"] is None and 'id="heroTwrYearBox"' in html  # até 1 ano não há rendimento anual
     m5 = post(client, "performance", token, period="5A").get_json()["message"]["summary"]
     with app.app_context():

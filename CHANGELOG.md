@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Visão Geral: mudar o período não mostra a barra de progresso**  
+  Os pedidos feitos ao mudar o período (1M a Max) já não ligam a barra no topo; o cartão Carteira e o gráfico mudam como antes.
 - **Visão Geral: rendimento anual nos períodos com mais de 1 ano**  
   Com 3A, 5A ou Max (e a carteira com mais de 1 ano), o cartão Carteira mostra ao lado do rendimento do período o rendimento anual, ex.: «+53,1% · +8,2%/ano». É o TWR anualizado, a taxa por ano que, composta, dá o rendimento do período (o mesmo CAGR da página Desempenho). Até 1 ano mostra só o do período.
 - **Barra de progresso no topo ao carregar páginas**  
