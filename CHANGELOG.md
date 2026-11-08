@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Notícias: sem o texto «Fontes:» antes dos botões das fontes**  
+  Os botões das fontes aparecem sozinhos no topo da página; o texto «Fontes:» só fica quando ainda não há notícias (e por isso não há botões).
 - **Notícias: sem o botão «Atualizar notícias»**  
   O botão sai da página Notícias. As notícias continuam a atualizar-se ao abrir a página quando têm mais de 1 hora (6 no Marketaux), e «Atualizar todas as fontes», em Definições → Dados de mercado, pede-as já.
 - **Notícias: fontes selecionáveis na página**  

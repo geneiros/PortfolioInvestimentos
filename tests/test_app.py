@@ -2828,5 +2828,5 @@ def test_news_source_chips(app, client, monkeypatch):
     bar = html.split('id="newsSources"', 1)[1].split("</span>\n", 1)[0]
     # uma pastilha por fonte com notícias, todas ligadas; as notícias levam a fonte para se poderem esconder
     assert re.search(r'class="pm-chip active" data-src="google".*?<span class="badge text-bg-light">2</span>', bar, re.S)
-    assert 'data-src="yahoo"' in bar and 'data-src="finnhub"' not in bar
+    assert 'data-src="yahoo"' in bar and 'data-src="finnhub"' not in bar and "Fontes:" not in bar
     assert 'data-provider="yahoo"' in html and "pm-hide-src" in html

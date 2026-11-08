@@ -26,12 +26,12 @@
     <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-market">Mercado <span class="badge text-bg-secondary ms-1">{{ market_rows|length }}</span></button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-radar"><i class="bi bi-bullseye"></i> Radar <span class="badge text-bg-secondary ms-1">{{ radar_rows|length }}</span></button></li>
   </ul>
-  <span class="small text-secondary ms-auto d-inline-flex flex-wrap align-items-center gap-1" id="newsSources">Fontes:
+  <span class="small text-secondary ms-auto d-inline-flex flex-wrap align-items-center gap-1" id="newsSources">
     {% set all_rows = news_rows + market_rows + radar_rows %}
     {% for p, name in news_providers.items() %}{% set n_src = all_rows|selectattr("provider", "equalto", p)|list|length %}
       {% if n_src %}<button type="button" class="pm-chip active" data-src="{{ p }}" aria-pressed="true" title="Mostrar ou esconder as notícias do {{ name }}">{{ name }} <span class="badge text-bg-light">{{ n_src }}</span></button>{% endif %}
     {% endfor %}
-    {% if not all_rows %}{% for p in news_enabled %}{{ news_providers[p] }}{{ ", " if not loop.last }}{% else %}nenhuma{% endfor %}{% endif %}
+    {% if not all_rows %}Fontes: {% for p in news_enabled %}{{ news_providers[p] }}{{ ", " if not loop.last }}{% else %}nenhuma{% endfor %}{% endif %}
     {{ help("As notícias dos últimos 7 dias, de cada fonte ligada em Definições → Dados de mercado: o Finnhub (com a tua chave; no plano gratuito só empresas cotadas nos EUA e no Canadá), o Google Notícias (pelo nome do ativo, sem chave), o Yahoo Finance (pelo símbolo, sem chave) e o Marketaux (com a tua chave). Atualizam-se ao abrir a página quando têm mais de 1 hora (6 no Marketaux); para as pedir já, usa «Atualizar todas as fontes» em Definições. As notícias abrem no site de origem; a página não carrega imagens de outros sites.") }}</span>
 </div>
 
