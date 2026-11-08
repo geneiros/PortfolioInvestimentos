@@ -2669,8 +2669,7 @@ def test_old_provider_news_removed(app, client):
                             NewsItem(ticker="", headline="y", url="https://y.com/x", published=datetime.now(), provider="yahoo")])
         Setting.set("news_sources", "antiga")  # escolhida antes: deixa de contar
         db.session.commit()
-        assert news.enabled() == []
-        assert sorted(n.headline for n in news.items(market=True)) == ["g", "y"]
+        assert news.enabled() == [] and news.items(market=True) == []  # nenhuma fonte escolhida: nada aparece
         news.refresh([], fetchers={})
         assert NewsItem.query.filter_by(provider="antiga").count() == 0 and NewsItem.query.count() == 2
     token = csrf(client)
@@ -2830,3 +2829,27 @@ def test_news_source_chips(app, client, monkeypatch):
     assert re.search(r'class="pm-chip active" data-src="google".*?<span class="badge text-bg-light">2</span>', bar, re.S)
     assert 'data-src="yahoo"' in bar and 'data-src="finnhub"' not in bar and "Fontes:" not in bar
     assert 'data-provider="yahoo"' in html and "pm-hide-src" in html
+
+
+def test_news_hidden_when_source_unselected(app, client, monkeypatch):
+    from datetime import datetime
+    from portfolio_investimentos.models import NewsItem, Setting
+    from portfolio_investimentos.services import news
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    monkeypatch.setattr(news, "refresh", lambda tickers, force=False, **k: {})
+    with app.app_context():
+        db.session.add_all([NewsItem(ticker="", headline="Do Yahoo", url="https://y.com/1", published=datetime.now(), provider="yahoo"),
+                            NewsItem(ticker="", headline="Do Google", url="https://g.com/1", published=datetime.now(), provider="google")])
+        db.session.commit()
+    assert "Do Yahoo" in client.get("/noticias").get_data(as_text=True)
+    # desligar o Yahoo em Definições e gravar: as notícias dele deixam de aparecer (ficam guardadas)
+    assert post(client, "set_news_sources", token, source_google="1", source_yahoo="0", source_finnhub="1",
+                source_marketaux="1").status_code == 200
+    html = client.get("/noticias").get_data(as_text=True)
+    assert "Do Yahoo" not in html and "Do Google" in html and 'data-src="yahoo"' not in html
+    with app.app_context():
+        assert NewsItem.query.filter_by(provider="yahoo").count() == 1
+        Setting.set("news_sources", None)
+        db.session.commit()
+    assert "Do Yahoo" in client.get("/noticias").get_data(as_text=True)  # ligado outra vez, volta a aparecer

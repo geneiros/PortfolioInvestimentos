@@ -65,11 +65,15 @@ def has_key(provider):
     return {"finnhub": api_key, "marketaux": marketaux_key}.get(provider, lambda: True)() is not None
 
 
-def enabled():
-    """Fontes ligadas (Definições); por omissão todas. O Finnhub e o Marketaux só contam com a chave."""
+def selected():
+    """Fontes escolhidas em Definições (por omissão todas), com ou sem chave: só as notícias delas aparecem."""
     raw = Setting.get("news_sources")
-    chosen = [p for p in (raw.split(",") if raw is not None else PROVIDERS) if p in PROVIDERS]
-    return [p for p in chosen if p not in KEYED or has_key(p)]
+    return [p for p in (raw.split(",") if raw is not None else PROVIDERS) if p in PROVIDERS]
+
+
+def enabled():
+    """Fontes a que se pedem notícias: as escolhidas em Definições; o Finnhub e o Marketaux só contam com a chave."""
+    return [p for p in selected() if p not in KEYED or has_key(p)]
 
 
 def _json_setting(name):
@@ -377,8 +381,10 @@ def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET, market
 
 
 def items(tickers=None, market=False, limit=LIMIT):
+    """As notícias guardadas, das mais recentes para as mais antigas, só das fontes escolhidas em Definições (as de
+    uma fonte desligada ficam guardadas, escondidas, e voltam a aparecer quando se liga outra vez)."""
     q = NewsItem.query.filter(NewsItem.ticker == "") if market else NewsItem.query.filter(NewsItem.ticker.in_(tickers or [""]))
-    q = q.filter(NewsItem.provider.in_(list(PROVIDERS)))
+    q = q.filter(NewsItem.provider.in_(selected()))
     return q.order_by(NewsItem.published.desc()).limit(limit).all()
 
 

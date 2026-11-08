@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Notícias: desligar uma fonte em Definições esconde as notícias dela**  
+  Ao retirar a seleção de uma fonte em Definições → Dados de mercado e gravar, as notícias já guardadas dessa fonte deixam de aparecer na página Notícias (em todos os separadores), além de se deixar de lhe pedir notícias. Ficam guardadas: voltam a aparecer quando se liga a fonte outra vez. Uma fonte sem chave mas selecionada continua a mostrar as notícias que já tinha.
 - **Notícias: sem o texto «Fontes:» antes dos botões das fontes**  
   Os botões das fontes aparecem sozinhos no topo da página; o texto «Fontes:» só fica quando ainda não há notícias (e por isso não há botões).
 - **Notícias: sem o botão «Atualizar notícias»**  
