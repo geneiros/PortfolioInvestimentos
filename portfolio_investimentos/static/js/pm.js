@@ -153,15 +153,45 @@
     if (st.missing.length) pm.toast("Sem cotações para: " + st.missing.join(", "), "warning");
     setTimeout(() => location.reload(), 2500);
   };
+  // a página faz a atualização aos bocados (cada pedido trata alguns ativos): não depende de o servidor deixar
+  // correr threads (no PythonAnywhere não deixa) e, se mudares de página, continua de onde ficou
+  let driving = false;
+  pm.driveRefresh = async (onlyOpen, restart) => {
+    if (driving) return;
+    driving = true;
+    setRefreshing(true, { done: 0, total: 0, current: "" });
+    let res, busy = 0;
+    try {
+      res = await pm.call("refresh_step", { only_open: onlyOpen ? "1" : "", restart: restart ? "1" : "" }, { silent: true });
+      while (!res.finished) {
+        setRefreshing(true, res);
+        if (res.busy) {  // outra atualização a correr (ex.: na consola): espera um pouco
+          if (++busy > 40) throw new Error(res.busy);
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+        res = await pm.call("refresh_step", { only_open: onlyOpen ? "1" : "" }, { silent: true });
+      }
+    } catch (err) {
+      driving = false;
+      setRefreshing(false);
+      activeRefresh = null;
+      pm.toast("A atualização parou: " + (err.message || err) + " Carrega outra vez para continuar.", "warning");
+      return;
+    }
+    driving = false;
+    setRefreshing(false);
+    activeRefresh = null;
+    pm.toast(`Cotações atualizadas (${res.updated} ${res.updated === 1 ? "ativo" : "ativos"}).`);
+    if (res.missing && res.missing.length) pm.toast("Sem cotações para: " + res.missing.join(", "), "warning");
+    setTimeout(() => location.reload(), 2500);
+  };
   document.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-pm-refresh]");
     if (!btn) return;
     e.preventDefault();
+    if (!btn.dataset.label) btn.dataset.label = btn.innerHTML;
     activeRefresh = btn;
-    try {
-      pm.toast(await pm.call("refresh_market", { only_open: btn.dataset.onlyOpen || "" }), "info");
-    } catch (err) { return; /* já mostrado */ }
-    pm.watchRefresh();
+    pm.driveRefresh(!!btn.dataset.onlyOpen, true);
   });
 
   // avisos: ao fechar um, lembra-o (só os 50 mais recentes, para a lista não crescer sem fim)
@@ -293,7 +323,12 @@
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
     // se a página abrir com uma atualização em curso, continua a acompanhá-la
     if (refreshButtons().length) {
-      pm.call("refresh_status", {}, { silent: true }).then((st) => { if (st.running) pm.watchRefresh(st); }).catch(() => {});
+      pm.call("refresh_status", {}, { silent: true }).then((st) => {
+        if (st.job) {  // uma atualização aos bocados por terminar: esta página continua-a
+          activeRefresh = [...refreshButtons()].find((b) => !!b.dataset.onlyOpen === !!st.job.only_open) || null;
+          pm.driveRefresh(st.job.only_open, false);
+        } else if (st.running) pm.watchRefresh(st);
+      }).catch(() => {});
     }
   });
 

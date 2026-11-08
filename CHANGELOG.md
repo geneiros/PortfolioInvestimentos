@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Atualizar cotações pela página aos bocados (funciona no PythonAnywhere)**  
+  O botão de Definições (e o da faixa de cotações antigas) lançava a atualização numa thread no servidor. No PythonAnywhere a aplicação web não deixa correr threads: a atualização só avançava enquanto a página fazia pedidos (ficava muito tempo em «1/18 · ^GSPC») e morria quando o servidor reciclava o processo, sem guardar as cotações. Agora a página pede a atualização aos bocados: cada pedido faz alguns ativos (cerca de 10 s), o progresso fica guardado na base de dados e aparece no botão; se mudares de página ou recarregares, a página seguinte continua de onde ficou. A atualização pela consola (`atualizar-cotacoes.sh`) fica igual.
+
 - **Visão Geral: MSCI World no gráfico de evolução**  
   O MSCI World junta-se aos índices de comparação do gráfico «Retorno total / Valor total»: S&P 500, MSCI World, FTSE All-World e STOXX Europe 600.
 

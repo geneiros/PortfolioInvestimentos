@@ -318,11 +318,14 @@ def _yahoo_client():
         return yahoo
 
 
-def refresh_all(start=None, progress=None, only_open=False):
+def refresh_all(start=None, progress=None, only_open=False, only=None, phases=("quotes", "fx", "events"),
+                stats=None):
     """Atualiza cotações, câmbios e eventos. Devolve um resumo textual.
 
     `progress(linha)` é chamada a cada ativo, à medida que a atualização avança (ex.: para a consola).
     Com `only_open`, só se atualizam as posições abertas (e os índices de comparação); as fechadas ficam como estão.
+    Aos bocados (`refresh_step`): `only` limita aos tickers indicados, `phases` às fases indicadas e, com `stats`,
+    o resultado (sem cotações, atualizados) fica nesse dicionário em vez de ser gravado como o da atualização.
     """
     yf = _yahoo_client()
     if not _lock.acquire(blocking=False):
@@ -357,6 +360,10 @@ def refresh_all(start=None, progress=None, only_open=False):
         # só com as posições abertas, a fila são elas (e os índices): o contador [n/total] conta só esses
         queue = [i for i in insts if not only_open or i.kind == "index" or i.ticker in held]
         closed = len(insts) - len(queue)
+        if only is not None:
+            queue = [i for i in queue if i.ticker in only]
+        if "quotes" not in phases:
+            queue = []
         _progress.update(done=0, total=len(queue), current="")
         for position, inst in enumerate(queue, 1):
             if inst in gone:
@@ -414,7 +421,9 @@ def refresh_all(start=None, progress=None, only_open=False):
             note(f"{symbol}: {n} cotações{last}")
 
         where[0] = ""
-        if only_open:  # só os câmbios dos ativos que se atualizaram
+        if "fx" not in phases:
+            currencies = set()
+        elif only_open:  # só os câmbios dos ativos que se atualizaram
             currencies = {i.currency for i in insts if i.kind == "index" or i.ticker in held}
         else:
             currencies = {i.currency for i in insts} | {c for (c,) in db.session.query(Transaction.currency).distinct()}
@@ -435,7 +444,8 @@ def refresh_all(start=None, progress=None, only_open=False):
         where[0] = ""
         # eventos (resultados, dividendos) e setor só interessam para as posições abertas; os ativos vendidos
         # podem já nem existir em bolsa (ex.: empresas compradas ou fundidas)
-        open_queue = [i for i in insts if i not in gone and i.kind != "index" and i.ticker in held]
+        open_queue = [i for i in insts if i not in gone and i.kind != "index" and i.ticker in held
+                      and "events" in phases and (only is None or i.ticker in only)]
         payers = 0
         _progress.update(done=0, total=len(open_queue), current="")
         for k, inst in enumerate(open_queue, 1):
@@ -473,6 +483,11 @@ def refresh_all(start=None, progress=None, only_open=False):
                 note(f"{inst.ticker} dividendos: erro ({str(exc)[:120]})")
             if progress:
                 progress(f"[eventos {k}/{len(open_queue)}] {inst.ticker} ({_time.monotonic() - step_started:.1f} s)")
+        if stats is not None:  # um bocado de uma atualização feita aos bocados: o resumo junta-se no fim
+            db.session.commit()
+            stats.update(missing=missing, updated=updated, closed=closed, quick=quick, skipped=skipped,
+                         payers=payers)
+            return "\n".join(report)
         if open_queue:
             note(f"Dividendos por ação (Yahoo, últimos 12 meses): {payers} de {len(open_queue)} posições abertas pagam.")
         if closed:
@@ -640,6 +655,110 @@ def _beat():
             Setting.set("refresh_status", _running_status(_background["only_open"], **_progress))
         except Exception:  # só um sinal de vida: se a base estiver ocupada, o do ativo seguinte chega
             db.session.rollback()
+
+
+# ------------------------------------------------------------- atualização aos bocados (pela página)
+# Em servidores que não deixam correr threads da aplicação (ex.: PythonAnywhere), a atualização em segundo plano
+# só avançava enquanto a página fazia pedidos e morria quando o servidor reciclava o processo. A página passa a
+# pedir a atualização aos bocados: cada pedido faz alguns ativos (~10 s) e o progresso fica guardado na base de
+# dados, por isso mudar de página ou recarregar continua do sítio onde ficou.
+STEP_BUDGET = 10.0  # segundos de trabalho por pedido
+JOB_STALE = timedelta(minutes=30)  # um trabalho parado há mais do que isto recomeça do início
+
+
+def _job():
+    import json
+    try:
+        job = json.loads(Setting.get("refresh_job") or "null")
+    except ValueError:
+        return None
+    if not isinstance(job, dict):
+        return None
+    try:
+        if datetime.now() - datetime.fromisoformat(job["touched"]) > JOB_STALE:
+            return None
+    except (KeyError, ValueError):
+        return None
+    return job
+
+
+def _save_job(job):
+    import json
+    job["touched"] = datetime.now().isoformat(timespec="seconds")
+    Setting.set("refresh_job", json.dumps(job) if job.get("steps") is not None else None)
+
+
+def current_job():
+    """O trabalho por terminar (para a página o continuar), ou None."""
+    job = _job()
+    return {"only_open": job["only_open"], "done": job["i"], "total": len(job["steps"])} if job else None
+
+
+def _new_job(only_open):
+    """Os passos: as cotações de cada ativo, os câmbios e os eventos de cada posição aberta."""
+    from .data import load_portfolio
+    ensure_benchmarks()
+    held = {pos.asset.ticker for pos in load_portfolio(None).open_positions}
+    insts = [i for i in Instrument.query.order_by(Instrument.ticker).all() if not i.ticker.startswith("DEMO-")]
+    quotes = [i.ticker for i in insts if not only_open or i.kind == "index" or i.ticker in held]
+    events = [i.ticker for i in insts if i.kind != "index" and i.ticker in held]
+    steps = [["quotes", t] for t in quotes] + [["fx", ""]] + [["events", t] for t in events]
+    return {"only_open": bool(only_open), "steps": steps, "i": 0, "report": [], "missing": [], "updated": 0,
+            "quick": 0, "skipped": 0, "payers": 0, "closed": 0, "started": datetime.now().isoformat(timespec="seconds")}
+
+
+def _step_label(step):
+    phase, ticker = step
+    return "câmbios" if phase == "fx" else (f"eventos de {ticker}" if phase == "events" else ticker)
+
+
+def refresh_step(only_open=False, restart=False, budget=STEP_BUDGET):
+    """Faz o bocado seguinte da atualização (cerca de `budget` segundos) e devolve o progresso.
+
+    {"done", "total", "current", "finished"} e, no fim, {"updated", "missing", "report"}."""
+    job = None if restart else _job()
+    if job is None or job["only_open"] != bool(only_open) and job["i"] == 0:
+        job = _new_job(only_open)
+    t0 = _time.monotonic()
+    total = len(job["steps"])
+    did = 0  # pelo menos um passo por pedido
+    while job["i"] < total and (did == 0 or _time.monotonic() - t0 < budget):
+        did += 1
+        phase, ticker = job["steps"][job["i"]]
+        Setting.set("refresh_status", _running_status(job["only_open"], job["i"], total, _step_label(job["steps"][job["i"]])))
+        stats = {}
+        out = refresh_all(only_open=job["only_open"], only={ticker} if ticker else set(), phases=(phase,), stats=stats)
+        if not stats:  # outra atualização a correr (ex.: na consola): tenta-se no pedido seguinte
+            _save_job(job)
+            return {"done": job["i"], "total": total, "current": _step_label(job["steps"][job["i"]]),
+                    "finished": False, "busy": out}
+        job["report"] += [ln for ln in out.split("\n") if ln]
+        job["missing"] += stats.get("missing", [])
+        job["updated"] += stats.get("updated", 0)
+        for k in ("quick", "skipped", "payers"):
+            job[k] += stats.get(k, 0)
+        job["closed"] = max(job["closed"], stats.get("closed", 0))
+        job["i"] += 1
+        _save_job(job)
+    if job["i"] < total:
+        return {"done": job["i"], "total": total, "current": _step_label(job["steps"][job["i"]]), "finished": False}
+    report = job["report"]
+    events = sum(1 for p, _ in job["steps"] if p == "events")
+    if events:
+        report.append(f"Dividendos por ação (Yahoo, últimos 12 meses): {job['payers']} de {events} posições abertas pagam.")
+    if job["only_open"] and job["closed"]:
+        report.append(f"Só posições abertas: {job['closed']} ativos fechados não foram atualizados.")
+    if job["quick"] or job["skipped"]:
+        report.append(f"Atualização incremental: {job['quick']} ativos só com os últimos dias; "
+                      f"{job['skipped']} posições fechadas sem pedidos.")
+    Setting.set("refresh_missing", ",".join(job["missing"]))
+    Setting.set("refresh_updated", job["updated"])
+    Setting.set("refresh_report", "\n".join(report))
+    Setting.set("last_refresh", datetime.now().isoformat(timespec="seconds"))
+    Setting.set("refresh_job", None)
+    _set_status("")
+    return {"done": total, "total": total, "current": "", "finished": True, "updated": job["updated"],
+            "missing": job["missing"]}
 
 
 def refresh_in_background(app, only_open=False):

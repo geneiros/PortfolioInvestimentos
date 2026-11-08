@@ -592,6 +592,19 @@ def refresh_market(only_open=""):
 
 
 @action
+def refresh_step(only_open="", restart=""):
+    """Faz o bocado seguinte da atualização de cotações (a página chama até terminar; sem threads no servidor)."""
+    if not market.yfinance_available():
+        raise ApiError("Instala o pacote yfinance para obter cotações (pip install yfinance).")
+    res = market.refresh_step(only_open=str(only_open).lower() in ("1", "true", "on", "sim"),
+                              restart=str(restart).lower() in ("1", "true"))
+    if res.get("finished"):
+        indices = {t for (t,) in db.session.query(Instrument.ticker).filter_by(kind="index")}
+        res["missing"] = [t for t in res.get("missing", []) if t not in indices]
+    return res
+
+
+@action
 def set_offline(enabled):
     on = str(enabled).lower() in ("1", "true", "on", "sim")
     Setting.set("offline_enabled", "1" if on else None)
@@ -745,7 +758,8 @@ def refresh_status():
     running, error, missing = market.refresh_state()
     indices = {t for (t,) in db.session.query(Instrument.ticker).filter_by(kind="index")}
     return {"running": running, "error": error, "missing": [t for t in missing if t not in indices], "last_refresh": Setting.get("last_refresh"),
-            "updated": int(Setting.get("refresh_updated") or 0), "progress": market.refresh_progress()}
+            "updated": int(Setting.get("refresh_updated") or 0), "progress": market.refresh_progress(),
+            "job": market.current_job()}
 
 
 @action

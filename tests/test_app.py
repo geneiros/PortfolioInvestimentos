@@ -2451,3 +2451,44 @@ def test_overview_compares_only_four_indices(app, client):
     assert [b["ticker"] for b in m["benchmarks"]] == ["^GSPC", "URTH", "FTSE-AW", "^STOXX"]
     assert all(b["twr"] for b in m["benchmarks"])
     assert "const shownPos = new Set();" in html  # as linhas das posições começam por selecionar
+
+
+def test_refresh_in_steps_without_threads(app, client, monkeypatch):
+    """A atualização pela página faz-se aos bocados (sem threads, para o PythonAnywhere) e continua de onde ficou."""
+    import sys
+    from portfolio_investimentos.models import Instrument, Price, Setting
+    from portfolio_investimentos.services import market
+    monkeypatch.setitem(sys.modules, "yfinance", _FakeYf)
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="ADB", currency="EUR", isin="US00724F1012", data_symbol="ADB.DE"),
+            Instrument(ticker="NOV", currency="EUR", isin="DK0062498333", data_symbol="NOV.DE"),
+            Transaction(date=date(2026, 8, 27), type="BUY", instrument="ADB", quantity=1, price=240.4, currency="EUR"),
+            Transaction(date=date(2026, 9, 14), type="BUY", instrument="NOV", quantity=1, price=37.5, currency="EUR"),
+            Transaction(date=date(2026, 9, 20), type="SELL", instrument="NOV", quantity=1, price=38.0, currency="EUR"),
+        ])
+        db.session.commit()
+        # um passo de cada vez (como pedidos curtos): o progresso fica guardado na base de dados
+        first = market.refresh_step(only_open=True, restart=True, budget=0)
+        assert not first["finished"] and first["done"] == 1 and first["total"] > 3
+        assert market.current_job()["done"] == 1 and market.refresh_state()[0]  # «a atualizar» para as outras páginas
+        res = first
+        for _ in range(50):
+            if res["finished"]:
+                break
+            res = market.refresh_step(only_open=True, budget=0)
+        assert res["finished"] and res["updated"] == 1, res
+        assert Price.query.filter_by(instrument="ADB").count() and not Price.query.filter_by(instrument="NOV").count()
+        assert market.current_job() is None and Setting.get("last_refresh") and not market.refresh_state()[0]
+        assert "Só posições abertas: 1 ativos fechados não foram atualizados." in Setting.get("refresh_report")
+    # pela API: o estado mostra o trabalho por terminar, para a página o continuar
+    token = csrf(client)
+    r = post(client, "refresh_step", token, only_open="1", restart="1").get_json()["message"]
+    assert "done" in r and "total" in r
+    st = post(client, "refresh_status", token).get_json()["message"]
+    assert st["job"] is None or st["job"]["only_open"] is True
+    for _ in range(50):
+        if r["finished"]:
+            break
+        r = post(client, "refresh_step", token, only_open="1").get_json()["message"]
+    assert r["finished"] and post(client, "refresh_status", token).get_json()["message"]["job"] is None
