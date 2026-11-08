@@ -2744,3 +2744,33 @@ def test_google_news_title_filter_and_purge(app):
         db.session.commit()
         news.refresh(["ADB", "FWIA"], market=False, fetchers={"google": lambda i, n: []})
         assert sorted(n.headline for n in NewsItem.query) == ["Adobe lança IA", "Wall Street Week Ahead"]
+
+
+def test_news_radar_tab(app, client, monkeypatch):
+    from datetime import datetime
+    from portfolio_investimentos.models import Instrument, NewsItem, WatchItem
+    from portfolio_investimentos.services import news
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    asked = []
+    monkeypatch.setattr(news, "refresh", lambda tickers, force=False, **k: asked.append(list(tickers)) or {})
+    html = client.get("/noticias").get_data(as_text=True)
+    with app.app_context():
+        WatchItem.query.delete()
+        db.session.commit()
+    html = client.get("/noticias").get_data(as_text=True)
+    assert "Ainda não segues ativos no Radar" in html
+    with app.app_context():
+        db.session.add_all([Instrument(ticker="NVDA", currency="USD", instrument_name="NVIDIA Corp"),
+                            WatchItem(instrument="NVDA", note="seguir"),
+                            NewsItem(ticker="NVDA", headline="NVIDIA bate recordes", url="https://ex.com/nv",
+                                     published=datetime.now(), provider="finnhub")])
+        db.session.commit()
+    html = client.get("/noticias").get_data(as_text=True)
+    assert html.index('data-bs-target="#tab-market"') < html.index('data-bs-target="#tab-radar"')
+    radar = html.split('id="tab-radar"', 1)[1]
+    assert "NVIDIA bate recordes" in radar and 'data-t="NVDA"' in radar
+    assert "NVIDIA bate recordes" not in html.split('id="tab-mine"', 1)[1].split('id="tab-market"', 1)[0]
+    assert "NVDA" in asked[-1]  # o radar também se atualiza ao abrir a página
+    plan = post(client, "news_plan", token).get_json()["message"]["steps"]
+    assert "NVDA" in plan

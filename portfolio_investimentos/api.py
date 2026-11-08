@@ -605,8 +605,10 @@ def refresh_step(only_open="", restart=""):
 
 
 def _news_tickers():
-    return [pos.asset.ticker for pos in data.load_portfolio(data.selected_broker()).open_positions
-            if not pos.asset.ticker.startswith("DEMO-")]
+    """Os ativos das posições abertas da carteira selecionada e os do Radar, sem repetir (sem os da demonstração)."""
+    from .views import radar_instruments
+    held = [pos.asset.ticker for pos in data.load_portfolio(data.selected_broker()).open_positions]
+    return [t for t in dict.fromkeys(held + [i.ticker for i in radar_instruments()]) if not t.startswith("DEMO-")]
 
 
 @action

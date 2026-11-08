@@ -24,6 +24,7 @@
   <ul class="nav nav-pills gap-2" role="tablist">
     <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-mine">Os meus ativos <span class="badge text-bg-light ms-1">{{ news_rows|length }}</span></button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-market">Mercado <span class="badge text-bg-secondary ms-1">{{ market_rows|length }}</span></button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-radar"><i class="bi bi-bullseye"></i> Radar <span class="badge text-bg-secondary ms-1">{{ radar_rows|length }}</span></button></li>
   </ul>
   <span class="small text-secondary ms-auto">Fontes: {% for p in news_enabled %}{{ news_providers[p] }}{{ ", " if not loop.last }}{% else %}nenhuma{% endfor %}
     {{ help("As notícias dos últimos 7 dias, de cada fonte ligada em Definições → Dados de mercado: o Finnhub (com a tua chave; no plano gratuito só empresas cotadas nos EUA e no Canadá), o Google Notícias (pelo nome do ativo, sem chave) e o Marketaux (com a tua chave). Ficam guardadas 1 hora (6 no Marketaux); «Atualizar notícias» pede-as outra vez. As notícias abrem no site de origem; a página não carrega imagens de outros sites.") }}</span>
@@ -45,7 +46,7 @@
 <div class="tab-content">
   <div class="tab-pane fade show active" id="tab-mine">
     <div class="pm-card">
-      <div class="d-flex flex-wrap gap-2 mb-2" id="newsFilter">
+      <div class="d-flex flex-wrap gap-2 mb-2 pm-news-filter" id="newsFilter" data-pane="#tab-mine">
         <button class="pm-chip filter active" data-t="">Todos</button>
         {% for a in news_assets if news_counts.get(a.ticker) %}<button class="pm-chip filter" data-t="{{ a.ticker }}">{{ a.ticker }} <span class="badge text-bg-light">{{ news_counts[a.ticker] }}</span></button>{% endfor %}
       </div>
@@ -56,15 +57,30 @@
   <div class="tab-pane fade" id="tab-market">
     <div class="pm-card">{{ news_list(market_rows, false) }}</div>
   </div>
+  <div class="tab-pane fade" id="tab-radar">
+    <div class="pm-card">
+      {% if radar_assets %}
+      <div class="d-flex flex-wrap gap-2 mb-2 pm-news-filter" id="radarFilter" data-pane="#tab-radar">
+        <button class="pm-chip filter active" data-t="">Todos</button>
+        {% for a in radar_assets if radar_counts.get(a.ticker) %}<button class="pm-chip filter" data-t="{{ a.ticker }}">{{ a.ticker }} <span class="badge text-bg-light">{{ radar_counts[a.ticker] }}</span></button>{% endfor %}
+      </div>
+      {{ news_list(radar_rows) }}
+      {% if radar_missing %}<div class="small text-secondary mt-2">Sem notícias: {% for t, why in radar_missing %}<b>{{ t }}</b> ({{ why }}){{ "; " if not loop.last }}{% endfor %}.</div>{% endif %}
+      {% else %}
+      <p class="text-secondary small mb-0">Ainda não segues ativos no Radar. Junta-os em <a href="/radar">Radar e alertas</a> para veres aqui as notícias deles.</p>
+      {% endif %}
+    </div>
+  </div>
 </div>
 {% endif %}
 {% endautoescape %}{% endblock %}
 
 {% block scripts %}
 <script>
-document.querySelectorAll("#newsFilter .pm-chip").forEach((b) => b.addEventListener("click", () => {
-  document.querySelectorAll("#newsFilter .pm-chip").forEach((x) => x.classList.toggle("active", x === b));
-  document.querySelectorAll("#tab-mine .pm-news").forEach((n) => n.classList.toggle("d-none", !!b.dataset.t && n.dataset.ticker !== b.dataset.t));
-}));
+// filtros por ativo de «Os meus ativos» e do «Radar»: cada um só mexe nas notícias do seu painel
+document.querySelectorAll(".pm-news-filter").forEach((bar) => bar.querySelectorAll(".pm-chip").forEach((b) => b.addEventListener("click", () => {
+  bar.querySelectorAll(".pm-chip").forEach((x) => x.classList.toggle("active", x === b));
+  document.querySelectorAll(`${bar.dataset.pane} .pm-news`).forEach((n) => n.classList.toggle("d-none", !!b.dataset.t && n.dataset.ticker !== b.dataset.t));
+})));
 </script>
 {% endblock %}

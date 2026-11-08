@@ -475,6 +475,16 @@ def radar():
     return render_template("pages/radar.html", **c)
 
 
+def radar_instruments():
+    """Os ativos seguidos em Radar e alertas, do mais recente para o mais antigo, sem repetir."""
+    out = {}
+    for w in WatchItem.query.order_by(WatchItem.creation.desc()).all():
+        inst = db.session.get(Instrument, w.instrument)
+        if inst is not None and inst.ticker not in out:
+            out[inst.ticker] = inst
+    return list(out.values())
+
+
 def _news_sources():
     raw = Setting.get("news_sources")
     return list(news_svc.PROVIDERS) if raw is None else raw.split(",")
@@ -482,20 +492,26 @@ def _news_sources():
 
 @bp.route("/noticias")
 def noticias():
-    """Notícias dos ativos da carteira selecionada no topo (ou de todas) e do mercado: Finnhub, Google Notícias e Marketaux."""
+    """Notícias dos ativos da carteira selecionada no topo (ou de todas), do mercado e dos ativos do Radar: Finnhub,
+    Google Notícias e Marketaux."""
     from .services import news
     c = ctx.build("noticias", "Notícias")
     p = c["p"]
     insts = [pos.asset for pos in p.open_positions]
     tickers = [a.ticker for a in insts]
-    errors = news.refresh([t for t in tickers if not t.startswith("DEMO-")])
+    watch = radar_instruments()
+    watch_tickers = [a.ticker for a in watch]
+    errors = news.refresh([t for t in dict.fromkeys(tickers + watch_tickers) if not t.startswith("DEMO-")])
     rows = news.items(tickers)
-    shown = {n.ticker for n in rows}
-    by_ticker = {a.ticker: a for a in insts}
+    radar_rows = news.items(watch_tickers) if watch_tickers else []
+    by_ticker = {a.ticker: a for a in watch + insts}
     c.update(news_rows=rows, market_rows=news.items(market=True), news_errors=errors, news_assets=insts,
-             news_by_ticker=by_ticker, news_missing=news.without_news(insts, shown), news_providers=news.PROVIDERS,
-             news_enabled=news.enabled(), news_has_key=bool(news.api_key()),
-             news_counts={t: sum(1 for n in rows if n.ticker == t) for t in tickers})
+             news_by_ticker=by_ticker, news_missing=news.without_news(insts, {n.ticker for n in rows}),
+             news_providers=news.PROVIDERS, news_enabled=news.enabled(), news_has_key=bool(news.api_key()),
+             news_counts={t: sum(1 for n in rows if n.ticker == t) for t in tickers},
+             radar_rows=radar_rows, radar_assets=watch,
+             radar_missing=news.without_news(watch, {n.ticker for n in radar_rows}),
+             radar_counts={t: sum(1 for n in radar_rows if n.ticker == t) for t in watch_tickers})
     return render_template("pages/noticias.html", **c)
 
 

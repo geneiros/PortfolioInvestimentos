@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Notícias: separador «Radar»**  
+  Depois de «Mercado», o separador «Radar» mostra as notícias dos ativos seguidos em Radar e alertas, com filtro por ativo e o aviso dos que ficaram sem notícias. Estes ativos atualizam-se com os da carteira (ao abrir a página, em «Atualizar notícias» e em «Atualizar todas as fontes»); um ativo que está na carteira e no radar partilha as notícias. Sem ativos no radar, o separador explica onde os juntar. Cada ativo no radar gasta também pedidos do Marketaux (100 por dia no plano gratuito).
 - **Visão Geral: a barra de períodos entre o cartão Carteira e o gráfico**  
   A barra 1M · 3M · 6M · YTD · 1A · 3A · 5A · Max sai do cartão «Retorno total / Valor total» e fica sozinha entre os dois cartões, porque filtra ambos. Não é um cartão: não se arrasta e fica nesse lugar quando se muda a ordem dos cartões.
 - **Notícias: o Google só traz notícias que falam do ativo**  
