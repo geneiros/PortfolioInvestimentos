@@ -2438,6 +2438,12 @@ def test_overview_carteira_widget_follows_period(app, client):
         perf = data_portfolio().performance("3M")
     assert abs(m3["summary"]["twr"] - perf["twr_total"]) < 1e-9
     assert abs(m3["summary"]["gain"] - round(perf["return_eur"], 2)) < 0.01
+    assert m3["summary"]["twr_annual"] is None and 'id="heroTwrYearBox"' in html  # até 1 ano não há rendimento anual
+    m5 = post(client, "performance", token, period="5A").get_json()["message"]["summary"]
+    with app.app_context():
+        p5 = data_portfolio().performance("5A")
+    if p5["years"] > 1.02:  # com mais de 1 ano: o TWR anualizado (o CAGR de Desempenho)
+        assert abs(m5["twr_annual"] - p5["cagr"]) < 1e-9 and abs((1 + m5["twr_annual"]) ** p5["years"] - 1 - m5["twr"]) < 1e-6
     # a barra de períodos fica entre o cartão Carteira e o do gráfico, fora dos dois
     i_cart, i_bar, i_graf = html.index('data-widget="carteira"'), html.index('id="periods"'), html.index('data-widget="grafico"')
     assert i_cart < i_bar < i_graf and "periods" not in html[i_graf:html.index("perfChart")]

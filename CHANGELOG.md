@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Visão Geral: rendimento anual nos períodos com mais de 1 ano**  
+  Com 3A, 5A ou Max (e a carteira com mais de 1 ano), o cartão Carteira mostra ao lado do rendimento do período o rendimento anual, ex.: «+53,1% · +8,2%/ano». É o TWR anualizado, a taxa por ano que, composta, dá o rendimento do período (o mesmo CAGR da página Desempenho). Até 1 ano mostra só o do período.
 - **Barra de progresso no topo ao carregar páginas**  
   Uma barra fina no topo, da cor principal da aplicação (como o tema «minimal» do Pace), aparece ao clicar num link, enviar um formulário ou sair da página, e cresce cada vez mais devagar até a página nova aparecer; também aparece ao abrir ou recarregar uma página e durante os pedidos à API (ex.: mudar o período na Visão Geral). Começa logo no clique, ainda na página antiga, que é quando se espera pela resposta do servidor (o pace.js só começaria na página nova). Os pedidos em segundo plano e as atualizações que já mostram o progresso no botão não a usam. Nunca fica presa: acaba ao voltar atrás e ao fim de 15 s. Sem bibliotecas novas.
 - **Notícias: desligar uma fonte em Definições esconde as notícias dela**  

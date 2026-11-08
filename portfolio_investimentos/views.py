@@ -77,7 +77,9 @@ def perf_payload(p, period, benchmarks=None):
             # variação sem depósitos e o rendimento (TWR)
             "holdings": [float(f"{holdings[i]:.5g}") for i in keep],
             "summary": {"label": PERIOD_NAMES.get(period, period), "gain": round(perf["return_eur"], 2),
-                        "gain_pct": perf["return_pct"], "twr": perf["twr_total"]},
+                        "gain_pct": perf["return_pct"], "twr": perf["twr_total"],
+                        # com mais de 1 ano, também o rendimento anual (TWR anualizado, o CAGR de Desempenho)
+                        "twr_annual": perf["cagr"] if perf["years"] > 1.02 else None},
             "benchmarks": [{"ticker": b["ticker"], "name": b["name"], "color": b["color"], "twr": pick(b["twr"], 5)}
                            for b in perf["benchmarks"]]}
 
