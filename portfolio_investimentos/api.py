@@ -628,6 +628,17 @@ def set_finnhub_key(key=""):
 
 
 @action
+def set_marketaux_key(key=""):
+    """Chave da API do Marketaux (vazia apaga)."""
+    from .services import news
+    key = (key or "").strip()
+    if key and not news.KEY_RE.match(key):
+        raise ApiError("A chave do Marketaux não parece válida (só letras, números, - e _).")
+    Setting.set("marketaux_key", key or None)
+    return "Chave do Marketaux guardada." if key else "Chave do Marketaux apagada."
+
+
+@action
 def set_news_sources(**values):
     """Fontes de notícias ligadas (campos source_<fonte>=1)."""
     from .services import news

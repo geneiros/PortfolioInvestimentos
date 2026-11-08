@@ -3,7 +3,9 @@
 - **Finnhub** (finnhub.io, com a chave em Definições ou na variável FINNHUB_API_KEY): no plano gratuito só tem
   notícias de empresas cotadas nos EUA e no Canadá (o símbolo encontra-se pelo ISIN);
 - **Yahoo Finance**, pelo yfinance que já se usa para as cotações (sem chave; também ações europeias e alguns ETF);
-- **Google Notícias**, por RSS, pesquisando pelo nome do ativo (sem chave; notícias em português e em inglês).
+- **Google Notícias**, por RSS, pesquisando pelo nome do ativo (sem chave; notícias em português e em inglês);
+- **Marketaux** (marketaux.com, com a chave em Definições ou na variável MARKETAUX_API_KEY): no plano gratuito
+  são 100 pedidos por dia e 3 notícias por pedido, por isso as do Marketaux reaproveitam-se durante 6 horas.
 
 Obtêm-se ao abrir a página Notícias, guardam-se na base de dados e reaproveitam-se durante 1 hora («Atualizar
 notícias» força um pedido novo). Cada pedido tem um limite de tempo e a página no total também: o que ficar por
@@ -24,8 +26,11 @@ from ..models import Instrument, NewsItem, Setting, db
 
 API = "https://finnhub.io/api/v1"
 GOOGLE_RSS = "https://news.google.com/rss/search"
-PROVIDERS = {"finnhub": "Finnhub", "yahoo": "Yahoo Finance", "google": "Google Notícias"}
+MARKETAUX = "https://api.marketaux.com/v1/news/all"
+PROVIDERS = {"finnhub": "Finnhub", "yahoo": "Yahoo Finance", "google": "Google Notícias", "marketaux": "Marketaux"}
+KEYED = {"finnhub", "marketaux"}  # fontes que só contam com a chave
 TTL = timedelta(hours=1)
+TTL_BY = {"marketaux": timedelta(hours=6)}  # o plano gratuito do Marketaux tem 100 pedidos por dia
 DAYS = 7          # notícias dos últimos 7 dias
 KEEP_DAYS = 30    # as mais antigas apagam-se
 LIMIT = 150       # notícias mostradas por separador
@@ -47,11 +52,23 @@ def key_from_env():
     return bool(os.environ.get("FINNHUB_API_KEY"))
 
 
+def marketaux_key():
+    return os.environ.get("MARKETAUX_API_KEY") or Setting.get("marketaux_key") or None
+
+
+def marketaux_from_env():
+    return bool(os.environ.get("MARKETAUX_API_KEY"))
+
+
+def has_key(provider):
+    return {"finnhub": api_key, "marketaux": marketaux_key}.get(provider, lambda: True)() is not None
+
+
 def enabled():
-    """Fontes ligadas (Definições); por omissão todas. O Finnhub só conta com a chave."""
+    """Fontes ligadas (Definições); por omissão todas. O Finnhub e o Marketaux só contam com a chave."""
     raw = Setting.get("news_sources")
     chosen = [p for p in (raw.split(",") if raw is not None else PROVIDERS) if p in PROVIDERS]
-    return [p for p in chosen if p != "finnhub" or api_key()]
+    return [p for p in chosen if p not in KEYED or has_key(p)]
 
 
 def _json_setting(name):
@@ -170,6 +187,31 @@ def _google(inst, now, fetch=None):
     return out
 
 
+def _marketaux(inst, now, fetch=None):
+    """Marketaux: notícias do ativo (pelo símbolo dos EUA, se o Finnhub o encontrou, ou pelo do Yahoo) ou, sem
+    ativo, do mercado. O Marketaux só aceita a chave no endereço (api_token): o endereço não se mostra nem regista."""
+    key = marketaux_key()
+    if not key:
+        raise NewsError("falta a chave do Marketaux (Definições → Dados de mercado)")
+    params = {"language": "pt,en", "published_after": (now - timedelta(days=DAYS)).strftime("%Y-%m-%dT%H:%M"),
+              "limit": 3, "api_token": key}
+    if inst is None:
+        params.update(countries="us,pt", filter_entities="false")
+    else:
+        symbol = _json_setting("finnhub_symbols").get(inst.ticker) or inst.data_symbol or inst.ticker
+        params.update(symbols=symbol, filter_entities="true")
+    try:
+        data = json.loads((fetch or _http)(f"{MARKETAUX}?{urllib.parse.urlencode(params)}").decode())
+    except urllib.error.HTTPError as exc:
+        msg = {401: "chave do Marketaux inválida", 402: "o Marketaux limitou os pedidos (limite diário do plano)",
+               429: "o Marketaux limitou os pedidos; tenta mais tarde"}.get(exc.code)
+        raise NewsError(msg or f"o Marketaux respondeu HTTP {exc.code}") from None  # sem o endereço (tem a chave)
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        raise NewsError(f"sem ligação ao Marketaux ({str(getattr(exc, 'reason', exc))[:100]})") from None
+    return [_row(r.get("title"), r.get("url"), r.get("source"), _parse_iso(r.get("published_at")),
+                 r.get("description") or r.get("snippet")) for r in data.get("data") or []]
+
+
 def _parse_iso(text):
     try:
         return datetime.fromisoformat((text or "").replace("Z", "+00:00")).timestamp()
@@ -212,37 +254,40 @@ def _store(ticker, provider, rows):
 
 
 def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET):
-    """Pede as notícias (das fontes ligadas) dos ativos e do mercado com mais de 1 hora. Devolve {"ativo · fonte": erro}.
+    """Pede as notícias (das fontes ligadas) dos ativos e do mercado cujo último pedido a essa fonte já passou da
+    validade (1 hora; 6 no Marketaux). Devolve {"ativo · fonte": erro}.
 
     `fetchers`: {fonte: função(inst ou None, agora)} para os testes."""
     now = now or datetime.now()
-    fetchers = fetchers or {"finnhub": _finnhub, "yahoo": _yahoo, "google": _google}
+    fetchers = fetchers or {"finnhub": _finnhub, "yahoo": _yahoo, "google": _google, "marketaux": _marketaux}
     fetched = _json_setting("news_fetched")
     errors, t0 = {}, time.monotonic()
     blocked = set()  # fontes que falharam por chave ou limite: não adianta insistir nesta visita
     sources = [p for p in enabled() if p in fetchers]
 
-    def due(key):
+    def due(provider, ticker):
         try:
-            return force or now - datetime.fromisoformat(fetched[key]) > TTL
+            return force or now - datetime.fromisoformat(fetched[f"{provider}:{ticker}"]) > TTL_BY.get(provider, TTL)
         except (KeyError, ValueError):
             return True
     for ticker in [""] + list(tickers):
         inst = None if ticker == "" else db.session.get(Instrument, ticker)
-        if (ticker and inst is None) or not due(ticker):
+        if ticker and inst is None:
+            continue
+        todo = [p for p in sources if p not in blocked and due(p, ticker)]
+        if not todo:
             continue
         if time.monotonic() - t0 > budget:  # o resto fica para a visita seguinte
             break
-        for provider in sources:
-            if provider in blocked:
-                continue
+        for provider in todo:
             try:
                 _store(ticker, provider, fetchers[provider](inst, now))
             except NewsError as exc:
                 errors[f"{ticker or 'Mercado'} · {PROVIDERS[provider]}"] = str(exc)
-                if "inválida" in str(exc) or "limitou" in str(exc) or "sem ligação" in str(exc):
+                if any(w in str(exc) for w in ("inválida", "limitou", "sem ligação", "falta a chave")):
                     blocked.add(provider)
-        fetched[ticker] = now.isoformat(timespec="seconds")
+                    continue
+            fetched[f"{provider}:{ticker}"] = now.isoformat(timespec="seconds")
     NewsItem.query.filter(NewsItem.published < now - timedelta(days=KEEP_DAYS)).delete(synchronize_session=False)
     Setting.set("news_fetched", json.dumps(fetched))
     db.session.commit()

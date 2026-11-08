@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Notícias: Marketaux como quarta fonte**  
+  Com a chave em Definições → Dados de mercado (ou na variável MARKETAUX_API_KEY), as notícias do Marketaux juntam-se às do Finnhub, do Yahoo Finance e do Google Notícias, pelo símbolo dos EUA quando existe (o mesmo que o Finnhub encontra pelo ISIN) ou pelo do Yahoo. O plano gratuito tem 100 pedidos por dia e 3 notícias por pedido: as do Marketaux reaproveitam-se durante 6 horas (as outras, 1 hora), com a validade agora contada por fonte. A API só aceita a chave no endereço, que a aplicação não mostra nem regista (os erros não o incluem).
+
 - **Nova área Notícias (Finnhub, Yahoo Finance e Google Notícias)**  
   Página Notícias no menu, a seguir a Radar e alertas: as notícias dos últimos 7 dias dos ativos da carteira selecionada no topo (ou de todas), com filtro por ativo, e um separador «Mercado». Três fontes: o Finnhub (com a chave em Definições ou na variável FINNHUB_API_KEY, enviada num cabeçalho; no plano gratuito só empresas cotadas nos EUA e no Canadá, com o símbolo encontrado pelo ISIN e guardado), o Yahoo Finance (pelo yfinance) e o Google Notícias (RSS, pelo nome do ativo, em português). A mesma notícia em duas fontes (endereço ou título igual) só aparece uma vez. Obtêm-se ao abrir a página, com limite de tempo, e guardam-se 1 hora (as com mais de 30 dias apagam-se); os erros de cada fonte aparecem na página. Em Definições → Dados de mercado: a chave do Finnhub (escondida depois de guardada), a escolha das fontes com o número de notícias guardadas de cada uma e o botão «Atualizar todas as fontes». A página não carrega imagens de outros sites. Tabela nova news_item; «Apagar todos os dados» apaga também as notícias.
 

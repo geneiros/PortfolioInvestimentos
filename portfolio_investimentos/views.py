@@ -551,6 +551,7 @@ def definicoes():
              risk_free_pct=round(data.risk_free() * 100, 2), last_refresh=Setting.get("last_refresh"), refresh_report=Setting.get("refresh_report"),
              stale_days=ctx.stale_days(), core_plan=cerne.plan(), widget_pages=widgets.customized(),
              finnhub_env=news_svc.key_from_env(), finnhub_saved=bool(Setting.get("finnhub_key")),
+             marketaux_env=news_svc.marketaux_from_env(), marketaux_saved=bool(Setting.get("marketaux_key")),
              news_providers=news_svc.PROVIDERS, news_sources=_news_sources(), news_stats=news_svc.stats(),
              password_env=bool(auth.env_password()))
     return render_template("pages/definicoes.html", **c)

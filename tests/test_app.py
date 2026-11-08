@@ -2603,3 +2603,53 @@ def test_google_and_yahoo_parsers():
                              {"title": "Antigo", "link": "https://y.com/o", "publisher": "AP", "providerPublishTime": 1762500000}]
     rows = news._yahoo(inst, None, client=Yf)
     assert [r["headline"] for r in rows] == ["Novo", "Antigo"] and rows[0]["source"] == "Reuters" and rows[0]["datetime"]
+
+
+def test_marketaux_source(app, client, monkeypatch):
+    import json
+    import urllib.error
+    from datetime import datetime
+    from portfolio_investimentos.models import Instrument, NewsItem, Setting
+    from portfolio_investimentos.services import news
+    now = datetime(2026, 11, 8, 12, 0)
+    with app.app_context():
+        inst = Instrument(ticker="ADB", currency="EUR", data_symbol="ADB.DE", instrument_name="Adobe")
+        db.session.add_all([inst, Transaction(date=date(2026, 1, 5), type="BUY", instrument="ADB", quantity=1,
+                                              price=300, currency="EUR")])
+        db.session.commit()
+        assert "marketaux" not in news.enabled()  # sem chave não conta
+        Setting.set("marketaux_key", "mx_key_123456")
+        Setting.set("finnhub_symbols", json.dumps({"ADB": "ADBE"}))
+        assert "marketaux" in news.enabled()
+        seen = []
+        body = json.dumps({"data": [{"title": "Adobe beats estimates", "url": "https://mx.com/a", "source": "reuters.com",
+                                     "published_at": "2026-11-07T10:00:00.000000Z", "description": "d"}]}).encode()
+        rows = news._marketaux(inst, now, fetch=lambda url, **k: seen.append(url) or body)
+        assert rows[0]["headline"] == "Adobe beats estimates" and rows[0]["source"] == "reuters.com" and rows[0]["datetime"]
+        assert "symbols=ADBE" in seen[0] and "api_token=mx_key_123456" in seen[0]  # o símbolo dos EUA
+
+        def limited(url, **k):
+            raise urllib.error.HTTPError(url, 402, "Payment Required", {}, None)
+        try:
+            news._marketaux(inst, now, fetch=limited)
+            raise AssertionError("devia falhar")
+        except news.NewsError as exc:
+            assert "limite diário" in str(exc) and "mx_key_123456" not in str(exc)  # a chave não aparece no erro
+        # as do Marketaux reaproveitam-se 6 horas (as das outras fontes, 1 hora)
+        Setting.set("news_sources", "yahoo,marketaux")
+        calls = []
+        F = {"yahoo": lambda i, n: calls.append("yahoo") or [],
+             "marketaux": lambda i, n: calls.append("marketaux") or [news._row("Adobe x", "https://mx.com/b", "mx", n.timestamp())]}
+        news.refresh(["ADB"], now=now, fetchers=F)
+        assert calls.count("marketaux") == 2 and NewsItem.query.filter_by(provider="marketaux").count() == 2  # mercado e ADB
+        calls.clear()
+        news.refresh(["ADB"], now=now + timedelta(hours=2), fetchers=F)
+        assert "yahoo" in calls and "marketaux" not in calls
+        calls.clear()
+        news.refresh(["ADB"], now=now + timedelta(hours=7), fetchers=F)
+        assert "marketaux" in calls
+    token = csrf(client)
+    assert post(client, "set_marketaux_key", token, key="mau valor!").status_code == 400
+    assert post(client, "set_marketaux_key", token, key="").status_code == 200
+    html = client.get("/definicoes").get_data(as_text=True)
+    assert "Chave do Marketaux" in html and 'data-source="marketaux"' in html

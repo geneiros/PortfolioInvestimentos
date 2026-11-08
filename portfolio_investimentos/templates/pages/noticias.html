@@ -26,7 +26,7 @@
     <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-market">Mercado <span class="badge text-bg-secondary ms-1">{{ market_rows|length }}</span></button></li>
   </ul>
   <span class="small text-secondary ms-auto">Fontes: {% for p in news_enabled %}{{ news_providers[p] }}{{ ", " if not loop.last }}{% endfor %}
-    {{ help("As notícias dos últimos 7 dias, de cada fonte ligada em Definições → Dados de mercado: o Finnhub (com a tua chave; no plano gratuito só empresas cotadas nos EUA e no Canadá), o Yahoo Finance e o Google Notícias (pelo nome do ativo). Ficam guardadas 1 hora; «Atualizar notícias» pede-as outra vez. As notícias abrem no site de origem; a página não carrega imagens de outros sites.") }}</span>
+    {{ help("As notícias dos últimos 7 dias, de cada fonte ligada em Definições → Dados de mercado: o Finnhub (com a tua chave; no plano gratuito só empresas cotadas nos EUA e no Canadá), o Yahoo Finance, o Google Notícias (pelo nome do ativo) e o Marketaux (com a tua chave). Ficam guardadas 1 hora (6 no Marketaux); «Atualizar notícias» pede-as outra vez. As notícias abrem no site de origem; a página não carrega imagens de outros sites.") }}</span>
   <button class="btn btn-sm btn-outline-secondary" data-pm-action="refresh_news"><i class="bi bi-arrow-repeat"></i> Atualizar notícias</button>
 </div>
 
