@@ -4,12 +4,10 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
-- **Visão Geral: mudar o período não mostra a barra de progresso**  
-  Os pedidos feitos ao mudar o período (1M a Max) já não ligam a barra no topo; o cartão Carteira e o gráfico mudam como antes.
+- **Retirada a barra de progresso no topo (a pedido)**  
+  Sai a barra fina no topo que aparecia ao mudar de página e durante os pedidos à aplicação (à maneira do Pace), e com ela a exceção do período da Visão Geral. O rendimento anual da Visão Geral fica.
 - **Visão Geral: rendimento anual nos períodos com mais de 1 ano**  
   Com 3A, 5A ou Max (e a carteira com mais de 1 ano), o cartão Carteira mostra ao lado do rendimento do período o rendimento anual, ex.: «+53,1% · +8,2%/ano». É o TWR anualizado, a taxa por ano que, composta, dá o rendimento do período (o mesmo CAGR da página Desempenho). Até 1 ano mostra só o do período.
-- **Barra de progresso no topo ao carregar páginas**  
-  Uma barra fina no topo, da cor principal da aplicação (como o tema «minimal» do Pace), aparece ao clicar num link, enviar um formulário ou sair da página, e cresce cada vez mais devagar até a página nova aparecer; também aparece ao abrir ou recarregar uma página e durante os pedidos à API (ex.: mudar o período na Visão Geral). Começa logo no clique, ainda na página antiga, que é quando se espera pela resposta do servidor (o pace.js só começaria na página nova). Os pedidos em segundo plano e as atualizações que já mostram o progresso no botão não a usam. Nunca fica presa: acaba ao voltar atrás e ao fim de 15 s. Sem bibliotecas novas.
 - **Notícias: desligar uma fonte em Definições esconde as notícias dela**  
   Ao retirar a seleção de uma fonte em Definições → Dados de mercado e gravar, as notícias já guardadas dessa fonte deixam de aparecer na página Notícias (em todos os separadores), além de se deixar de lhe pedir notícias. Ficam guardadas: voltam a aparecer quando se liga a fonte outra vez. Uma fonte sem chave mas selecionada continua a mostrar as notícias que já tinha.
 - **Notícias: sem o texto «Fontes:» antes dos botões das fontes**  

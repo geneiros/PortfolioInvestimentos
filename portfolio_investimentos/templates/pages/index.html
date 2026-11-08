@@ -166,7 +166,7 @@
   let pos = null;
   // as linhas das posições ficam na legenda por selecionar; um clique mostra cada uma
   const shownPos = new Set();
-  const loadPositions = async (opts = {}) => { pos = showPos ? await pm.call("positions", { period }, opts) : null; };
+  const loadPositions = async () => { pos = showPos ? await pm.call("positions", { period }) : null; };
 
   document.addEventListener("DOMContentLoaded", () => {
     // widget Carteira: o gráfico de fundo, a variação e o rendimento seguem o período do gráfico
@@ -203,10 +203,9 @@
     document.querySelectorAll("#periods button").forEach((b) => b.addEventListener("click", async () => {
       document.querySelectorAll("#periods button").forEach((x) => x.classList.toggle("active", x === b));
       period = b.dataset.p;
-      // mudar o período não mostra a barra de progresso do topo
-      perf = await pm.call("performance", { period, benchmarks: BENCH }, { progress: false });
+      perf = await pm.call("performance", { period, benchmarks: BENCH });
       drawHero();
-      await loadPositions({ progress: false });
+      await loadPositions();
       draw();
     }));
     document.querySelectorAll(".pm-chip.bench").forEach((b) => b.addEventListener("click", () => {

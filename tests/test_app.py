@@ -2438,7 +2438,6 @@ def test_overview_carteira_widget_follows_period(app, client):
         perf = data_portfolio().performance("3M")
     assert abs(m3["summary"]["twr"] - perf["twr_total"]) < 1e-9
     assert abs(m3["summary"]["gain"] - round(perf["return_eur"], 2)) < 0.01
-    assert 'pm.call("performance", { period, benchmarks: BENCH }, { progress: false })' in html  # sem barra no topo
     assert m3["summary"]["twr_annual"] is None and 'id="heroTwrYearBox"' in html  # até 1 ano não há rendimento anual
     m5 = post(client, "performance", token, period="5A").get_json()["message"]["summary"]
     with app.app_context():
@@ -2860,10 +2859,3 @@ def test_news_hidden_when_source_unselected(app, client, monkeypatch):
         Setting.set("news_sources", None)
         db.session.commit()
     assert "Do Yahoo" in client.get("/noticias").get_data(as_text=True)  # ligado outra vez, volta a aparecer
-
-
-def test_page_progress_bar(client):
-    html = client.get("/").get_data(as_text=True)
-    assert html.index('id="pmProgress"') < html.index('class="pm-shell"')  # logo no início, antes do conteúdo
-    js = client.get("/static/js/pm.js").get_data(as_text=True)
-    assert "pm.progress" in js and "beforeunload" in js
