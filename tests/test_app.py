@@ -2684,12 +2684,16 @@ def test_google_news_parser():
     rss = b"""<?xml version="1.0"?><rss><channel>
       <item><title>Stellantis sobe na bolsa - Jornal de Negocios</title><link>https://news.google.com/a</link>
         <pubDate>Sat, 07 Nov 2026 10:00:00 GMT</pubDate><source url="https://jn.pt">Jornal de Negocios</source></item>
-      <item><title>Sem fonte</title><link>https://news.google.com/b</link></item></channel></rss>"""
+      <item><title>STLAP em queda</title><link>https://news.google.com/b</link></item>
+      <item><title>Bolinho de chuva delicioso sem gluten - Estadao</title><link>https://news.google.com/c</link>
+        <pubDate>Sat, 07 Nov 2026 10:00:00 GMT</pubDate><source>Estadao</source></item></channel></rss>"""
     seen = []
     rows = news._google(inst, None, fetch=lambda url, **k: seen.append(url) or rss)
-    assert [r["headline"] for r in rows] == ["Stellantis sobe na bolsa", "Sem fonte"]
+    assert [r["headline"] for r in rows] == ["Stellantis sobe na bolsa", "STLAP em queda"]  # a receita sai
     assert rows[0]["source"] == "Jornal de Negocios" and rows[0]["datetime"] and rows[1]["datetime"] is None
-    assert "%22Stellantis%22" in seen[0] and "hl=pt-PT" in seen[0]  # pelo nome, sem «N.V.»
+    assert "%22Stellantis%22" in seen[0] and "hl=pt-PT" in seen[0] and "bolsa" in seen[0]  # pelo nome, sem «N.V.»
+    etf = type("I", (), {"instrument_name": "FTSE All-World UCITS ETF", "ticker": "FWIA.DE", "kind": "etf"})()
+    assert news._google(etf, None, fetch=lambda url, **k: seen.append(url) or rss) == [] and len(seen) == 1
 
     def down(url, **k):
         raise urllib.error.URLError("sem rede")
@@ -2708,3 +2712,32 @@ def test_news_last_results_per_source(app):
         Setting.set("finnhub_key", "abcdef123456")
         news.refresh([], now=datetime(2026, 11, 8, 12), fetchers={"finnhub": lambda i, n: []})
         assert news.last_results()["finnhub"]["asked"] == 1 and news.last_results()["finnhub"]["found"] == 0
+
+
+def test_google_news_title_filter_and_purge(app):
+    import json
+    from datetime import datetime
+    from portfolio_investimentos.models import Instrument, NewsItem, Setting
+    from portfolio_investimentos.services import news
+    def asset(name, ticker="ADB", kind="stock"):
+        return type("A", (), {"instrument_name": name, "ticker": ticker, "kind": kind})()
+    adobe = asset("Adobe Inc.")
+    assert news._mentions(adobe, "Adobe sobe 3% após resultados")
+    assert not news._mentions(adobe, "Bolinho de chuva delicioso sem glúten")
+    assert not news._mentions(adobe, "ADB aprova empréstimo")  # 3 letras: também é o banco asiático
+    assert news._mentions(asset("Stellantis N.V.", "STLAP"), "Stellantis supera 800 mil vendas na América do Sul")
+    assert not news._mentions(asset("Sitio Royalties Corp", "SITC"), "Casa no sítio à venda")
+    with app.app_context():
+        Setting.set("finnhub_symbols", json.dumps({"ADB": "ADBE"}))
+        assert news._mentions(adobe, "ADBE beats estimates")
+        db.session.add_all([
+            Instrument(ticker="ADB", currency="EUR", instrument_name="Adobe Inc."),
+            Instrument(ticker="FWIA", currency="EUR", kind="etf", instrument_name="FTSE All-World"),
+            NewsItem(ticker="ADB", headline="Bolinho de chuva", url="https://g.com/1", published=datetime.now(), provider="google"),
+            NewsItem(ticker="ADB", headline="Adobe lança IA", url="https://g.com/2", published=datetime.now(), provider="google"),
+            NewsItem(ticker="ADB", headline="Wall Street Week Ahead", url="https://f.com/1", published=datetime.now(), provider="finnhub"),
+            NewsItem(ticker="FWIA", headline="Cotação da Occidental", url="https://g.com/3", published=datetime.now(), provider="google")])
+        Setting.set("news_sources", "google")
+        db.session.commit()
+        news.refresh(["ADB", "FWIA"], market=False, fetchers={"google": lambda i, n: []})
+        assert sorted(n.headline for n in NewsItem.query) == ["Adobe lança IA", "Wall Street Week Ahead"]

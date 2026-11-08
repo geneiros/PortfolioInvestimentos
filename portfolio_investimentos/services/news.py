@@ -134,14 +134,53 @@ def _finnhub(inst, now, get=None):
             for r in rows]
 
 
+def _clean_name(inst):
+    """O nome do ativo sem a forma jurídica (Inc, N.V., S.A., …): «Stellantis N.V.» → «Stellantis»."""
+    return re.sub(r"\b(Inc|Corp|Corporation|S\.?A|N\.?V|plc|AG|SE|Ltd|Holdings?|Group|UCITS ETF.*)\b\.?",
+                  "", getattr(inst, "instrument_name", None) or "", flags=re.I).strip(" ,.-")
+
+
+def _us_symbol(inst):
+    try:
+        return _json_setting("finnhub_symbols").get(inst.ticker) or ""
+    except RuntimeError:  # fora da aplicação (testes do motor)
+        return ""
+
+
+def _mentions(inst, title):
+    """O título fala do ativo? A primeira palavra do nome ou o nome todo (sem contar maiúsculas; os acentos contam,
+    para «Sitio» não ser «sítio»), ou o símbolo dos EUA ou o ticker (com 4 ou mais letras) em maiúsculas
+    (ex.: STLA, ADBE, STLAP)."""
+    title = title or ""
+    name = _clean_name(inst)
+    words = [w for w in re.findall(r"[^\W\d_][\w&'-]*", name) if len(w) >= 3]
+    for term in ([words[0]] if words else []) + ([name] if len(name) >= 3 else []):
+        if re.search(rf"(?<!\w){re.escape(term)}(?!\w)", title, re.I):
+            return True
+    base = (inst.ticker or "").split(".")[0]
+    for sym in {base if len(base) >= 4 else "", _us_symbol(inst)}:  # «ADB» sozinho também é o banco asiático
+        if len(sym) >= 3 and re.search(rf"(?<![\w]){re.escape(sym.upper())}(?![\w])", title):
+            return True
+    return False
+
+
 def _google(inst, now, fetch=None):
-    """Google Notícias (RSS) pelo nome do ativo, dos últimos 7 dias; o mercado pelos termos de bolsa."""
+    """Google Notícias (RSS), dos últimos 7 dias: do ativo pelo nome, com contexto de bolsa, e só as notícias cujo
+    título fala dele (a pesquisa do Google encontra a palavra em qualquer sítio da página, ex.: o crédito «Adobe
+    Stock» das fotografias de receitas); o mercado pelos termos de bolsa. Os ETF e os índices não se pesquisam: o
+    nome do índice aparece em páginas de outras empresas. O Google Finance não tem API nem feed: as notícias que
+    mostra são as do Google Notícias para a empresa."""
     if inst is None:
         query = "bolsa OR mercados OR ações"
     else:
-        name = re.sub(r"\b(Inc|Corp|Corporation|S\.?A|N\.?V|plc|AG|SE|Ltd|Holdings?|Group|UCITS ETF.*)\b\.?",
-                      "", inst.instrument_name or "", flags=re.I).strip(" ,.-")
-        query = f'"{name}"' if len(name) >= 3 else (inst.ticker or "")
+        if getattr(inst, "kind", None) in ("etf", "index"):
+            return []
+        name = _clean_name(inst)
+        if len(name) < 3:
+            name = inst.ticker or ""
+        symbol = _us_symbol(inst) or (inst.ticker or "").split(".")[0]
+        extra = f" OR {symbol}" if re.fullmatch(r"[A-Z0-9]{2,6}", symbol or "") else ""
+        query = f'"{name}" (ações OR bolsa OR resultados{extra})'
     params = {"q": f"{query} when:{DAYS}d", "hl": "pt-PT", "gl": "PT", "ceid": "PT:pt-150"}
     try:
         xml = (fetch or _http)(f"{GOOGLE_RSS}?{urllib.parse.urlencode(params)}", limit=2_000_000)
@@ -158,8 +197,18 @@ def _google(inst, now, fetch=None):
             ts = email.utils.parsedate_to_datetime(it.findtext("pubDate") or "").timestamp()
         except (TypeError, ValueError):
             ts = None
-        out.append(_row(title, it.findtext("link"), source, ts))
+        if inst is None or _mentions(inst, title):
+            out.append(_row(title, it.findtext("link"), source, ts))
     return out
+
+
+def _purge_google(ticker, inst):
+    """Apaga as notícias do Google guardadas deste ativo que não falam dele (as de antes do filtro)."""
+    if inst is None:
+        return
+    for n in NewsItem.query.filter_by(ticker=ticker, provider="google").all():
+        if inst.kind in ("etf", "index") or not _mentions(inst, n.headline):
+            db.session.delete(n)
 
 
 def _marketaux(inst, now, fetch=None):
@@ -260,6 +309,8 @@ def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET, market
             st["asked"] += 1
             try:
                 rows = fetchers[provider](inst, now)
+                if provider == "google":
+                    _purge_google(ticker, inst)
                 st["found"] += len(rows or [])
                 st["new"] += _store(ticker, provider, rows)
             except NewsError as exc:
