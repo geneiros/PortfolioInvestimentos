@@ -152,6 +152,7 @@
 <script>
 (function () {
   let perf = {{ perf|safe }};
+  const BENCH = {{ benchmarks|map(attribute="ticker")|list|tojson }};  // os índices que se podem comparar
   let mode = "gain";
   let period = "YTD";
   const active = new Set();
@@ -159,7 +160,8 @@
   let showPos = true;
   try { showPos = localStorage.getItem("pm-show-positions") !== "0"; } catch (e) { /* sem armazenamento */ }
   let pos = null;
-  const hiddenPos = new Set();
+  // as linhas das posições ficam na legenda por selecionar; um clique mostra cada uma
+  const shownPos = new Set();
   const loadPositions = async () => { pos = showPos ? await pm.call("positions", { period }) : null; };
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -193,7 +195,7 @@
     document.querySelectorAll("#periods button").forEach((b) => b.addEventListener("click", async () => {
       document.querySelectorAll("#periods button").forEach((x) => x.classList.toggle("active", x === b));
       period = b.dataset.p;
-      perf = await pm.call("performance", { period });
+      perf = await pm.call("performance", { period, benchmarks: BENCH });
       drawHero();
       await loadPositions();
       draw();
@@ -227,7 +229,7 @@
       el.type = "button";
       el.className = "pm-chip flex-column align-items-start px-3 py-1";
       el.style.borderColor = color;
-      if (key && hiddenPos.has(key)) el.style.opacity = ".4";
+      if (key && !shownPos.has(key)) el.style.opacity = ".4";
       const top = document.createElement("span");
       top.className = "small fw-semibold d-flex align-items-center gap-1";
       const sw = document.createElement("span");
@@ -238,7 +240,7 @@
       val.className = "small money " + (total >= 0 ? "text-up" : "text-down");
       val.textContent = pm.money(total, 0, true) + (pct == null ? "" : " " + pm.pct(pct, 0));
       el.append(top, val);
-      if (key) el.addEventListener("click", () => { hiddenPos.has(key) ? hiddenPos.delete(key) : hiddenPos.add(key); draw(); });
+      if (key) el.addEventListener("click", () => { shownPos.has(key) ? shownPos.delete(key) : shownPos.add(key); draw(); });
       box.append(el);
     };
     chip("Carteira", pm.css("--pm-accent"), perf.gain[perf.gain.length - 1], null, null);
@@ -260,7 +262,7 @@
       datasets.push({ label: b.name, data, borderColor: b.color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .2 });
     });
     if (showPos && pos) {
-      pos.lines.filter((l) => !hiddenPos.has(l.name)).forEach((l) => {
+      pos.lines.filter((l) => shownPos.has(l.name)).forEach((l) => {
         datasets.push({ label: l.others ? l.name : l.ticker, data: mode === "gain" ? l.gain : l.value, borderColor: l.color,
                         borderWidth: 1.5, pointRadius: 0, fill: false, tension: .2, borderDash: l.others ? [3, 3] : [] });
       });

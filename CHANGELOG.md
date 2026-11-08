@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Visão Geral: comparar com S&P 500, FTSE All-World e STOXX Europe 600; posições por selecionar**  
+  O gráfico «Retorno total / Valor total» passa a comparar só com o S&P 500, o FTSE All-World (cotações do ETF VWCE.DE, com o ticker próprio FTSE-AW para não se confundir com quem o tem na carteira) e o STOXX Europe 600 (^STOXX); os dois novos ficam também na lista de índices da «Carteira vs mercado» e recebem cotações na atualização. Por baixo do gráfico só a Carteira vem selecionada: as linhas das posições ficam na legenda, por selecionar (um clique mostra cada uma).
+
 - **Visão Geral: o período do gráfico de evolução filtra também o cartão Carteira**  
   Os botões 1M, 3M, 6M, YTD, 1A, 3A, 5A e Máx do gráfico «Retorno total / Valor total» passam a mudar também o primeiro cartão: o gráfico de fundo mostra o valor das posições abertas nesse período, «Variação diária» passa a «Variação · período» (ganho sem depósitos, em € e %, como em Desempenho) e «Ano corrente» passa a «Rendimento · período» (TWR). Abre em YTD. O valor da carteira, o retorno total e os resultados e a conta não mudam.
 

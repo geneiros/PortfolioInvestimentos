@@ -20,6 +20,8 @@ bp = Blueprint("pages", __name__)
 
 PERIODS = [("1M", "1 mês"), ("3M", "3 meses"), ("6M", "6 meses"), ("YTD", "Ano corrente"),
            ("1A", "1 ano"), ("3A", "3 anos"), ("5A", "5 anos"), ("MAX", "Máx")]
+# índices que se podem comparar no gráfico de evolução da Visão Geral
+OVERVIEW_TICKERS = [t for t, *_ in market.OVERVIEW_BENCHMARKS]
 # o período no widget Carteira da Visão Geral («Variação · 3 meses»)
 PERIOD_NAMES = {k: ("desde o início" if k == "MAX" else v.lower()) for k, v in PERIODS}
 LABELS = {"BUY": "Compra", "SELL": "Venda", "DIVIDEND": "Dividendo", "DEPOSIT": "Depósito",
@@ -121,14 +123,15 @@ def overview():
     today = date.today()
     week, two = today + timedelta(days=7), today + timedelta(days=14)
     instruments = {i.ticker: i for i in Instrument.query.filter(Instrument.ticker.in_({e.instrument for e in events} or {""}))}
+    perf_ytd = perf_payload(p, "YTD", OVERVIEW_TICKERS)
     c.update(
         movers=movers, events_total=len(events),
         mover_charts={m.asset.ticker: ctx.js_json(_mover_chart(p, m)) for m in movers},
         event_groups=[("Próxima semana", [e for e in events if e.date <= week]),
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
                       ("Mais tarde", [e for e in events if e.date > two][:10])],
-        instruments=instruments, fired=check_alerts(p), portfolio_fired=portfolio_alerts.check(), perf=ctx.js_json(perf_payload(p, "YTD")), hero=(perf_payload(p, "YTD") or {}).get("summary"),
-        benchmarks=p.benchmarks, scores=insights.scores(p, c["broker"], c["broker_doc"].broker_name if c["broker_doc"] else None),
+        instruments=instruments, fired=check_alerts(p), portfolio_fired=portfolio_alerts.check(), perf=ctx.js_json(perf_ytd), hero=(perf_ytd or {}).get("summary"),
+        benchmarks=[b for t in OVERVIEW_TICKERS for b in p.benchmarks if b.ticker == t], scores=insights.scores(p, c["broker"], c["broker_doc"].broker_name if c["broker_doc"] else None),
         networth=networth.summary(data.load_portfolio(None)) if networth.assets() else None,
         networth_late=len(networth.reminder()),
         insights_data=ctx.js_json({"wr": insights.weight_return(p), "alloc": insights.allocation(p, c["broker"])}),

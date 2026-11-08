@@ -11,7 +11,7 @@ from datetime import date, timedelta
 
 from ..models import (Alert, Broker, Event, Fundamental, FxRate, ImportBatch, Instrument, OtherAsset, OtherAssetValue,
                       Price, Setting, Transaction, WatchItem, db)
-from .market import DEFAULT_BENCHMARKS, ensure_benchmarks
+from .market import DEFAULT_BENCHMARKS, OVERVIEW_BENCHMARKS, ensure_benchmarks
 
 START = date(2021, 6, 1)
 
@@ -26,7 +26,8 @@ INSTRUMENTS = [
     ("DEMO-CASH", "ETF Monetário (fictício)", "etf", "Equivalentes de Caixa", "EUR", 100, 0.025, 0.004, 0.0),
 ]
 DEMO_TER = {"DEMO-WRLD": 0.0020}  # custo anual de um dos ETF de exemplo (o outro fica por indicar)
-BENCH_PARAMS = {"^GSPC": (4200, 0.11, 0.17), "^NDX": (13500, 0.14, 0.23), "URTH": (125, 0.09, 0.16)}
+BENCH_PARAMS = {"^GSPC": (4200, 0.11, 0.17), "^NDX": (13500, 0.14, 0.23), "URTH": (125, 0.09, 0.16),
+                "FTSE-AW": (95, 0.085, 0.15), "^STOXX": (440, 0.06, 0.15)}
 COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#06b6d4", "#ef4444", "#a855f7", "#94a3b8"]
 
 
@@ -62,7 +63,7 @@ def create_demo(seed=42):
     market = [rng.gauss(0, 1) for _ in days]
 
     ensure_benchmarks()
-    for ticker, *_ in DEFAULT_BENCHMARKS:
+    for ticker in dict.fromkeys([t for t, *_ in DEFAULT_BENCHMARKS] + [t for t, *_ in OVERVIEW_BENCHMARKS]):
         if not Price.query.filter_by(instrument=ticker).first():
             p0, mu, sigma = BENCH_PARAMS[ticker]
             _insert_series(Price, "instrument", ticker, "close", _walk(rng, days, p0, mu, sigma, market))

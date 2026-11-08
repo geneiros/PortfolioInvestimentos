@@ -875,9 +875,10 @@ def test_refresh_only_open_positions(app, monkeypatch):
         lines = []
         report = market.refresh_all(only_open=True, progress=lines.append)
         assert "ADB.DE" in calls and "NOV.DE" not in calls  # NOV está vendida
-        # o contador só conta o que se atualiza: ADB e os 3 índices de comparação (não a posição vendida)
-        assert any(ln.startswith("[1/4] ") for ln in lines) and not any("/5]" in ln for ln in lines)
-        assert any(ln.startswith("[1/4] ") and ln.endswith(" s)") for ln in lines)  # com o tempo de cada ativo
+        # o contador só conta o que se atualiza: ADB e os 5 índices de comparação (não a posição vendida)
+        assert any(ln.startswith("[1/6] ") for ln in lines) and not any("/7]" in ln for ln in lines)
+        assert any(ln.startswith("[1/6] ") and ln.endswith(" s)") for ln in lines)  # com o tempo de cada ativo
+        assert "VWCE.DE" in calls  # o FTSE All-World pelas cotações do ETF (ticker próprio FTSE-AW)
         assert any(ln.startswith("[eventos 1/1] ADB") for ln in lines)
         assert "1 ativos fechados não foram atualizados" in report
         calls.clear()
@@ -2437,3 +2438,15 @@ def test_overview_carteira_widget_follows_period(app, client):
         perf = data_portfolio().performance("3M")
     assert abs(m3["summary"]["twr"] - perf["twr_total"]) < 1e-9
     assert abs(m3["summary"]["gain"] - round(perf["return_eur"], 2)) < 0.01
+
+
+def test_overview_compares_only_three_indices(app, client):
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    html = client.get("/").get_data(as_text=True)
+    chips = re.findall(r'class="pm-chip bench" data-t="([^"]+)"', html)
+    assert chips == ["^GSPC", "FTSE-AW", "^STOXX"]
+    assert "STOXX Europe 600" in html and "FTSE All-World" in html and 'data-t="^NDX"' not in html
+    m = post(client, "performance", token, period="1A", benchmarks='["^GSPC", "FTSE-AW", "^STOXX"]').get_json()["message"]
+    assert [b["ticker"] for b in m["benchmarks"]] == ["^GSPC", "FTSE-AW", "^STOXX"] and all(m["benchmarks"][i]["twr"] for i in range(3))
+    assert "const shownPos = new Set();" in html  # as linhas das posições começam por selecionar

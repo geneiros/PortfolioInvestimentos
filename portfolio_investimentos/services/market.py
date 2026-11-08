@@ -69,10 +69,20 @@ DEFAULT_BENCHMARKS = [
     ("^NDX", "Nasdaq 100", "#8b5cf6"),
     ("URTH", "MSCI World", "#eab308"),
 ]
+# comparação do gráfico de evolução da Visão Geral: (ticker, nome, cor, moeda). O FTSE All-World não está no
+# Yahoo: usa as cotações do ETF da Vanguard em euros (VWCE.DE), com um ticker próprio para não se confundir com
+# quem tenha esse ETF na carteira; o STOXX Europe 600 é o índice (^STOXX)
+OVERVIEW_BENCHMARKS = [
+    ("^GSPC", "S&P 500", "#f97316", "USD"),
+    ("FTSE-AW", "FTSE All-World", "#0ea5e9", "EUR"),
+    ("^STOXX", "STOXX Europe 600", "#22c55e", "EUR"),
+]
+INDEX_SYMBOLS = {"FTSE-AW": "VWCE.DE"}  # ticker do índice → símbolo no Yahoo, quando são diferentes
 
 # índices que se podem escolher na Carteira («Carteira vs mercado»): (grupo, ticker, nome, moeda, cor)
 INDEX_CATALOG = [
     ("Global", "URTH", "MSCI World", "USD", "#eab308"),
+    ("Global", "FTSE-AW", "FTSE All-World", "EUR", "#0ea5e9"),
     ("EUA", "^GSPC", "S&P 500", "USD", "#f97316"),
     ("EUA", "^DJI", "Dow Jones", "USD", "#0ea5e9"),
     ("EUA", "^NDX", "Nasdaq 100", "USD", "#8b5cf6"),
@@ -81,6 +91,7 @@ INDEX_CATALOG = [
     ("Europa", "^FTSE", "FTSE 100", "GBP", "#14b8a6"),
     ("Europa", "^FCHI", "CAC 40", "EUR", "#6366f1"),
     ("Europa", "^GDAXI", "DAX", "EUR", "#ef4444"),
+    ("Europa", "^STOXX", "STOXX Europe 600", "EUR", "#16a34a"),
     ("Europa", "^STOXX50E", "Euro STOXX 50", "EUR", "#22c55e"),
     ("Europa", "^AEX", "AEX", "EUR", "#f43f5e"),
     ("Europa", "^N100", "Euronext 100", "EUR", "#06b6d4"),
@@ -110,8 +121,8 @@ def set_market_indices(tickers):
     for t in tickers:
         if not db.session.get(Instrument, t):
             name, cur, color = catalog[t]
-            db.session.add(Instrument(ticker=t, instrument_name=name, kind="index", currency=cur, data_symbol=t,
-                                      color=color))
+            db.session.add(Instrument(ticker=t, instrument_name=name, kind="index", currency=cur,
+                                      data_symbol=INDEX_SYMBOLS.get(t, t), color=color))
     Setting.set("market_indices", json.dumps(tickers))
 
 
@@ -221,10 +232,11 @@ def market_status(now=None, regions=("EU",)):
 
 
 def ensure_benchmarks():
-    for ticker, name, color in DEFAULT_BENCHMARKS:
+    wanted = [(t, n, c, "USD") for t, n, c in DEFAULT_BENCHMARKS] + OVERVIEW_BENCHMARKS
+    for ticker, name, color, currency in wanted:
         if not db.session.get(Instrument, ticker):
-            db.session.add(Instrument(ticker=ticker, instrument_name=name, kind="index", currency="USD",
-                                      data_symbol=ticker, color=color))
+            db.session.add(Instrument(ticker=ticker, instrument_name=name, kind="index", currency=currency,
+                                      data_symbol=INDEX_SYMBOLS.get(ticker, ticker), color=color))
     db.session.commit()
 
 
