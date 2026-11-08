@@ -175,17 +175,11 @@
       const spark = perf.holdings || [], h = perf.summary || {};
       const c = document.getElementById("heroSpark");
       const accent = pm.css("--pm-up");
-      const sparkData = { labels: spark.map((_, i) => i), datasets: [{ data: spark, borderColor: accent, borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: pm.gradient(c.getContext("2d"), accent), tension: .3 }] };
-      const sparkOpts = { maintainAspectRatio: false, animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } } };
-      // ao mudar o período, o gráfico de fundo atualiza-se no mesmo lugar e desliza para os valores novos
-      const sparkChart = pm.charts.heroSpark;
-      if (sparkChart && sparkChart.canvas === c) {
-        sparkChart.data = sparkData;
-        sparkChart.options = { ...sparkOpts, animation: matchMedia("(prefers-reduced-motion: reduce)").matches ? false : { duration: 650, easing: "easeOutQuart" } };
-        sparkChart.update();
-      } else {
-        pm.chart("heroSpark", { type: "line", data: sparkData, options: sparkOpts });
-      }
+      pm.chart("heroSpark", {
+        type: "line",
+        data: { labels: spark.map((_, i) => i), datasets: [{ data: spark, borderColor: accent, borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: pm.gradient(c.getContext("2d"), accent), tension: .3 }] },
+        options: { maintainAspectRatio: false, animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } } },
+      });
       const tone = (el, v) => { el.classList.remove("text-up", "text-down", "text-secondary"); el.classList.add(pm.tone(v)); };
       document.getElementById("heroGainLabel").textContent = `Variação · ${h.label}`;
       document.getElementById("heroTwrLabel").textContent = `Rendimento · ${h.label}`;
@@ -261,7 +255,6 @@
     pos.lines.forEach((l) => chip(l.others ? l.name : l.ticker, l.color, l.total, l.pct, l.name));
   }
 
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   function draw() {
     if (!perf) return;
     const fmt = (d) => new Date(d).toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" });
@@ -283,24 +276,17 @@
       });
     }
     drawLegend();
-    const options = {
-      maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
-      plugins: { legend: { display: datasets.length > 1 && !showPos, position: "bottom" },
-        tooltip: { callbacks: { title: (it) => fmt(it[0].label), label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0, mode === "gain")}` } } },
-      scales: { x: { ticks: { maxTicksLimit: 8, callback: (v, i) => perf.dates[i].slice(0, 7) }, grid: { display: false } },
-                y: { position: "right", ticks: { callback: (v) => pm.money(v, 0, mode === "gain") } } },
-    };
-    // depois do primeiro desenho, o gráfico atualiza-se no mesmo lugar: as linhas e o eixo deslizam suavemente dos
-    // valores antigos para os novos (a transição do Chart.js), em vez de o gráfico ser apagado e desenhado de novo
-    const chart = pm.charts.perfChart;
-    if (chart && chart.canvas === document.getElementById("perfChart")) {
-      chart.data.labels = perf.dates;
-      chart.data.datasets = datasets;
-      chart.options = { ...options, animation: reducedMotion ? false : { duration: 650, easing: "easeOutQuart" } };
-      chart.update();
-      return;
-    }
-    pm.chart("perfChart", { type: "line", data: { labels: perf.dates, datasets }, options });
+    pm.chart("perfChart", {
+      type: "line",
+      data: { labels: perf.dates, datasets },
+      options: {
+        maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: datasets.length > 1 && !showPos, position: "bottom" },
+          tooltip: { callbacks: { title: (it) => fmt(it[0].label), label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0, mode === "gain")}` } } },
+        scales: { x: { ticks: { maxTicksLimit: 8, callback: (v, i) => perf.dates[i].slice(0, 7) }, grid: { display: false } },
+                  y: { position: "right", ticks: { callback: (v) => pm.money(v, 0, mode === "gain") } } },
+      },
+    });
   }
 })();
 </script>

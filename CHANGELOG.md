@@ -4,8 +4,6 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
-- **Visão Geral: transição suave do gráfico ao mudar o período**  
-  O gráfico de evolução deixa de ser apagado e desenhado de novo: atualiza-se no mesmo lugar, e as linhas e o eixo deslizam suavemente dos valores antigos para os novos (a transição do Chart.js, ~0,65 s). Vale para o período, Retorno/Valor, os índices e as posições, e também para o gráfico de fundo do cartão Carteira. Sem animação com «reduzir movimento» ligado no sistema.
 - **Retirada a barra de progresso no topo (a pedido)**  
   Sai a barra fina no topo que aparecia ao mudar de página e durante os pedidos à aplicação (à maneira do Pace), e com ela a exceção do período da Visão Geral. O rendimento anual da Visão Geral fica.
 - **Visão Geral: rendimento anual nos períodos com mais de 1 ano**  
