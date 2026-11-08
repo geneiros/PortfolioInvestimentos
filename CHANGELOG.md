@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Barra de progresso no topo ao carregar páginas**  
+  Uma barra fina no topo, da cor principal da aplicação (como o tema «minimal» do Pace), aparece ao clicar num link, enviar um formulário ou sair da página, e cresce cada vez mais devagar até a página nova aparecer; também aparece ao abrir ou recarregar uma página e durante os pedidos à API (ex.: mudar o período na Visão Geral). Começa logo no clique, ainda na página antiga, que é quando se espera pela resposta do servidor (o pace.js só começaria na página nova). Os pedidos em segundo plano e as atualizações que já mostram o progresso no botão não a usam. Nunca fica presa: acaba ao voltar atrás e ao fim de 15 s. Sem bibliotecas novas.
 - **Notícias: desligar uma fonte em Definições esconde as notícias dela**  
   Ao retirar a seleção de uma fonte em Definições → Dados de mercado e gravar, as notícias já guardadas dessa fonte deixam de aparecer na página Notícias (em todos os separadores), além de se deixar de lhe pedir notícias. Ficam guardadas: voltam a aparecer quando se liga a fonte outra vez. Uma fonte sem chave mas selecionada continua a mostrar as notícias que já tinha.
 - **Notícias: sem o texto «Fontes:» antes dos botões das fontes**  

@@ -18,8 +18,79 @@
   pm.tone = (v) => (!v ? "text-secondary" : v > 0 ? "text-up" : "text-down");
   pm.css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
+  // ---------------------------------------------------------------- barra de progresso no topo (à maneira do Pace)
+  // Começa logo no clique (na página antiga, enquanto o servidor responde) e acaba quando a página nova aparece;
+  // também mostra os pedidos à API. Avança sozinha cada vez mais devagar, sem passar dos 90%, até acabar.
+  pm.progress = (() => {
+    const bar = document.getElementById("pmProgress");
+    let count = 0, value = 0, timer = null, hide = null, guard = null;
+    const set = (v) => { value = v; if (bar) bar.style.width = (v * 100).toFixed(1) + "%"; };
+    const tick = () => set(value + (0.9 - value) * 0.08);
+    const start = () => {
+      if (!bar) return;
+      count += 1;
+      clearTimeout(hide);
+      if (timer) return;
+      bar.classList.remove("pm-done");
+      bar.classList.add("pm-on");
+      set(Math.max(value, 0.08));
+      timer = setInterval(tick, 200);
+      clearTimeout(guard);
+      guard = setTimeout(() => { count = 0; finish(); }, 15000);  // nunca fica presa
+    };
+    const finish = () => {
+      if (!bar) return;
+      clearInterval(timer); clearTimeout(guard);
+      timer = null;
+      set(1);
+      bar.classList.add("pm-done");
+      hide = setTimeout(() => { bar.classList.remove("pm-on", "pm-done"); set(0); }, 350);
+    };
+    const done = () => { count = Math.max(count - 1, 0); if (!count && timer) finish(); };
+    const reset = () => { count = 0; if (timer) finish(); };
+    // o arranque inline (base.html) já mostrou a barra enquanto a página carregava: acaba no «load»
+    if (bar && bar.classList.contains("pm-on")) {
+      value = parseFloat(bar.style.width) / 100 || 0.08;
+      count = 1;
+      timer = setInterval(tick, 200);
+      guard = setTimeout(reset, 15000);
+      if (document.readyState === "complete") setTimeout(done, 0);
+      else window.addEventListener("load", done, { once: true });
+    }
+    return { start, done, reset };
+  })();
+
+  // navegação: clique num link da aplicação, envio de um formulário normal ou saída da página
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (a.target && a.target !== "_self") return;
+    if (a.hasAttribute("download") || a.hasAttribute("data-bs-toggle") || a.closest("[data-bs-toggle]")) return;
+    const url = new URL(a.href, location.href);
+    if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) return;
+    if (url.pathname === location.pathname && url.search === location.search && url.hash) return;  // âncora
+    if (url.pathname.startsWith("/static/") || url.pathname.startsWith("/api/")) return;
+    pm.progress.start();
+  });
+  document.addEventListener("submit", (e) => {
+    const f = e.target;
+    if (!e.defaultPrevented && f && !f.hasAttribute("data-pm-method") && (!f.target || f.target === "_self")) pm.progress.start();
+  });
+  window.addEventListener("beforeunload", () => pm.progress.start());
+  window.addEventListener("pageshow", (e) => { if (e.persisted) pm.progress.reset(); });  // voltar atrás (cache)
+
   // ---------------------------------------------------------------- API Frappe
   pm.call = async (method, args = {}, opts = {}) => {
+    // os pedidos em segundo plano ({silent}) e os que têm progresso próprio ({progress: false}) não mexem na barra
+    const track = !opts.silent && opts.progress !== false;
+    if (track) pm.progress.start();
+    try {
+      return await call(method, args, opts);
+    } finally {
+      if (track) pm.progress.done();
+    }
+  };
+  const call = async (method, args = {}, opts = {}) => {
     const body = args instanceof FormData ? args : new URLSearchParams(
       Object.entries(args).filter(([, v]) => v !== undefined && v !== null)
         .map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : v]));
@@ -209,7 +280,7 @@
     show("A atualizar notícias…");
     const errors = [];
     try {
-      const { steps } = await pm.call("news_plan");
+      const { steps } = await pm.call("news_plan", {}, { progress: false });
       for (let i = 0; i < steps.length; i++) {
         show(`A atualizar notícias… ${i + 1}/${steps.length} · ${steps[i] || "mercado"}`);
         const res = await pm.call("refresh_news_step", { ticker: steps[i] }, { silent: true });

@@ -2853,3 +2853,10 @@ def test_news_hidden_when_source_unselected(app, client, monkeypatch):
         Setting.set("news_sources", None)
         db.session.commit()
     assert "Do Yahoo" in client.get("/noticias").get_data(as_text=True)  # ligado outra vez, volta a aparecer
+
+
+def test_page_progress_bar(client):
+    html = client.get("/").get_data(as_text=True)
+    assert html.index('id="pmProgress"') < html.index('class="pm-shell"')  # logo no início, antes do conteúdo
+    js = client.get("/static/js/pm.js").get_data(as_text=True)
+    assert "pm.progress" in js and "beforeunload" in js

@@ -7,6 +7,7 @@ Gestor de carteira de investimentos local: desempenho, dividendos, fiscalidade (
 - **Sem servidor e sem base de dados para instalar.** Os dados ficam num único ficheiro SQLite no teu computador.
 - **Abre-se com um duplo clique.** O script de arranque prepara tudo na primeira vez e abre o browser.
 - **Interface Bootstrap 5.3 nativa**, com modo claro, escuro ou automático (segue o sistema operativo).
+- **Barra de progresso no topo** (à maneira do Pace) ao mudar de página e enquanto a aplicação responde a um pedido: começa logo no clique, enquanto o servidor ainda está a responder.
 - **Cartões à tua medida:** em todas as páginas, um clique longo (2 segundos no fundo de um cartão, com o rato ou o dedo) levanta o cartão para o arrastar para outro lugar; a ordem fica guardada na aplicação, igual em todos os dispositivos, e repõe-se em Definições.
 - **Logótipos das empresas e ETF:** em Definições → Ativos, clica nas iniciais de um ativo para carregar uma imagem ou indicar o site da empresa (ou do emitente do ETF) e procurar o ícone; o logótipo fica guardado na aplicação, por isso as páginas não fazem pedidos a outros sites.
 - **Esconder valores** (botão do olho, no topo): cada valor em euros passa a «€ ••••», na cor do valor, em todas as páginas; o botão fica selecionado enquanto o modo está ligado e a escolha fica guardada no dispositivo.
