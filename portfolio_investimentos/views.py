@@ -20,6 +20,8 @@ bp = Blueprint("pages", __name__)
 
 PERIODS = [("1M", "1 mês"), ("3M", "3 meses"), ("6M", "6 meses"), ("YTD", "Ano corrente"),
            ("1A", "1 ano"), ("3A", "3 anos"), ("5A", "5 anos"), ("MAX", "Máx")]
+# o período no widget Carteira da Visão Geral («Variação · 3 meses»)
+PERIOD_NAMES = {k: ("desde o início" if k == "MAX" else v.lower()) for k, v in PERIODS}
 LABELS = {"BUY": "Compra", "SELL": "Venda", "DIVIDEND": "Dividendo", "DEPOSIT": "Depósito",
           "WITHDRAWAL": "Levantamento", "FEE": "Comissão", "INTEREST": "Juros",
           "TRANSFER_IN": "Transferência (entrada)", "TRANSFER_OUT": "Transferência (saída)",
@@ -65,8 +67,14 @@ def perf_payload(p, period, benchmarks=None):
 
     def pick(xs, digits):
         return [round(xs[i], digits) for i in keep]
+    holdings = p.series.holdings[len(p.series.holdings) - len(perf["dates"]):]
     return {"start": perf["start"].isoformat(), "dates": [perf["dates"][i] for i in keep],
             "gain": pick(perf["gain"], 2), "value": pick(perf["value"], 2),
+            # o widget Carteira da Visão Geral segue o mesmo período: o gráfico de fundo (posições abertas), a
+            # variação sem depósitos e o rendimento (TWR)
+            "holdings": [float(f"{holdings[i]:.5g}") for i in keep],
+            "summary": {"label": PERIOD_NAMES.get(period, period), "gain": round(perf["return_eur"], 2),
+                        "gain_pct": perf["return_pct"], "twr": perf["twr_total"]},
             "benchmarks": [{"ticker": b["ticker"], "name": b["name"], "color": b["color"], "twr": pick(b["twr"], 5)}
                            for b in perf["benchmarks"]]}
 
@@ -114,13 +122,12 @@ def overview():
     week, two = today + timedelta(days=7), today + timedelta(days=14)
     instruments = {i.ticker: i for i in Instrument.query.filter(Instrument.ticker.in_({e.instrument for e in events} or {""}))}
     c.update(
-        hero_spark=ctx.js_json(_hero_spark(p)), ytd=p.year_to_date(),
         movers=movers, events_total=len(events),
         mover_charts={m.asset.ticker: ctx.js_json(_mover_chart(p, m)) for m in movers},
         event_groups=[("Próxima semana", [e for e in events if e.date <= week]),
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
                       ("Mais tarde", [e for e in events if e.date > two][:10])],
-        instruments=instruments, fired=check_alerts(p), portfolio_fired=portfolio_alerts.check(), perf=ctx.js_json(perf_payload(p, "YTD")),
+        instruments=instruments, fired=check_alerts(p), portfolio_fired=portfolio_alerts.check(), perf=ctx.js_json(perf_payload(p, "YTD")), hero=(perf_payload(p, "YTD") or {}).get("summary"),
         benchmarks=p.benchmarks, scores=insights.scores(p, c["broker"], c["broker_doc"].broker_name if c["broker_doc"] else None),
         networth=networth.summary(data.load_portfolio(None)) if networth.assets() else None,
         networth_late=len(networth.reminder()),
@@ -141,12 +148,6 @@ def _mover_chart(p, pos, days=365):
     return {"s": start.isoformat(), "o": [(d - start).days for d, _ in rows],
             "v": [float(f"{v:.5g}") for _, v in rows],
             "avg": round(pos.avg_price, 4) if pos.avg_price else None, "cur": pos.asset.currency}
-
-
-def _hero_spark(p):
-    """Valor das posições abertas no último ano (o fundo do cartão Carteira na Visão Geral)."""
-    since = p.as_of - timedelta(days=365)
-    return [float(f"{v:.5g}") for d, v in zip(p.series.dates, p.series.holdings) if d > since]
 
 
 def _market_bars(p):

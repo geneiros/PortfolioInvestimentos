@@ -22,17 +22,18 @@
       <div class="pm-hero-chart"><canvas id="heroSpark"></canvas></div>
       <div class="row position-relative">
         <div class="col-md-7">
-          <div class="pm-label">Carteira {{ help("Valor de mercado das posições abertas, em euros. O gráfico de fundo é a evolução desse valor no último ano.") }}</div>
+          <div class="pm-label">Carteira {{ help("Valor de mercado das posições abertas, em euros. O gráfico de fundo é a evolução desse valor no período escolhido no gráfico «Retorno total / Valor total».") }}</div>
           <div class="pm-hero-value money my-3">{{ p.holdings_value|money }}</div>
           {% if networth %}<a href="/patrimonio" class="small text-secondary text-decoration-none d-inline-block mt-n2" id="netWorthLink">Património líquido <span class="money">{{ networth.total|money }}</span> · disponível <span class="money">{{ networth.available|money }}</span>{% if networth_late %} <span class="badge text-bg-warning" title="Valores do Património sem atualizar há mais de um mês"><i class="bi bi-calendar-check"></i> {{ networth_late }} por atualizar</span>{% endif %} <i class="bi bi-chevron-right"></i></a>{% endif %}
-          <div class="pm-label mt-4">Variação diária · {{ p.as_of|ddmm }} {{ help("Variação do valor desde o fecho anterior, sem contar depósitos.") }}</div>
-          <div class="pm-big {{ day_change[0]|tone }}">{{ day_change[1]|pct(1) }} <small class="fs-5 money">· {{ day_change[0]|money(sign=True) }}</small></div>
+          {% set h = hero or {"label": "ano corrente", "gain": 0, "gain_pct": 0, "twr": 0} %}
+          <div class="pm-label mt-4"><span id="heroGainLabel">Variação · {{ h.label }}</span> {{ help("Ganho no período escolhido no gráfico, sem contar depósitos e levantamentos. Em %: sobre o máximo de capital investido no período, como em Desempenho.") }}</div>
+          <div class="pm-big {{ h.gain|tone }}" id="heroGain"><span id="heroGainPct">{{ h.gain_pct|pct(1) }}</span> <small class="fs-5">· <span class="money" id="heroGainEur">{{ h.gain|money(sign=True) }}</span></small></div>
         </div>
         <div class="col-md-5 mt-4 mt-md-0">
           <div class="pm-label mt-md-4">Retorno total {{ help("Em euros: valor total (posições + caixa) menos o dinheiro líquido depositado (depósitos − levantamentos). Em %: esse ganho dividido pelo máximo de dinheiro líquido que chegaste a ter investido. O retorno ponderado no tempo (TWR) está em Desempenho.") }}</div>
           <div class="pm-big {{ p.total_return|tone }}">{{ p.total_return_pct|pct(1) }} <small class="fs-5 money">· {{ p.total_return|money(sign=True) }}</small></div>
-          <div class="pm-label mt-4">Ano corrente {{ help("Em euros: variação do valor desde 31 de dezembro, sem contar depósitos e levantamentos. Em %: esse ganho dividido pelo capital investido no ano (valor a 31 de dezembro mais as entradas do ano).") }}</div>
-          <div class="pm-big {{ ytd[1]|tone }}">{{ ytd[1]|pct(1) }} <small class="fs-5 money">· {{ ytd[0]|money(sign=True) }}</small></div>
+          <div class="pm-label mt-4"><span id="heroTwrLabel">Rendimento · {{ h.label }}</span> {{ help("Rendimento ponderado pelo tempo (TWR) no período escolhido no gráfico: mede só as escolhas de investimento, sem depender de quando puseste ou tiraste dinheiro (como em Desempenho).") }}</div>
+          <div class="pm-big {{ h.twr|tone }}" id="heroTwr">{{ h.twr|pct(1) }}</div>
         </div>
       </div>
       </div>
@@ -150,7 +151,6 @@
 <script src="{{ url_for('static', filename='js/movers.js') }}"></script>
 <script>
 (function () {
-  const spark = {{ hero_spark|safe }};
   let perf = {{ perf|safe }};
   let mode = "gain";
   let period = "YTD";
@@ -163,13 +163,28 @@
   const loadPositions = async () => { pos = showPos ? await pm.call("positions", { period }) : null; };
 
   document.addEventListener("DOMContentLoaded", () => {
-    const c = document.getElementById("heroSpark");
-    const accent = pm.css("--pm-up");
-    pm.chart("heroSpark", {
-      type: "line",
-      data: { labels: spark.map((_, i) => i), datasets: [{ data: spark, borderColor: accent, borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: pm.gradient(c.getContext("2d"), accent), tension: .3 }] },
-      options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } } },
-    });
+    // widget Carteira: o gráfico de fundo, a variação e o rendimento seguem o período do gráfico
+    const drawHero = () => {
+      if (!perf) return;
+      const spark = perf.holdings || [], h = perf.summary || {};
+      const c = document.getElementById("heroSpark");
+      const accent = pm.css("--pm-up");
+      pm.chart("heroSpark", {
+        type: "line",
+        data: { labels: spark.map((_, i) => i), datasets: [{ data: spark, borderColor: accent, borderWidth: 2, pointRadius: 0, fill: true, backgroundColor: pm.gradient(c.getContext("2d"), accent), tension: .3 }] },
+        options: { maintainAspectRatio: false, animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } } },
+      });
+      const tone = (el, v) => { el.classList.remove("text-up", "text-down", "text-secondary"); el.classList.add(pm.tone(v)); };
+      document.getElementById("heroGainLabel").textContent = `Variação · ${h.label}`;
+      document.getElementById("heroTwrLabel").textContent = `Rendimento · ${h.label}`;
+      document.getElementById("heroGainPct").textContent = pm.pct(h.gain_pct, 1);
+      document.getElementById("heroGainEur").textContent = pm.money(h.gain, 0, true);
+      tone(document.getElementById("heroGain"), h.gain);
+      const twr = document.getElementById("heroTwr");
+      twr.textContent = pm.pct(h.twr, 1);
+      tone(twr, h.twr);
+    };
+    drawHero();
 
     document.querySelectorAll("#modeSeg button").forEach((b) => b.addEventListener("click", () => {
       document.querySelectorAll("#modeSeg button").forEach((x) => x.classList.toggle("active", x === b));
@@ -179,6 +194,7 @@
       document.querySelectorAll("#periods button").forEach((x) => x.classList.toggle("active", x === b));
       period = b.dataset.p;
       perf = await pm.call("performance", { period });
+      drawHero();
       await loadPositions();
       draw();
     }));

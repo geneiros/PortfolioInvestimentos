@@ -627,7 +627,9 @@ def test_overview_chart_payload_is_slim(app, client):
     token = csrf(client)
     post(client, "load_demo", token)
     full = post(client, "performance", token, period="MAX").get_json()["message"]
-    assert set(full) == {"start", "dates", "gain", "value", "benchmarks"}  # nada do que a página não desenha
+    # nada do que a página não desenha (holdings e summary: o widget Carteira segue o período do gráfico)
+    assert set(full) == {"start", "dates", "gain", "value", "benchmarks", "holdings", "summary"}
+    assert len(full["holdings"]) == len(full["dates"]) and full["summary"]["label"] == "desde o início"
     assert all(set(b) == {"ticker", "name", "color", "twr"} for b in full["benchmarks"])
     assert len(full["dates"]) < 400 and len(full["dates"]) == len(full["value"]) == len(full["gain"])
     assert all(round(v, 2) == v for v in full["value"])
@@ -2422,3 +2424,16 @@ def test_warm_computes_every_broker(app, client):
         ids = [str(b.id) for b in Broker.query.all()]
     keys = {k[0] for k in data._cache if isinstance(k, tuple) and len(k) == 3}
     assert None in keys and set(ids) <= keys
+
+
+def test_overview_carteira_widget_follows_period(app, client):
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="heroGainLabel">Variação · ano corrente' in html and 'id="heroTwrLabel">Rendimento · ano corrente' in html
+    m3 = post(client, "performance", token, period="3M").get_json()["message"]
+    assert m3["summary"]["label"] == "3 meses" and len(m3["holdings"]) == len(m3["dates"])
+    with app.app_context():
+        perf = data_portfolio().performance("3M")
+    assert abs(m3["summary"]["twr"] - perf["twr_total"]) < 1e-9
+    assert abs(m3["summary"]["gain"] - round(perf["return_eur"], 2)) < 0.01

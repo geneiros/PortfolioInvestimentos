@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-08
+
+- **Visão Geral: o período do gráfico de evolução filtra também o cartão Carteira**  
+  Os botões 1M, 3M, 6M, YTD, 1A, 3A, 5A e Máx do gráfico «Retorno total / Valor total» passam a mudar também o primeiro cartão: o gráfico de fundo mostra o valor das posições abertas nesse período, «Variação diária» passa a «Variação · período» (ganho sem depósitos, em € e %, como em Desempenho) e «Ano corrente» passa a «Rendimento · período» (TWR). Abre em YTD. O valor da carteira, o retorno total e os resultados e a conta não mudam.
+
 ## 2026-11-07
 
 - **Património: na evolução mensal, por omissão só o disponível, a liquidez imediata e o curto prazo**  
