@@ -74,6 +74,7 @@ DEFAULT_BENCHMARKS = [
 # quem tenha esse ETF na carteira; o STOXX Europe 600 é o índice (^STOXX)
 OVERVIEW_BENCHMARKS = [
     ("^GSPC", "S&P 500", "#f97316", "USD"),
+    ("URTH", "MSCI World", "#eab308", "USD"),
     ("FTSE-AW", "FTSE All-World", "#0ea5e9", "EUR"),
     ("^STOXX", "STOXX Europe 600", "#22c55e", "EUR"),
 ]

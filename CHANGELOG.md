@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Visão Geral: índices sem cotações deixam de ficar «mudos»; a aplicação web vê as atualizações feitas na consola; MSCI World no gráfico**  
+  Os índices novos (FTSE All-World, STOXX Europe 600) passam a existir quando a aplicação arranca, mas só têm cotações depois de uma atualização; até lá, ao selecioná-los não aparecia nada. Agora o botão de um índice sem cotações no período fica desativado, com a explicação. E a cache da aplicação web passa a ser esquecida quando outro processo atualiza as cotações (ex.: `atualizar-cotacoes.sh` no PythonAnywhere): antes, a aplicação continuava com os dados antigos até ao dia seguinte ou a um reload. O MSCI World volta a estar entre os índices de comparação do gráfico (S&P 500, MSCI World, FTSE All-World e STOXX Europe 600).
+
 - **Visão Geral: comparar com S&P 500, FTSE All-World e STOXX Europe 600; posições por selecionar**  
   O gráfico «Retorno total / Valor total» passa a comparar só com o S&P 500, o FTSE All-World (cotações do ETF VWCE.DE, com o ticker próprio FTSE-AW para não se confundir com quem o tem na carteira) e o STOXX Europe 600 (^STOXX); os dois novos ficam também na lista de índices da «Carteira vs mercado» e recebem cotações na atualização. Por baixo do gráfico só a Carteira vem selecionada: as linhas das posições ficam na legenda, por selecionar (um clique mostra cada uma).
 

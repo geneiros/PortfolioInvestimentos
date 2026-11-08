@@ -131,6 +131,7 @@ def overview():
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
                       ("Mais tarde", [e for e in events if e.date > two][:10])],
         instruments=instruments, fired=check_alerts(p), portfolio_fired=portfolio_alerts.check(), perf=ctx.js_json(perf_ytd), hero=(perf_ytd or {}).get("summary"),
+        bench_ready={b["ticker"] for b in (perf_ytd or {}).get("benchmarks", [])},
         benchmarks=[b for t in OVERVIEW_TICKERS for b in p.benchmarks if b.ticker == t], scores=insights.scores(p, c["broker"], c["broker_doc"].broker_name if c["broker_doc"] else None),
         networth=networth.summary(data.load_portfolio(None)) if networth.assets() else None,
         networth_late=len(networth.reminder()),
