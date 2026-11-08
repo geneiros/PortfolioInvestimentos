@@ -206,7 +206,7 @@
       perf = await pm.call("performance", { period, benchmarks: BENCH });
       drawHero();
       await loadPositions();
-      draw();
+      draw({ sweep: true });  // ao mudar o período, a linha desenha-se da esquerda para a direita
     }));
     document.querySelectorAll(".pm-chip.bench").forEach((b) => b.addEventListener("click", () => {
       b.classList.toggle("active");
@@ -255,7 +255,25 @@
     pos.lines.forEach((l) => chip(l.others ? l.name : l.ticker, l.color, l.total, l.pct, l.name));
   }
 
-  function draw() {
+  // animação «a desenhar»: cada ponto aparece um pouco depois do anterior, da esquerda para a direita
+  const SWEEP_MS = 800;
+  const sweepAnimation = (n) => {
+    const step = SWEEP_MS / Math.max(n, 1);
+    const prevY = (c) => c.index === 0 ? c.chart.scales.y.getPixelForValue(c.dataset.data[0] ?? 0)
+      : c.chart.getDatasetMeta(c.datasetIndex).data[c.index - 1].getProps(["y"], true).y;
+    const delay = (key) => (c) => {
+      if (c.type !== "data" || c[key]) return 0;
+      c[key] = true;
+      return c.index * step;
+    };
+    return {
+      x: { type: "number", easing: "linear", duration: step, from: NaN, delay: delay("xStarted") },
+      y: { type: "number", easing: "linear", duration: step, from: prevY, delay: delay("yStarted") },
+    };
+  };
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function draw(opts = {}) {
     if (!perf) return;
     const fmt = (d) => new Date(d).toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" });
     document.getElementById("periodLabel").textContent = fmt(perf.start) + " – hoje";
@@ -281,6 +299,7 @@
       data: { labels: perf.dates, datasets },
       options: {
         maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+        ...(opts.sweep && !reducedMotion ? { animation: sweepAnimation(perf.dates.length) } : {}),
         plugins: { legend: { display: datasets.length > 1 && !showPos, position: "bottom" },
           tooltip: { callbacks: { title: (it) => fmt(it[0].label), label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0, mode === "gain")}` } } },
         scales: { x: { ticks: { maxTicksLimit: 8, callback: (v, i) => perf.dates[i].slice(0, 7) }, grid: { display: false } },

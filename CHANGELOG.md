@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Visão Geral: o gráfico desenha-se da esquerda para a direita ao mudar o período**  
+  Ao escolher outro período (1M a Max), as linhas do gráfico de evolução (carteira, índices e posições) aparecem ponto a ponto, da esquerda para a direita, em cerca de 0,8 s. Os outros cliques (Retorno/Valor, índices, posições) mantêm a transição curta de antes. Sem animação para quem tem «reduzir movimento» ligado no sistema.
 - **Retirada a barra de progresso no topo (a pedido)**  
   Sai a barra fina no topo que aparecia ao mudar de página e durante os pedidos à aplicação (à maneira do Pace), e com ela a exceção do período da Visão Geral. O rendimento anual da Visão Geral fica.
 - **Visão Geral: rendimento anual nos períodos com mais de 1 ano**  
