@@ -27,13 +27,13 @@
     <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-radar"><i class="bi bi-bullseye"></i> Radar <span class="badge text-bg-secondary ms-1">{{ radar_rows|length }}</span></button></li>
   </ul>
   <span class="small text-secondary ms-auto">Fontes: {% for p in news_enabled %}{{ news_providers[p] }}{{ ", " if not loop.last }}{% else %}nenhuma{% endfor %}
-    {{ help("As notícias dos últimos 7 dias, de cada fonte ligada em Definições → Dados de mercado: o Finnhub (com a tua chave; no plano gratuito só empresas cotadas nos EUA e no Canadá), o Google Notícias (pelo nome do ativo, sem chave) e o Marketaux (com a tua chave). Ficam guardadas 1 hora (6 no Marketaux); «Atualizar notícias» pede-as outra vez. As notícias abrem no site de origem; a página não carrega imagens de outros sites.") }}</span>
+    {{ help("As notícias dos últimos 7 dias, de cada fonte ligada em Definições → Dados de mercado: o Finnhub (com a tua chave; no plano gratuito só empresas cotadas nos EUA e no Canadá), o Google Notícias (pelo nome do ativo, sem chave), o Yahoo Finance (pelo símbolo, sem chave) e o Marketaux (com a tua chave). Ficam guardadas 1 hora (6 no Marketaux); «Atualizar notícias» pede-as outra vez. As notícias abrem no site de origem; a página não carrega imagens de outros sites.") }}</span>
   <button class="btn btn-sm btn-outline-secondary" data-pm-news-refresh><i class="bi bi-arrow-repeat"></i> Atualizar notícias</button>
 </div>
 
 {% if not news_enabled %}
 <div class="alert alert-info small d-flex gap-2 align-items-start"><i class="bi bi-key"></i>
-  <div>Sem fontes de notícias ligadas. Liga o Google Notícias em Definições, ou junta o Finnhub e o Marketaux com uma chave gratuita (<a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">finnhub.io</a>, <a href="https://www.marketaux.com/register" target="_blank" rel="noopener noreferrer">marketaux.com</a>): indica-a em <a href="/definicoes#newsSettings">Definições → Dados de mercado</a>.</div></div>
+  <div>Sem fontes de notícias ligadas. Liga o Google Notícias ou o Yahoo Finance em Definições, ou junta o Finnhub e o Marketaux com uma chave gratuita (<a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">finnhub.io</a>, <a href="https://www.marketaux.com/register" target="_blank" rel="noopener noreferrer">marketaux.com</a>): indica-a em <a href="/definicoes#newsSettings">Definições → Dados de mercado</a>.</div></div>
 {% elif not news_has_key %}
 <div class="alert alert-info small d-flex gap-2 align-items-start"><i class="bi bi-key"></i>
   <div>Com uma chave gratuita de <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">finnhub.io</a>, juntam-se as notícias do Finnhub: indica-a em <a href="/definicoes#newsSettings">Definições → Dados de mercado</a>.</div></div>

@@ -63,7 +63,7 @@
       </form>
       <hr>
       <div id="newsSettings" class="small">
-        <div class="text-body-secondary mb-1">Notícias {{ help("A página Notícias junta as notícias dos teus ativos e do mercado destas fontes. O Finnhub e o Marketaux precisam de uma chave (gratuitas em finnhub.io e marketaux.com; o Finnhub gratuito só tem empresas cotadas nos EUA e no Canadá). O Google Notícias não precisa de chave e procura pelo nome do ativo.") }}</div>
+        <div class="text-body-secondary mb-1">Notícias {{ help("A página Notícias junta as notícias dos teus ativos e do mercado destas fontes. O Finnhub e o Marketaux precisam de uma chave (gratuitas em finnhub.io e marketaux.com; o Finnhub gratuito só tem empresas cotadas nos EUA e no Canadá). O Google Notícias (pelo nome do ativo) e o Yahoo Finance (pelo símbolo, de preferência o dos EUA) não precisam de chave.") }}</div>
         <form class="d-flex flex-wrap gap-2 align-items-center mb-2" data-pm-method="set_finnhub_key" data-pm-success="Guardado.">
           <label for="finnhubKey" class="text-body-secondary">Chave do Finnhub</label>
           {% if finnhub_env %}<span class="badge text-bg-secondary">definida na variável FINNHUB_API_KEY</span>

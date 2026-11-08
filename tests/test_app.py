@@ -2530,11 +2530,11 @@ def test_news_sources_store_dedupe_cache_and_page(app, client, monkeypatch):
             Transaction(date=date(2026, 1, 5), type="BUY", instrument="ADB", quantity=1, price=300, currency="EUR"),
             Transaction(date=date(2026, 1, 5), type="BUY", instrument="FWIA", quantity=10, price=7, currency="EUR")])
         db.session.commit()
-        # sem chaves só o Google Notícias (o Yahoo foi retirado)
-        assert news.enabled() == ["google"]
+        # sem chaves só as fontes sem chave (o Google Notícias e o Yahoo Finance)
+        assert news.enabled() == ["google", "yahoo"]
         Setting.set("finnhub_key", "abcdef123456")
         Setting.set("marketaux_key", "mx_key_123456")
-        assert news.enabled() == ["finnhub", "google", "marketaux"]
+        assert news.enabled() == ["finnhub", "google", "yahoo", "marketaux"]
         errors = news.refresh(["ADB", "FWIA"], now=now, fetchers=F)
         assert errors == {}
         assert json.loads(Setting.get("finnhub_symbols"))["ADB"] == "ADBE"  # o símbolo dos EUA, pelo ISIN
@@ -2570,7 +2570,7 @@ def test_news_settings_and_reset(app, client):
     assert 'id="newsSettings"' in html and "guardada" in html and "abcdef123456" not in html  # a chave não aparece
     assert post(client, "set_news_sources", token, source_yahoo="1", source_finnhub="0", source_marketaux="1").status_code == 200
     with app.app_context():
-        assert Setting.get("news_sources") == "marketaux"  # o Yahoo já não é fonte
+        assert Setting.get("news_sources") == "yahoo,marketaux"
     assert post(client, "set_news_sources", token).status_code == 400
     assert post(client, "set_finnhub_key", token, key="").status_code == 200
     with app.app_context():
@@ -2657,28 +2657,64 @@ def test_news_refresh_in_steps(app, client, monkeypatch):
     assert "data-pm-news-refresh" in html
 
 
-def test_yahoo_news_removed_google_kept(app, client):
+def test_old_provider_news_removed(app, client):
     from datetime import datetime
     from portfolio_investimentos.models import NewsItem
     from portfolio_investimentos.services import news
     from portfolio_investimentos.models import Setting
-    assert "yahoo" not in news.PROVIDERS and "google" in news.PROVIDERS
-    with app.app_context():  # as notícias guardadas do Yahoo deixam de aparecer e apagam-se na atualização
+    assert {"google", "yahoo"} <= set(news.PROVIDERS)
+    with app.app_context():  # as notícias de uma fonte que já não existe deixam de aparecer e apagam-se
         db.session.add_all([NewsItem(ticker="", headline="g", url="https://news.google.com/x", published=datetime.now(), provider="google"),
-                            NewsItem(ticker="", headline="y", url="https://y.com/x", published=datetime.now(), provider="yahoo"),
-                            NewsItem(ticker="", headline="f", url="https://f.com/x", published=datetime.now(), provider="finnhub")])
-        Setting.set("news_sources", "yahoo")  # escolhido antes: deixa de contar
+                            NewsItem(ticker="", headline="o", url="https://o.com/x", published=datetime.now(), provider="antiga"),
+                            NewsItem(ticker="", headline="y", url="https://y.com/x", published=datetime.now(), provider="yahoo")])
+        Setting.set("news_sources", "antiga")  # escolhida antes: deixa de contar
         db.session.commit()
         assert news.enabled() == []
-        assert sorted(n.headline for n in news.items(market=True)) == ["f", "g"]
+        assert sorted(n.headline for n in news.items(market=True)) == ["g", "y"]
         news.refresh([], fetchers={})
-        assert NewsItem.query.filter_by(provider="yahoo").count() == 0
-        assert NewsItem.query.filter_by(provider="google").count() == 1
+        assert NewsItem.query.filter_by(provider="antiga").count() == 0 and NewsItem.query.count() == 2
     token = csrf(client)
     post(client, "load_demo", token)
+    with app.app_context():
+        Setting.set("news_sources", "antiga")
+        db.session.commit()
     html = client.get("/noticias").get_data(as_text=True)
-    assert "Sem fontes de notícias ligadas" in html and "Yahoo" not in html
+    assert "Sem fontes de notícias ligadas" in html
 
+
+def test_yahoo_rss_source(app):
+    import json
+    import urllib.error
+    from portfolio_investimentos.models import Setting
+    from portfolio_investimentos.services import news
+    rss = b"""<?xml version="1.0"?><rss><channel><item><title>Adobe beats estimates</title>
+      <link>https://finance.yahoo.com/news/adobe-1.html</link><description>Adobe &lt;b&gt;reported&lt;/b&gt; record revenue.</description>
+      <pubDate>Sat, 07 Nov 2026 10:00:00 +0000</pubDate></item></channel></rss>"""
+    empty = b"<?xml version='1.0'?><rss><channel></channel></rss>"
+    asked = []
+
+    def fetch(url, **k):
+        asked.append(url)
+        return rss if "s=ADBE" in url else empty
+    with app.app_context():
+        Setting.set("finnhub_symbols", json.dumps({"ADB": "ADBE"}))
+        adb = type("A", (), {"ticker": "ADB", "data_symbol": "ADB.DE", "kind": "stock"})()
+        rows = news._yahoo(adb, None, fetch=fetch)
+        assert [r["headline"] for r in rows] == ["Adobe beats estimates"] and "s=ADBE" in asked[0]  # primeiro o dos EUA
+        assert rows[0]["summary"] == "Adobe reported record revenue." and rows[0]["datetime"] and rows[0]["source"] == "Yahoo Finance"
+        stl = type("A", (), {"ticker": "STLAP", "data_symbol": "STLAP.PA", "kind": "stock"})()
+        asked.clear()
+        assert news._yahoo(stl, None, fetch=fetch) == [] and len(asked) == 2  # STLAP.PA e STLAP, sem notícias
+        news._yahoo(None, None, fetch=fetch)
+        assert "s=%5EGSPC" in asked[-1]  # o mercado pelo S&P 500
+
+        def down(url, **k):
+            raise urllib.error.URLError("Tunnel connection failed: 403 Forbidden")
+        try:
+            news._yahoo(adb, None, fetch=down)
+            raise AssertionError("devia falhar")
+        except news.NewsError as exc:
+            assert str(exc).startswith("Yahoo Finance:") and "403" in str(exc)
 
 def test_google_news_parser():
     import urllib.error

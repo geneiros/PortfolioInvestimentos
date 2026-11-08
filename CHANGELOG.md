@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Notícias: o Yahoo Finance volta, pelo feed RSS**  
+  O Yahoo Finance junta-se outra vez às fontes, agora pelo feed RSS de notícias por símbolo (feeds.finance.yahoo.com), lido só com a biblioteca padrão, sem o yfinance: o yfinance pede as notícias a um servidor que o PythonAnywhere gratuito bloqueia, e este feed responde lá. Pede primeiro o símbolo dos EUA (o que o Finnhub encontra pelo ISIN, ex.: ADB.DE → ADBE), depois o do Yahoo e o ticker; o mercado vem do S&P 500. Não precisa de chave. Quem já guardou a escolha das fontes em Definições tem de ligar o Yahoo Finance lá.
 - **Notícias: separador «Radar»**  
   Depois de «Mercado», o separador «Radar» mostra as notícias dos ativos seguidos em Radar e alertas, com filtro por ativo e o aviso dos que ficaram sem notícias. Estes ativos atualizam-se com os da carteira (ao abrir a página, em «Atualizar notícias» e em «Atualizar todas as fontes»); um ativo que está na carteira e no radar partilha as notícias. Sem ativos no radar, o separador explica onde os juntar. Cada ativo no radar gasta também pedidos do Marketaux (100 por dia no plano gratuito).
 - **Visão Geral: a barra de períodos entre o cartão Carteira e o gráfico**  

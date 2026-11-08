@@ -1,8 +1,9 @@
-"""Notícias dos ativos da carteira e do mercado, de três fontes:
+"""Notícias dos ativos da carteira e do mercado, de quatro fontes:
 
 - **Finnhub** (finnhub.io, com a chave em Definições ou na variável FINNHUB_API_KEY): no plano gratuito só tem
   notícias de empresas cotadas nos EUA e no Canadá (o símbolo encontra-se pelo ISIN);
 - **Google Notícias** (RSS, sem chave), pelo nome do ativo, em português;
+- **Yahoo Finance** (o RSS feeds.finance.yahoo.com, sem chave nem yfinance), pelo símbolo dos EUA ou do Yahoo;
 - **Marketaux** (marketaux.com, com a chave em Definições ou na variável MARKETAUX_API_KEY): no plano gratuito
   são 100 pedidos por dia e 3 notícias por pedido, por isso as do Marketaux reaproveitam-se durante 6 horas.
 
@@ -26,7 +27,8 @@ from ..models import Instrument, NewsItem, Setting, db
 API = "https://finnhub.io/api/v1"
 MARKETAUX = "https://api.marketaux.com/v1/news/all"
 GOOGLE_RSS = "https://news.google.com/rss/search"
-PROVIDERS = {"finnhub": "Finnhub", "google": "Google Notícias", "marketaux": "Marketaux"}  # o Yahoo foi retirado
+YAHOO_RSS = "https://feeds.finance.yahoo.com/rss/2.0/headline"
+PROVIDERS = {"finnhub": "Finnhub", "google": "Google Notícias", "yahoo": "Yahoo Finance", "marketaux": "Marketaux"}
 KEYED = {"finnhub", "marketaux"}  # fontes que só contam com a chave
 TTL = timedelta(hours=1)
 TTL_BY = {"marketaux": timedelta(hours=6)}  # o plano gratuito do Marketaux tem 100 pedidos por dia
@@ -202,6 +204,44 @@ def _google(inst, now, fetch=None):
     return out
 
 
+def _yahoo_symbols(inst):
+    """Símbolos a pedir ao Yahoo: o dos EUA (o que o Finnhub encontrou pelo ISIN) e depois o do Yahoo; sem ativo, o
+    S&P 500. O feed do Yahoo quase só tem notícias nas cotações americanas (ex.: ADBE e não ADB.DE)."""
+    if inst is None:
+        return ["^GSPC"]
+    if getattr(inst, "kind", None) == "index":
+        return []
+    return list(dict.fromkeys(s for s in (_us_symbol(inst), getattr(inst, "data_symbol", None), inst.ticker) if s))
+
+
+def _yahoo(inst, now, fetch=None):
+    """Yahoo Finance pelo RSS de notícias por símbolo (só com a biblioteca padrão; o yfinance pede as notícias a um
+    servidor que o PythonAnywhere gratuito bloqueia, este não). Fica no primeiro símbolo com notícias."""
+    failures = []
+    symbols = _yahoo_symbols(inst)
+    for symbol in symbols:
+        params = {"s": symbol, "region": "US", "lang": "en-US"}
+        try:
+            root = ET.fromstring((fetch or _http)(f"{YAHOO_RSS}?{urllib.parse.urlencode(params)}", limit=2_000_000))
+        except (urllib.error.URLError, OSError, ET.ParseError, ValueError) as exc:
+            failures.append(str(getattr(exc, "reason", exc))[:100])
+            continue
+        out = []
+        for it in list(root.iter("item"))[:40]:
+            try:
+                ts = email.utils.parsedate_to_datetime(it.findtext("pubDate") or "").timestamp()
+            except (TypeError, ValueError):
+                ts = None
+            summary = re.sub(r"<[^>]+>", "", it.findtext("description") or "").strip()[:400]
+            out.append(_row((it.findtext("title") or "").strip(), (it.findtext("link") or "").strip(), "Yahoo Finance",
+                            ts, summary))
+        if out:
+            return out
+    if failures and len(failures) >= len(symbols):
+        raise NewsError(f"Yahoo Finance: {failures[0]}")
+    return []
+
+
 def _purge_google(ticker, inst):
     """Apaga as notícias do Google guardadas deste ativo que não falam dele (as de antes do filtro)."""
     if inst is None:
@@ -283,7 +323,7 @@ def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET, market
 
     `fetchers`: {fonte: função(inst ou None, agora)} para os testes."""
     now = now or datetime.now()
-    fetchers = fetchers or {"finnhub": _finnhub, "google": _google, "marketaux": _marketaux}
+    fetchers = fetchers or {"finnhub": _finnhub, "google": _google, "yahoo": _yahoo, "marketaux": _marketaux}
     fetched = _json_setting("news_fetched")
     errors, t0 = {}, time.monotonic()
     blocked = set()  # fontes que falharam por chave ou limite: não adianta insistir nesta visita
@@ -321,7 +361,7 @@ def refresh(tickers, force=False, now=None, fetchers=None, budget=BUDGET, market
                     continue
             fetched[f"{provider}:{ticker}"] = now.isoformat(timespec="seconds")
     NewsItem.query.filter(NewsItem.published < now - timedelta(days=KEEP_DAYS)).delete(synchronize_session=False)
-    # fontes retiradas (o Yahoo Finance): as notícias delas deixam de aparecer
+    # fontes retiradas: as notícias delas deixam de aparecer
     NewsItem.query.filter(NewsItem.provider.notin_(list(PROVIDERS))).delete(synchronize_session=False)
     Setting.set("news_fetched", json.dumps(fetched))
     if last:
