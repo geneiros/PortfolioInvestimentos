@@ -332,20 +332,21 @@ def desempenho():
     p = c["p"]
     period = (request.args.get("periodo") or "MAX").upper()
     period = period if period in dict(PERIODS) else "MAX"
-    bench = request.args.get("bench") or "URTH"
-    perf = p.performance(period, risk_free=data.risk_free()) if p.transactions else None
-    c.update(period=period, periods=PERIODS, period_label=dict(PERIODS)[period], bench_ticker=bench, perf=perf)
+    # os mesmos índices de comparação da Visão Geral; escolha múltipla, por omissão só a carteira (?bench=a,b)
+    chosen = [t for t in (request.args.get("bench") or "").split(",") if t in OVERVIEW_TICKERS]
+    perf = p.performance(period, OVERVIEW_TICKERS, risk_free=data.risk_free()) if p.transactions else None
+    c.update(period=period, periods=PERIODS, period_label=dict(PERIODS)[period], bench_chosen=chosen, perf=perf,
+             bench_options=[b for t in OVERVIEW_TICKERS for b in p.benchmarks if b.ticker == t])
     if perf:
-        b = next((x for x in perf["benchmarks"] if x["ticker"] == bench), None)
         r = perf["risk"]
         good = ["Fraco", "Normal", "Bom", "Excelente"]
         heat = {}
         for key, ret in perf["monthly"]:
             y, m = key.split("-")
             heat.setdefault(int(y), {})[int(m)] = ret
-        by = dict(b["yearly"]) if b else {}
+        years = [k for k, _ in perf["yearly"]]
         c.update(
-            bench=b, merit_name=next((x.name for x in p.benchmarks if x.ticker == MERIT_BENCHMARK), "S&P 500"),
+            merit_name=next((x.name for x in p.benchmarks if x.ticker == MERIT_BENCHMARK), "S&P 500"),
             ratings={"sharpe": _rating(r["sharpe"], [0.5, 1, 2], good),
                      "sortino": _rating(r["sortino"], [0.5, 1.5, 3], good),
                      "calmar": _rating(r["calmar"], [0.5, 1, 3], good),
@@ -354,8 +355,10 @@ def desempenho():
             heat=dict(sorted(heat.items())),
             chart=ctx.js_json(_round({
                 "dates": perf["dates"], "twr": perf["twr"], "drawdown": perf["drawdown"], "yearly": perf["yearly"],
-                "bench": b and {"name": b["name"], "color": b["color"], "twr": b["twr"], "drawdown": b["drawdown"],
-                                "yearly": [by.get(k) for k, _ in perf["yearly"]]},
+                "benches": [{"ticker": b["ticker"], "name": b["name"], "color": b["color"], "twr": b["twr"],
+                             "drawdown": b["drawdown"], "total": b["total"], "cagr": b["cagr"],
+                             "yearly": [dict(b["yearly"]).get(k) for k in years]} for b in perf["benchmarks"]],
+                "chosen": chosen,
                 "merit": perf["merit"] and {k: perf["merit"][k] for k in ("monthly_excess", "yearly_excess", "sorted")},
             })),
         )

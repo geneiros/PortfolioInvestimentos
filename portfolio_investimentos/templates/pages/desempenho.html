@@ -4,20 +4,20 @@
 {% if not perf %}
   {{ empty("Sem dados de desempenho", "Importa as tuas transações para veres a evolução da carteira.", "/importar", "Importar extrato") }}
 {% else %}
-{% set m = perf.merit %}{% set r = perf.risk %}{% set b = bench %}
+{% set m = perf.merit %}{% set r = perf.risk %}
 
 <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
   <div class="pm-section-title m-0">1 · Que retorno tiveste?</div>
   <div class="pm-card pm-card-sm ms-auto d-flex align-items-center gap-2 flex-wrap" style="height:auto">
     <span class="small text-secondary">Comparar com:</span>
-    {% for x in p.benchmarks %}
-      <a class="pm-chip {{ 'active' if x.ticker == bench_ticker }}" style="--chip: {{ x.color }}" href="?periodo={{ period }}&bench={{ x.ticker|urlencode }}"><span class="sw" style="background: {{ x.color }}"></span>{{ x.name }}</a>
+    {% for x in bench_options %}
+      <button type="button" class="pm-chip bench {{ 'active' if x.ticker in bench_chosen }}" data-t="{{ x.ticker }}" style="--chip: {{ x.color }}"><span class="sw" style="background: {{ x.color }}"></span>{{ x.name }}</button>
     {% endfor %}
     <div class="text-end ms-2"><div class="pm-label">Período</div><b class="small">{{ perf.start|month_label }} – hoje</b></div>
     <div class="dropdown">
       <button class="btn btn-pm dropdown-toggle fw-bold" data-bs-toggle="dropdown">{{ period_label }}</button>
       <ul class="dropdown-menu dropdown-menu-end">
-        {% for k, label in periods %}<li><a class="dropdown-item {{ 'active' if k == period }}" href="?periodo={{ k }}&bench={{ bench_ticker|urlencode }}">{{ label }}</a></li>{% endfor %}
+        {% for k, label in periods %}<li><a class="dropdown-item {{ 'active' if k == period }}" href="?periodo={{ k }}{{ '&bench=' ~ (bench_chosen|join(',')|urlencode) if bench_chosen }}" data-period="{{ k }}">{{ label }}</a></li>{% endfor %}
       </ul>
     </div>
   </div>
@@ -46,13 +46,13 @@
       <div class="col-sm-6">
         <div class="pm-label">No total <span class="badge text-bg-secondary">TWR</span> {{ help("Retorno ponderado no tempo: mede as tuas escolhas de investimento, ignorando quando depositaste.") }}</div>
         <div class="d-flex align-items-baseline gap-2 flex-wrap mt-2"><span class="pm-big {{ perf.twr_total|tone }}">{{ perf.twr_total|pct(2) }}</span>
-          {% if b %}<small><span class="pm-chip active py-0" style="--chip: {{ b.color }}">{{ b.name }} <b class="{{ b.total|tone }}">{{ b.total|pct(2) }}</b></span></small>{% endif %}</div>
+          <small class="d-inline-flex flex-wrap gap-1" id="benchTotal"></small></div>
         <div class="text-secondary">tempo-ponderado</div>
       </div>
       <div class="col-sm-6 border-start" style="border-color: var(--pm-border)!important">
         <div class="pm-label">Por ano <span class="badge text-bg-secondary">CAGR</span> {{ help("Taxa de crescimento anual composta do TWR. Com um período de menos de 1 ano não se anualiza (seria uma extrapolação): mostra o retorno do período.") }}</div>
         <div class="d-flex align-items-baseline gap-2 flex-wrap mt-2"><span class="pm-big {{ perf.cagr|tone }}">{{ perf.cagr|pct(2) }}</span>
-          {% if b %}<small><span class="pm-chip active py-0" style="--chip: {{ b.color }}">{{ b.name }} <b class="{{ b.cagr|tone }}">{{ b.cagr|pct(2) }}</b></span></small>{% endif %}</div>
+          <small class="d-inline-flex flex-wrap gap-1" id="benchCagr"></small></div>
         <div class="text-secondary">{% if perf.years < 1 %}no período (menos de 1 ano, não anualizado){% else %}composto anual{% endif %}</div>
       </div>
     </div>
@@ -183,18 +183,27 @@
   const pctAxis = { ticks: { callback: (v) => pm.pct(v, 0) } };
   const MONTHS = {{ MONTHS|tojson }};
   const monthLabel = (k) => (k.length > 4 ? `${MONTHS[+k.slice(5) - 1]} '${k.slice(2, 4)}` : k);
+  // índices de comparação (os mesmos da Visão Geral): escolha múltipla, por omissão só a carteira
+  const active = new Set(d.chosen);
+  const benchChips = () => {
+    const chip = (b, v) => `<span class="pm-chip active py-0" style="--chip: ${b.color}">${b.name} <b class="${pm.tone(v)}">${pm.pct(v, 2)}</b></span>`;
+    const picked = d.benches.filter((b) => active.has(b.ticker));
+    document.getElementById("benchTotal").innerHTML = picked.map((b) => chip(b, b.total)).join("");
+    document.getElementById("benchCagr").innerHTML = picked.map((b) => chip(b, b.cagr)).join("");
+  };
   function draw() {
+    benchChips();
     const up = pm.css("--pm-up"), down = pm.css("--pm-down"), accent = pm.css("--pm-accent");
-    const bench = d.bench;
+    const benches = d.benches.filter((b) => active.has(b.ticker));
     const yearDs = [{ label: "Carteira", data: d.yearly.map((y) => y[1]), backgroundColor: accent, borderRadius: 3 }];
-    if (bench) yearDs.push({ label: bench.name, data: bench.yearly, backgroundColor: bench.color, borderRadius: 3 });
+    benches.forEach((bench) => yearDs.push({ label: bench.name, data: bench.yearly, backgroundColor: bench.color, borderRadius: 3 }));
     pm.chart("yearChart", { type: "bar", data: { labels: d.yearly.map((y) => y[0]), datasets: yearDs },
       options: { maintainAspectRatio: false, plugins: { legend: { position: "bottom", align: "end" }, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.pct(it.parsed.y, 2)}` } } }, scales: { y: pctAxis, x: { grid: { display: false } } } } });
 
     const lineDs = (key, fill) => {
       const ctx = document.getElementById(key === "twr" ? "cumChart" : "ddChart").getContext("2d");
       const ds = [{ label: "Carteira", data: d[key], borderColor: accent, backgroundColor: pm.gradient(ctx, accent), fill, borderWidth: 2, pointRadius: 0, tension: .15 }];
-      if (bench) ds.push({ label: bench.name, data: bench[key], borderColor: bench.color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .15 });
+      benches.forEach((bench) => ds.push({ label: bench.name, data: bench[key], borderColor: bench.color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .15 }));
       return ds;
     };
     const lineOpts = { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
@@ -221,6 +230,15 @@
         scales: { y: pctAxis, x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14, callback: (v, i) => monthLabel(rows[i][0]) } } } } });
   }
   document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".pm-chip.bench").forEach((b) => b.addEventListener("click", () => {
+      b.classList.toggle("active");
+      active.has(b.dataset.t) ? active.delete(b.dataset.t) : active.add(b.dataset.t);
+      // fica no endereço (e nos links dos períodos), para a escolha se manter ao mudar de período
+      const q = [...active].join(",");
+      history.replaceState(null, "", `?periodo={{ period }}${q ? "&bench=" + encodeURIComponent(q) : ""}`);
+      document.querySelectorAll("[data-period]").forEach((a) => { a.href = `?periodo=${a.dataset.period}${q ? "&bench=" + encodeURIComponent(q) : ""}`; });
+      draw();
+    }));
     draw();
     document.addEventListener("pm:theme", draw);
     document.querySelectorAll("#beatSeg button").forEach((b) => b.addEventListener("click", () => {

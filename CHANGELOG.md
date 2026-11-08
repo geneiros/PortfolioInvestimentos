@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Desempenho: o mesmo «Comparar com» da Visão Geral**  
+  Os índices de comparação são os mesmos da Visão Geral (S&P 500, MSCI World, FTSE All-World e STOXX Europe 600), agora com escolha múltipla: cada botão liga ou desliga a linha do índice nos gráficos TWR anual, TWR acumulado e drawdown, e o retorno do índice ao lado do «No total» e do «Por ano». Por omissão só a carteira. A escolha fica no endereço (?bench=…) e mantém-se ao mudar de período. O mérito vs mercado continua a usar o S&P 500.
 - **Retirada a barra de progresso no topo (a pedido)**  
   Sai a barra fina no topo que aparecia ao mudar de página e durante os pedidos à aplicação (à maneira do Pace), e com ela a exceção do período da Visão Geral. O rendimento anual da Visão Geral fica.
 - **Visão Geral: rendimento anual nos períodos com mais de 1 ano**  
