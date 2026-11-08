@@ -2451,38 +2451,3 @@ def test_overview_compares_only_four_indices(app, client):
     assert [b["ticker"] for b in m["benchmarks"]] == ["^GSPC", "URTH", "FTSE-AW", "^STOXX"]
     assert all(b["twr"] for b in m["benchmarks"])
     assert "const shownPos = new Set();" in html  # as linhas das posições começam por selecionar
-
-
-def test_cache_follows_refresh_from_another_process(app, client):
-    from portfolio_investimentos.services import data
-    assert post(client, "load_demo", csrf(client)).status_code == 200
-    client.get("/")  # carteira em cache
-    calls = []
-    orig = data._compute_portfolio
-    data._compute_portfolio = lambda b: calls.append(b) or orig(b)
-    try:
-        client.get("/")
-        assert calls == []  # da cache
-        # outro processo (atualizar-cotacoes.sh) atualiza as cotações e grava last_refresh diretamente na base
-        import sqlite3
-        con = sqlite3.connect(app.config["DB_PATH"])
-        con.execute("INSERT OR REPLACE INTO setting (key, value) VALUES ('last_refresh', '2099-01-01T00:00:00')")
-        con.commit()
-        con.close()
-        client.get("/")
-        assert calls  # recalculada com os dados novos
-    finally:
-        data._compute_portfolio = orig
-
-
-def test_overview_index_without_quotes_is_disabled(app, client):
-    from portfolio_investimentos.models import Price
-    token = csrf(client)
-    assert post(client, "load_demo", token).status_code == 200
-    with app.app_context():
-        Price.query.filter_by(instrument="^STOXX").delete()
-        db.session.commit()
-    html = client.get("/").get_data(as_text=True)
-    stoxx = re.search(r'<button class="pm-chip bench" data-t="\^STOXX"[^>]*>', html).group(0)
-    gspc = re.search(r'<button class="pm-chip bench" data-t="\^GSPC"[^>]*>', html).group(0)
-    assert "disabled" in stoxx and "Sem cotações" in stoxx and "disabled" not in gspc

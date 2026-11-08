@@ -39,33 +39,8 @@ def _series(sql):
     return out
 
 
-_seen = {"refresh": None}  # o último «last_refresh» que este processo viu
-
-
-def _sync_external():
-    """Esquece a cache quando outro processo atualizou as cotações (ex.: atualizar-cotacoes.sh na consola,
-    enquanto a aplicação web corre noutro processo): as escritas desse processo não passam pelos eventos daqui,
-    mas o fim de cada atualização grava `last_refresh`. Uma consulta por pedido."""
-    try:
-        if g.get("pm_synced"):
-            return
-        g.pm_synced = True
-    except RuntimeError:  # fora de um contexto da aplicação
-        return
-    try:
-        stamp = db.session.query(Setting.value).filter_by(key="last_refresh").scalar()
-    except Exception:
-        return
-    if _seen["refresh"] is None:
-        _seen["refresh"] = stamp or ""
-    elif (stamp or "") != _seen["refresh"]:
-        _seen["refresh"] = stamp or ""
-        invalidate()
-
-
 def _market_data():
     """Todas as cotações e câmbios, partilhados por todas as corretoras até os dados mudarem."""
-    _sync_external()
     rev = _state["rev"]
     with _lock:
         shared = _cache.get(("market", rev))
@@ -232,7 +207,6 @@ def load_portfolio(broker=None):
     cache = g.setdefault("pm_portfolios", {})
     if broker in cache:
         return cache[broker]
-    _sync_external()
     key = (broker, _state["rev"], date.today())
     with _lock:
         p = _cache.get(key)
@@ -274,7 +248,6 @@ def brokers():
 
 def open_position_counts():
     """corretora → nº de posições abertas (cache até os dados mudarem)."""
-    _sync_external()
     key = ("open_counts", _state["rev"])
     with _lock:
         hit = _cache.get(key)
