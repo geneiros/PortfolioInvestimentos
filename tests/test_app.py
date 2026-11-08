@@ -2810,3 +2810,23 @@ def test_news_radar_tab(app, client, monkeypatch):
     assert "NVDA" in asked[-1]  # o radar também se atualiza ao abrir a página
     plan = post(client, "news_plan", token).get_json()["message"]["steps"]
     assert "NVDA" in plan
+
+
+def test_news_source_chips(app, client, monkeypatch):
+    from datetime import datetime
+    from portfolio_investimentos.models import NewsItem
+    from portfolio_investimentos.services import news
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    monkeypatch.setattr(news, "refresh", lambda tickers, force=False, **k: {})
+    with app.app_context():
+        db.session.add_all([NewsItem(ticker="", headline="Mercado A", url="https://a.com", published=datetime.now(), provider="yahoo"),
+                            NewsItem(ticker="", headline="Mercado B", url="https://b.com", published=datetime.now(), provider="google"),
+                            NewsItem(ticker="", headline="Mercado C", url="https://c.com", published=datetime.now(), provider="google")])
+        db.session.commit()
+    html = client.get("/noticias").get_data(as_text=True)
+    bar = html.split('id="newsSources"', 1)[1].split("</span>\n", 1)[0]
+    # uma pastilha por fonte com notícias, todas ligadas; as notícias levam a fonte para se poderem esconder
+    assert re.search(r'class="pm-chip active" data-src="google".*?<span class="badge text-bg-light">2</span>', bar, re.S)
+    assert 'data-src="yahoo"' in bar and 'data-src="finnhub"' not in bar
+    assert 'data-provider="yahoo"' in html and "pm-hide-src" in html

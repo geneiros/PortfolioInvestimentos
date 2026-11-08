@@ -6,7 +6,7 @@
 {% else %}
 {% macro news_list(rows, show_ticker=true) -%}
   {% for n in rows %}
-  <article class="pm-news d-flex gap-3 py-2 border-bottom" data-ticker="{{ n.ticker }}">
+  <article class="pm-news d-flex gap-3 py-2 border-bottom" data-ticker="{{ n.ticker }}" data-provider="{{ n.provider }}">
     {% if show_ticker and n.ticker in news_by_ticker %}{{ logo(news_by_ticker[n.ticker]) }}{% endif %}
     <div class="flex-grow-1" style="min-width: 0">
       <a class="fw-semibold text-body text-decoration-none pm-news-title" href="{{ n.url }}" target="_blank" rel="noopener noreferrer">{{ n.headline }}</a>
@@ -26,7 +26,12 @@
     <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-market">Mercado <span class="badge text-bg-secondary ms-1">{{ market_rows|length }}</span></button></li>
     <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-radar"><i class="bi bi-bullseye"></i> Radar <span class="badge text-bg-secondary ms-1">{{ radar_rows|length }}</span></button></li>
   </ul>
-  <span class="small text-secondary ms-auto">Fontes: {% for p in news_enabled %}{{ news_providers[p] }}{{ ", " if not loop.last }}{% else %}nenhuma{% endfor %}
+  <span class="small text-secondary ms-auto d-inline-flex flex-wrap align-items-center gap-1" id="newsSources">Fontes:
+    {% set all_rows = news_rows + market_rows + radar_rows %}
+    {% for p, name in news_providers.items() %}{% set n_src = all_rows|selectattr("provider", "equalto", p)|list|length %}
+      {% if n_src %}<button type="button" class="pm-chip active" data-src="{{ p }}" aria-pressed="true" title="Mostrar ou esconder as notícias do {{ name }}">{{ name }} <span class="badge text-bg-light">{{ n_src }}</span></button>{% endif %}
+    {% endfor %}
+    {% if not all_rows %}{% for p in news_enabled %}{{ news_providers[p] }}{{ ", " if not loop.last }}{% else %}nenhuma{% endfor %}{% endif %}
     {{ help("As notícias dos últimos 7 dias, de cada fonte ligada em Definições → Dados de mercado: o Finnhub (com a tua chave; no plano gratuito só empresas cotadas nos EUA e no Canadá), o Google Notícias (pelo nome do ativo, sem chave), o Yahoo Finance (pelo símbolo, sem chave) e o Marketaux (com a tua chave). Ficam guardadas 1 hora (6 no Marketaux); «Atualizar notícias» pede-as outra vez. As notícias abrem no site de origem; a página não carrega imagens de outros sites.") }}</span>
   <button class="btn btn-sm btn-outline-secondary" data-pm-news-refresh><i class="bi bi-arrow-repeat"></i> Atualizar notícias</button>
 </div>
@@ -80,7 +85,24 @@
 // filtros por ativo de «Os meus ativos» e do «Radar»: cada um só mexe nas notícias do seu painel
 document.querySelectorAll(".pm-news-filter").forEach((bar) => bar.querySelectorAll(".pm-chip").forEach((b) => b.addEventListener("click", () => {
   bar.querySelectorAll(".pm-chip").forEach((x) => x.classList.toggle("active", x === b));
-  document.querySelectorAll(`${bar.dataset.pane} .pm-news`).forEach((n) => n.classList.toggle("d-none", !!b.dataset.t && n.dataset.ticker !== b.dataset.t));
+  document.querySelectorAll(`${bar.dataset.pane} .pm-news`).forEach((n) => n.classList.toggle("pm-hide-t", !!b.dataset.t && n.dataset.ticker !== b.dataset.t));
 })));
+// fontes: todas ligadas por omissão; desligar uma esconde as notícias dela em todos os separadores (fica lembrado neste browser)
+(() => {
+  const KEY = "pm-news-hidden-sources";
+  let off = [];
+  try { off = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { off = []; }
+  const chips = [...document.querySelectorAll("#newsSources [data-src]")];
+  const apply = () => {
+    chips.forEach((c) => { const on = !off.includes(c.dataset.src); c.classList.toggle("active", on); c.setAttribute("aria-pressed", on); });
+    document.querySelectorAll(".pm-news").forEach((n) => n.classList.toggle("pm-hide-src", off.includes(n.dataset.provider)));
+  };
+  chips.forEach((c) => c.addEventListener("click", () => {
+    off = off.includes(c.dataset.src) ? off.filter((s) => s !== c.dataset.src) : [...off, c.dataset.src];
+    try { localStorage.setItem(KEY, JSON.stringify(off)); } catch (e) { /* sem armazenamento */ }
+    apply();
+  }));
+  apply();
+})();
 </script>
 {% endblock %}

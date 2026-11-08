@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Notícias: fontes selecionáveis na página**  
+  No topo da página Notícias, cada fonte com notícias tem uma pastilha com o número de notícias. Todas aparecem ligadas; desligar uma esconde as notícias dessa fonte em todos os separadores (Os meus ativos, Mercado e Radar), sem as apagar nem deixar de as pedir. A escolha fica lembrada neste browser. Para deixar de pedir notícias a uma fonte, continua a ser em Definições → Dados de mercado.
 - **Notícias: o Yahoo Finance volta, pelo feed RSS**  
   O Yahoo Finance junta-se outra vez às fontes, agora pelo feed RSS de notícias por símbolo (feeds.finance.yahoo.com), lido só com a biblioteca padrão, sem o yfinance: o yfinance pede as notícias a um servidor que o PythonAnywhere gratuito bloqueia, e este feed responde lá. Pede primeiro o símbolo dos EUA (o que o Finnhub encontra pelo ISIN, ex.: ADB.DE → ADBE), depois o do Yahoo e o ticker; o mercado vem do S&P 500. Não precisa de chave. Quem já guardou a escolha das fontes em Definições tem de ligar o Yahoo Finance lá.
 - **Notícias: separador «Radar»**  
