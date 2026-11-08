@@ -252,3 +252,8 @@ body.pm-widget-drag-on .tooltip { display: none; }
 
 /* logótipos (e iniciais) dos ativos: maiores e com cantos bem arredondados, como nas apps das corretoras */
 span.pm-logo { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; font-size: .7rem; }
+
+/* Notícias */
+.pm-news-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pm-news-title:hover { text-decoration: underline !important; }
+.pm-news-summary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

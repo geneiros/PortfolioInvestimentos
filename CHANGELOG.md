@@ -4,6 +4,9 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-08
 
+- **Nova área Notícias (Finnhub, Yahoo Finance e Google Notícias)**  
+  Página Notícias no menu, a seguir a Radar e alertas: as notícias dos últimos 7 dias dos ativos da carteira selecionada no topo (ou de todas), com filtro por ativo, e um separador «Mercado». Três fontes: o Finnhub (com a chave em Definições ou na variável FINNHUB_API_KEY, enviada num cabeçalho; no plano gratuito só empresas cotadas nos EUA e no Canadá, com o símbolo encontrado pelo ISIN e guardado), o Yahoo Finance (pelo yfinance) e o Google Notícias (RSS, pelo nome do ativo, em português). A mesma notícia em duas fontes (endereço ou título igual) só aparece uma vez. Obtêm-se ao abrir a página, com limite de tempo, e guardam-se 1 hora (as com mais de 30 dias apagam-se); os erros de cada fonte aparecem na página. Em Definições → Dados de mercado: a chave do Finnhub (escondida depois de guardada), a escolha das fontes com o número de notícias guardadas de cada uma e o botão «Atualizar todas as fontes». A página não carrega imagens de outros sites. Tabela nova news_item; «Apagar todos os dados» apaga também as notícias.
+
 - **Atualizar cotações pela página aos bocados (funciona no PythonAnywhere)**  
   O botão de Definições (e o da faixa de cotações antigas) lançava a atualização numa thread no servidor. No PythonAnywhere a aplicação web não deixa correr threads: a atualização só avançava enquanto a página fazia pedidos (ficava muito tempo em «1/18 · ^GSPC») e morria quando o servidor reciclava o processo, sem guardar as cotações. Agora a página pede a atualização aos bocados: cada pedido faz alguns ativos (cerca de 10 s), o progresso fica guardado na base de dados e aparece no botão; se mudares de página ou recarregares, a página seguinte continua de onde ficou. A atualização pela consola (`atualizar-cotacoes.sh`) fica igual.
 

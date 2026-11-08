@@ -605,6 +605,41 @@ def refresh_step(only_open="", restart=""):
 
 
 @action
+def refresh_news():
+    """Pede outra vez as notícias (sem esperar pela hora de cache)."""
+    from .services import news
+    insts = [pos.asset for pos in data.load_portfolio(data.selected_broker()).open_positions]
+    errors = news.refresh([a.ticker for a in insts if not a.ticker.startswith("DEMO-")], force=True)
+    return "Notícias atualizadas." if not errors else "Notícias atualizadas, com falhas: " + "; ".join(
+        f"{k}: {v}" for k, v in list(errors.items())[:3])
+
+
+@action
+def set_finnhub_key(key=""):
+    """Chave da API do Finnhub (vazia apaga)."""
+    from .services import news
+    key = (key or "").strip()
+    if key and not news.KEY_RE.match(key):
+        raise ApiError("A chave do Finnhub não parece válida (só letras, números, - e _).")
+    Setting.set("finnhub_key", key or None)
+    Setting.set("news_fetched", None)  # com outra chave, pede-se tudo outra vez
+    Setting.set("finnhub_symbols", None)
+    return "Chave do Finnhub guardada." if key else "Chave do Finnhub apagada."
+
+
+@action
+def set_news_sources(**values):
+    """Fontes de notícias ligadas (campos source_<fonte>=1)."""
+    from .services import news
+    chosen = [p for p in news.PROVIDERS if str(values.get(f"source_{p}", "")) in ("1", "on", "true")]
+    if not chosen:
+        raise ApiError("Escolhe pelo menos uma fonte de notícias.")
+    Setting.set("news_sources", ",".join(chosen))
+    Setting.set("news_fetched", None)
+    return "Fontes de notícias guardadas."
+
+
+@action
 def set_offline(enabled):
     on = str(enabled).lower() in ("1", "true", "on", "sim")
     Setting.set("offline_enabled", "1" if on else None)
@@ -774,8 +809,8 @@ def reset_data(confirm=""):
     if confirm != "APAGAR":
         raise ApiError('Escreve APAGAR para confirmar.')
     _backup("apagar-tudo")
-    from .models import Fundamental, Logo
-    for model in (Logo, Transaction, ImportBatch, Alert, PortfolioAlert, WatchItem, Event, DividendHistory, Price, FxRate,
+    from .models import Fundamental, Logo, NewsItem
+    for model in (NewsItem, Logo, Transaction, ImportBatch, Alert, PortfolioAlert, WatchItem, Event, DividendHistory, Price, FxRate,
                   OtherAssetValue, OtherAsset, Fundamental):
         model.query.delete()
     Broker.query.delete()

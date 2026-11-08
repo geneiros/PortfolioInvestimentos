@@ -13,6 +13,7 @@ from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory
 from . import auth
 from .services import context as ctx
 from .services import backups, cerne, data, insights, market, networth, portfolio_alerts, widgets
+from .services import news as news_svc
 from .services.importer import BROKERS, INSTRUCTIONS
 from .services.market import check_alerts, refresh_state, upcoming_events, yfinance_available
 
@@ -474,6 +475,30 @@ def radar():
     return render_template("pages/radar.html", **c)
 
 
+def _news_sources():
+    raw = Setting.get("news_sources")
+    return list(news_svc.PROVIDERS) if raw is None else raw.split(",")
+
+
+@bp.route("/noticias")
+def noticias():
+    """Notícias dos ativos da carteira selecionada no topo (ou de todas) e do mercado: Finnhub, Yahoo e Google."""
+    from .services import news
+    c = ctx.build("noticias", "Notícias")
+    p = c["p"]
+    insts = [pos.asset for pos in p.open_positions]
+    tickers = [a.ticker for a in insts]
+    errors = news.refresh([t for t in tickers if not t.startswith("DEMO-")])
+    rows = news.items(tickers)
+    shown = {n.ticker for n in rows}
+    by_ticker = {a.ticker: a for a in insts}
+    c.update(news_rows=rows, market_rows=news.items(market=True), news_errors=errors, news_assets=insts,
+             news_by_ticker=by_ticker, news_missing=news.without_news(insts, shown), news_providers=news.PROVIDERS,
+             news_enabled=news.enabled(), news_has_key=bool(news.api_key()),
+             news_counts={t: sum(1 for n in rows if n.ticker == t) for t in tickers})
+    return render_template("pages/noticias.html", **c)
+
+
 @bp.route("/importar")
 def importar():
     c = ctx.build("importar", "Importar")
@@ -525,6 +550,8 @@ def definicoes():
              yfinance=yfinance_available(),
              risk_free_pct=round(data.risk_free() * 100, 2), last_refresh=Setting.get("last_refresh"), refresh_report=Setting.get("refresh_report"),
              stale_days=ctx.stale_days(), core_plan=cerne.plan(), widget_pages=widgets.customized(),
+             finnhub_env=news_svc.key_from_env(), finnhub_saved=bool(Setting.get("finnhub_key")),
+             news_providers=news_svc.PROVIDERS, news_sources=_news_sources(), news_stats=news_svc.stats(),
              password_env=bool(auth.env_password()))
     return render_template("pages/definicoes.html", **c)
 

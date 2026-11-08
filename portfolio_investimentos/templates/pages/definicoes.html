@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-{% from "macros.html" import logo %}
+{% from "macros.html" import help, logo %}
 <div class="row g-3">
   <div class="col-xl-5">
     <div class="pm-card mb-3">
@@ -61,6 +61,35 @@
         <button class="btn btn-sm btn-outline-secondary" type="submit">Guardar</button>
         <span class="text-body-secondary w-100">Uma faixa no topo de todas as páginas, com o botão para atualizar. Por omissão 5 dias; 0 desliga o aviso.</span>
       </form>
+      <hr>
+      <div id="newsSettings" class="small">
+        <div class="text-body-secondary mb-1">Notícias {{ help("A página Notícias junta as notícias dos teus ativos e do mercado destas fontes. O Finnhub precisa de uma chave (gratuita em finnhub.io; no plano gratuito só tem notícias de empresas cotadas nos EUA e no Canadá). O Yahoo Finance e o Google Notícias não precisam de chave.") }}</div>
+        <form class="d-flex flex-wrap gap-2 align-items-center mb-2" data-pm-method="set_finnhub_key" data-pm-success="Guardado.">
+          <label for="finnhubKey" class="text-body-secondary">Chave do Finnhub</label>
+          {% if finnhub_env %}<span class="badge text-bg-secondary">definida na variável FINNHUB_API_KEY</span>
+          {% else %}
+          <input id="finnhubKey" name="key" type="password" autocomplete="off" class="form-control form-control-sm" style="max-width: 16rem" placeholder="{{ 'guardada (escreve outra para mudar)' if finnhub_saved else 'a tua chave de finnhub.io' }}">
+          <button class="btn btn-sm btn-outline-secondary" type="submit">Guardar</button>
+          {% if finnhub_saved %}<button class="btn btn-sm btn-link text-danger" type="button" data-pm-action="set_finnhub_key" data-args='{"key": ""}' data-confirm="Apagar a chave do Finnhub?">Apagar</button>{% endif %}
+          {% endif %}
+        </form>
+        <form class="mt-2" data-pm-method="set_news_sources" data-pm-success="Guardado." id="newsSources">
+          <div class="text-body-secondary mb-1">Fontes de notícias</div>
+          <div class="table-responsive"><table class="table pm-table mb-2"><thead><tr><th>Fonte</th><th class="text-end">Notícias</th><th class="text-nowrap">Mais recente</th></tr></thead><tbody>
+          {% for key, name in news_providers.items() %}{% set st = news_stats.get(key, {}) %}
+            <tr data-source="{{ key }}"><td><label class="d-flex gap-2 align-items-center"><input type="hidden" name="source_{{ key }}" value="0"><input class="form-check-input mt-0" type="checkbox" name="source_{{ key }}" value="1" {{ 'checked' if key in news_sources }}> {{ name }}
+              {% if key == 'finnhub' and not (finnhub_saved or finnhub_env) %}<span class="text-body-secondary">(precisa da chave)</span>{% endif %}</label></td>
+              <td class="text-end">{{ st.count or 0 }}{% if st.count %} <span class="text-body-secondary">({{ st.assets }} {{ 'ativo' if st.assets == 1 else 'ativos' }}{{ ' + mercado' if st.market }})</span>{% endif %}</td>
+              <td class="text-body-secondary text-nowrap">{{ st.last.strftime('%d/%m %H:%M') if st.last else '—' }}</td></tr>
+          {% endfor %}
+          </tbody></table></div>
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Guardar fontes</button>
+            <button class="btn btn-sm btn-primary" type="button" data-pm-action="refresh_news"><i class="bi bi-arrow-repeat"></i> Atualizar todas as fontes</button>
+            <span class="text-body-secondary">As notícias dos últimos 7 dias dos ativos da carteira selecionada e do mercado; guardam-se 30 dias.</span>
+          </div>
+        </form>
+      </div>
       <hr>
       {% set core_steps = core_plan.steps %}
       <form class="d-flex flex-wrap gap-2 align-items-center small" data-pm-method="set_core_interval" data-pm-success="Guardado." id="coreInterval">

@@ -18,6 +18,7 @@ NAV = [
     ("patrimonio", "Património", "/patrimonio", "bi-bank"),
     ("planeamento", "Planeamento", "/planeamento", "bi-flag"),
     ("radar", "Radar e alertas", "/radar", "bi-bullseye"),
+    ("noticias", "Notícias", "/noticias", "bi-newspaper"),
     ("fiscal", "Fiscal", "/fiscal", "bi-receipt"),
 ]
 NAV_BOTTOM = [

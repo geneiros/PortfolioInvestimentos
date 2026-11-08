@@ -156,6 +156,21 @@ class Logo(db.Model):
     fetched = db.Column(db.DateTime, default=utcnow)
 
 
+class NewsItem(db.Model):
+    """Notícia de um ativo (`ticker`) ou do mercado em geral (`ticker` vazio), do Finnhub, do Yahoo Finance ou do
+    Google Notícias (`provider`)."""
+    __table_args__ = (db.UniqueConstraint("ticker", "url"),)
+    id = db.Column(db.Integer, primary_key=True)
+    ticker = db.Column(db.String(32), nullable=False, default="", index=True)
+    headline = db.Column(db.String(500), nullable=False)
+    summary = db.Column(db.Text)
+    source = db.Column(db.String(120))
+    url = db.Column(db.String(1000), nullable=False)
+    published = db.Column(db.DateTime, nullable=False, index=True)
+    finnhub_id = db.Column(db.BigInteger)
+    provider = db.Column(db.String(16))  # finnhub | yahoo | google
+
+
 class DividendHistory(db.Model):
     """Dividendos por ação de um ativo segundo o Yahoo (data ex-dividendo), para projetar posições recentes."""
     id = db.Column(db.Integer, primary_key=True)
