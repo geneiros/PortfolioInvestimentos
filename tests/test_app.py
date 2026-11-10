@@ -2311,9 +2311,8 @@ def test_overview_carteira_widget_follows_period(app, client):
     assert abs(m3["summary"]["twr"] - perf["twr_total"]) < 1e-9
     assert abs(m3["summary"]["gain"] - round(perf["return_eur"], 2)) < 0.01
     assert m3["summary"]["twr_annual"] is None and 'id="heroTwrYearBox"' in html
-    with app.app_context():  # o rendimento em euros: o TWR sobre o valor no início do período
-        assert abs(m3["summary"]["twr_eur"] - perf["twr_total"] * perf["value"][0]) < 0.01
-    assert 'id="heroDay"' in html and "Variação · dia" in html and 'id="heroTwrEur"' in html  # até 1 ano não há rendimento anual
+    assert "twr_eur" not in m3["summary"]  # o rendimento (TWR) só em %: sem um valor em € que faça sentido
+    assert 'id="heroDay"' in html and "Variação · dia" in html and 'id="heroTwrEur"' not in html  # até 1 ano não há rendimento anual
     m5 = post(client, "performance", token, period="5A").get_json()["message"]["summary"]
     with app.app_context():
         p5 = data_portfolio().performance("5A")

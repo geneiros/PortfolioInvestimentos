@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-10
 
+- **Visão Geral: o Rendimento volta a mostrar só o %**  
+  Sai o valor em € do «Rendimento» do cartão Carteira (o TWR aplicado ao valor no 1.º dia do período). Com «Max», esse dia é o da primeira compra e o valor ficava muito baixo (ex.: +€630 para +63%), porque não conta o dinheiro que entrou depois; o TWR não tem um equivalente em euros que faça sentido com depósitos. Os euros ficam na Variação e no Retorno total; a Variação do dia mantém-se.
 - **Versão 0.3.0: primeira release com os executáveis**  
   A etiqueta v0.3.0 publica a primeira release no GitHub, com o executável único para Windows, macOS e Linux (gerados e experimentados pelo workflow «Executável único (PyInstaller)»). É a página para onde aponta o README.
 - **Executável único (PyInstaller), para quem não quer instalar o Python**  
