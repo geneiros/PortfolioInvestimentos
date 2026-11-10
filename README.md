@@ -42,7 +42,7 @@ Se não queres instalar o Python, descarrega o executável do teu sistema na pá
 - Tem tudo dentro, incluindo o `yfinance` para atualizar as cotações. O primeiro arranque demora alguns segundos, porque o executável se descompacta numa pasta temporária.
 - Os dados ficam na mesma pasta que na instalação com Python (ver **Onde ficam os dados**), por isso podes passar de uma para a outra. Para atualizar, descarrega o executável novo e substitui o antigo: os dados não são afetados.
 - Aceita as mesmas opções da linha de comandos, por exemplo `PortfolioInvestimentos-windows.exe --port 5001` ou `--no-browser`.
-- Para o gerares tu próprio: `pip install -r requirements.txt pyinstaller pillow` e `pyinstaller packaging/portfolio-investimentos.spec`; o executável fica em `dist/`. O workflow **Executável único (PyInstaller)** do GitHub gera os três e, numa etiqueta `v*`, junta-os a uma release.
+- Para o gerares tu próprio: `pip install -r requirements.txt pyinstaller pillow` e `pyinstaller packaging/portfolio-investimentos.spec`; o executável fica em `dist/`. O workflow **Executável único (PyInstaller)** do GitHub gera os três e, numa etiqueta `v*` (ou corrido à mão em Actions com a versão em «etiqueta», ex.: `v0.3.0`), junta-os a uma release.
 
 ### Instalar como aplicação (PWA)
 
