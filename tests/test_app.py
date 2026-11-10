@@ -2742,3 +2742,20 @@ def test_core_portfolio_removed(client):
         html = client.get(url).get_data(as_text=True)
         assert "coreCard" not in html and "coreInterval" not in html and "core_ack" not in html, url
     assert post(client, "core_reset", token).status_code in (400, 404)
+
+
+def test_desempenho_shadow_index(app, client):
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    html = client.get("/desempenho").get_data(as_text=True)
+    card = html.split('id="shadowCard"', 1)[1].split('id="shadowTable"', 1)[1].split("</table>", 1)[0]
+    assert "E se tivesse investido no índice?" in html and 'id="shadowChart"' in html
+    assert card.count("<tr>") >= 4  # cabeçalho + pelo menos 3 dos 4 índices da Visão Geral
+    with app.app_context():
+        from portfolio_investimentos.views import OVERVIEW_TICKERS
+        perf = data_portfolio().performance("MAX", OVERVIEW_TICKERS)
+    sh = [b["shadow"] for b in perf["benchmarks"] if b["shadow"]]
+    assert sh and all(len(x["value"]) == len(perf["dates"]) for x in sh)
+    # o dinheiro posto no índice é o mesmo da carteira: o valor final − o ganho dá igual nos dois
+    carteira_put = perf["value"][-1] - perf["gain"][-1]
+    assert all(abs((x["final"] - x["gain"]) - carteira_put) < 0.01 for x in sh)

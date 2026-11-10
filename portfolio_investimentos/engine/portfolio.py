@@ -1001,6 +1001,7 @@ class Portfolio:
                 "total": b_total,
                 "cagr": (1 + b_total) ** (1 / years) - 1 if years >= 1 else b_total,
                 "yearly": period_returns(dates, bidx, "year"),
+                "shadow": shadow_investment(dates, closes, v0, s.flows[k0:], years),
             })
 
         # o mês e o ano ainda a decorrer não contam para o melhor/pior nem para a sequência atual
@@ -1053,6 +1054,37 @@ class Portfolio:
 
 
 # ---------------------------------------------------------------- utilitários
+def shadow_investment(dates, closes, v0, flows, years):
+    """«E se tivesse investido no índice?»: o mesmo dinheiro, nos mesmos dias, num índice.
+
+    O valor da carteira no início do período (`v0`) compra unidades do índice no 1.º dia; cada depósito líquido do
+    dia (`flows[k]`, positivo) compra unidades ao fecho desse dia e cada levantamento (negativo) vende-as. `closes`:
+    os fechos do índice em euros nas mesmas datas (None antes de haver cotação: usa o primeiro fecho conhecido).
+    Devolve o valor dia a dia, o valor final, o ganho (final − dinheiro posto) e o IRR do mesmo dinheiro.
+    """
+    known = [c for c in closes if c]
+    if not known:
+        return None
+    first = known[0]
+    units, value, cash_flows = 0.0, [], []
+    last = first
+    for k, d in enumerate(dates):
+        last = closes[k] or last
+        put = (v0 if k == 0 else 0.0) + (flows[k] if k > 0 or v0 <= EPS else 0.0)
+        if abs(put) > EPS:
+            units += put / last
+            if units < 0:  # levantou mais do que o índice valia: fica a zero
+                units = 0.0
+            cash_flows.append((d, -put))
+        value.append(units * last)
+    final = value[-1]
+    put_total = -sum(v for _, v in cash_flows)
+    irr = xirr(cash_flows + [(dates[-1], final)])
+    if irr is not None and years < 1:
+        irr = (1 + irr) ** ((dates[-1] - dates[0]).days / 365.0) - 1
+    return {"value": value, "final": final, "gain": final - put_total, "irr": irr}
+
+
 MIN_BASE = 1.0  # EUR: abaixo disto a carteira está praticamente vazia e não serve de base ao TWR
 
 

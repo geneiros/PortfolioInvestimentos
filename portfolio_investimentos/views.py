@@ -328,7 +328,13 @@ def desempenho():
             y, m = key.split("-")
             heat.setdefault(int(y), {})[int(m)] = ret
         years = [k for k, _ in perf["yearly"]]
+        # «E se tivesse investido no índice?»: o resumo de cada índice, para a tabela
+        final = perf["value"][-1]
+        shadows = [{"name": b["name"], "color": b["color"], "final": b["shadow"]["final"], "gain": b["shadow"]["gain"],
+                    "irr": b["shadow"]["irr"], "diff": final - b["shadow"]["final"]}
+                   for b in perf["benchmarks"] if b.get("shadow")]
         c.update(
+            shadows=shadows,
             merit_name=next((x.name for x in p.benchmarks if x.ticker == MERIT_BENCHMARK), "S&P 500"),
             ratings={"sharpe": _rating(r["sharpe"], [0.5, 1, 2], good),
                      "sortino": _rating(r["sortino"], [0.5, 1.5, 3], good),
@@ -340,7 +346,11 @@ def desempenho():
                 "dates": perf["dates"], "twr": perf["twr"], "drawdown": perf["drawdown"], "yearly": perf["yearly"],
                 "benches": [{"ticker": b["ticker"], "name": b["name"], "color": b["color"], "twr": b["twr"],
                              "drawdown": b["drawdown"], "total": b["total"], "cagr": b["cagr"],
-                             "yearly": [dict(b["yearly"]).get(k) for k in years]} for b in perf["benchmarks"]],
+                             "yearly": [dict(b["yearly"]).get(k) for k in years],
+                             # o mesmo dinheiro, nos mesmos dias, no índice (valor em euros, arredondado ao euro)
+                             "shadow": b["shadow"] and [round(x) for x in b["shadow"]["value"]]}
+                            for b in perf["benchmarks"]],
+                "value": [round(x) for x in perf["value"]],
                 "chosen": chosen,
                 "merit": perf["merit"] and {k: perf["merit"][k] for k in ("monthly_excess", "yearly_excess", "sorted")},
             })),

@@ -77,6 +77,29 @@
   </div></div>
 </div>
 
+{% if shadows %}
+<div class="pm-card mt-3" id="shadowCard">
+  <div class="pm-label mb-1">E se tivesse investido no índice? {{ help("O mesmo dinheiro, nos mesmos dias, num índice: o valor da carteira no início do período compra unidades do índice no primeiro dia, cada depósito compra unidades ao fecho desse dia e cada levantamento vende-as (em euros, ao câmbio de cada dia). Ao contrário do TWR, conta quando puseste e tiraste dinheiro, como o IRR. Não inclui comissões nem o custo de um ETF que siga o índice.") }}</div>
+  <p class="small text-secondary mb-2">Com os mesmos depósitos e levantamentos do período, quanto valeria hoje em cada índice, comparado com a carteira (<span class="money">{{ perf.value[-1]|money }}</span>, IRR {{ perf.irr|pct(2) if perf.irr is not none else '—' }}).</p>
+  <div class="row g-3">
+    <div class="col-12">
+      <div class="table-responsive"><table class="table pm-table mb-0" id="shadowTable">
+        <thead><tr><th>Índice</th><th class="text-end">Valor hoje</th><th class="text-end">Ganho</th><th class="text-end">IRR</th><th class="text-end text-nowrap">Carteira − índice {{ help("Quanto a carteira vale a mais (+) ou a menos (−) do que o mesmo dinheiro no índice.") }}</th></tr></thead>
+        <tbody>{% for s in shadows %}
+          <tr><td class="text-nowrap"><span class="sw d-inline-block me-1" style="width:8px;height:8px;border-radius:2px;background: {{ s.color }}"></span>{{ s.name }}</td>
+            <td class="text-end money">{{ s.final|money }}</td>
+            <td class="text-end money {{ s.gain|tone }}">{{ s.gain|money(sign=True) }}</td>
+            <td class="text-end {{ s.irr|tone }}">{{ s.irr|pct(2) if s.irr is not none else '—' }}</td>
+            <td class="text-end fw-semibold money {{ s.diff|tone }}">{{ s.diff|money(sign=True) }}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+    </div>
+    <div class="col-12"><div style="height: 260px"><canvas id="shadowChart"></canvas></div>
+      <div class="small text-secondary mt-1">O valor da carteira e, para os índices escolhidos em «Comparar com», o valor do mesmo dinheiro no índice.</div></div>
+  </div>
+</div>
+{% endif %}
+
 <div class="pm-section-title">2 · Como foi a jornada?</div>
 <div class="row g-3">
   <div class="col-xl-6"><div class="pm-card"><div class="pm-label mb-3">TWR anual</div><div style="height: 280px"><canvas id="yearChart"></canvas></div></div></div>
@@ -209,6 +232,14 @@
     const lineOpts = { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
       plugins: { legend: { position: "bottom", align: "end" }, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.pct(it.parsed.y, 2)}` } } },
       scales: { y: pctAxis, x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 0, callback: pm.yearTicks(d.dates) } } } };
+    if (document.getElementById("shadowChart")) {
+      const sctx = document.getElementById("shadowChart").getContext("2d");
+      const sds = [{ label: "Carteira", data: d.value, borderColor: accent, backgroundColor: pm.gradient(sctx, accent), fill: true, borderWidth: 2, pointRadius: 0, tension: .15 }];
+      benches.filter((b) => b.shadow).forEach((b) => sds.push({ label: `Mesmo dinheiro no ${b.name}`, data: b.shadow, borderColor: b.color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .15 }));
+      pm.chart("shadowChart", { type: "line", data: { labels: d.dates, datasets: sds },
+        options: { ...lineOpts, plugins: { ...lineOpts.plugins, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y)}` } } },
+          scales: { ...lineOpts.scales, y: { ticks: { callback: (v) => pm.money(v) } } } } });
+    }
     pm.chart("cumChart", { type: "line", data: { labels: d.dates, datasets: lineDs("twr", true) }, options: lineOpts });
     pm.chart("ddChart", { type: "line", data: { labels: d.dates, datasets: lineDs("drawdown", "origin") }, options: lineOpts });
 

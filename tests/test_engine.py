@@ -677,3 +677,21 @@ def test_irr_short_period_not_annualized():
     assert perf["irr"] < 0.03 and perf["irr_annual"] > 0.15
     full = p.performance("MAX")  # 1 ano: igual ao anual
     assert full["years"] >= 0.99 and full["irr"] == pytest.approx(full["irr_annual"])
+
+
+def test_shadow_investment_same_money_in_index():
+    from datetime import date
+    from portfolio_investimentos.engine.portfolio import shadow_investment
+    days = [date(2025, 1, 1), date(2025, 7, 1), date(2026, 1, 1)]
+    closes = [100.0, 200.0, 300.0]
+    # 1000 € no início (10 unidades) e +2000 € a meio (10 unidades): 20 × 300 = 6000 €
+    r = shadow_investment(days, closes, 1000.0, [0.0, 2000.0, 0.0], years=1.0)
+    assert r["value"] == [1000.0, 4000.0, 6000.0]
+    assert r["final"] == 6000.0 and r["gain"] == 3000.0 and r["irr"] > 0
+    # um levantamento vende unidades: −1000 € a meio são 5 unidades; ficam 5 × 300 = 1500 €
+    r = shadow_investment(days, closes, 1000.0, [0.0, -1000.0, 0.0], years=1.0)
+    assert r["final"] == 1500.0 and r["gain"] == 1500.0
+    # carteira vazia no início: o primeiro dia conta o fluxo desse dia
+    r = shadow_investment(days, closes, 0.0, [500.0, 0.0, 0.0], years=1.0)
+    assert r["final"] == 1500.0
+    assert shadow_investment(days, [None, None, None], 1000.0, [0.0, 0.0, 0.0], years=1.0) is None
