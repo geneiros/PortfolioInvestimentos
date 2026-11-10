@@ -710,6 +710,8 @@ def planeamento():
         out["more"] = sorted([{"x": year(d), "y": round(v)} for d, v in keep] + extra, key=lambda q: q["x"])
     c.update(fire_extra=others, cfg=cfg, plan=plan, life=life, with_pension=with_pension, chart=ctx.js_json(chart), reach=reach,
              track=fire.monthly_track(s.dates, s.value, plan["number"]))
+    from .services import goals
+    c.update(goals=goals.all_goals(), goal_options=goals.options())
     return render_template("pages/planeamento.html", **c)
 
 

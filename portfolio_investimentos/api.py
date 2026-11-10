@@ -626,6 +626,56 @@ def delete_other_asset(name):
     db.session.commit()
 
 
+# ------------------------------------------------------------------ objetivos de poupança
+@action
+def save_goal(**values):
+    """Cria (ou, com `goal`, altera) um objetivo: nome, valor alvo em € ou meses de despesas (fundo de
+    emergência), data, valor fixo já reservado, rendimento esperado e os ativos/corretoras que contam
+    (asset_<id>=1, broker_<id>=1)."""
+    from .models import SavingsGoal
+    label = (values.get("label") or "").strip()
+    if not label:
+        raise ApiError("Dá um nome ao objetivo (ex.: Entrada da casa).")
+    months = _float(values["months"]) if str(values.get("months") or "").strip() else None
+    target = _float(values["target"]) if str(values.get("target") or "").strip() else None
+    if months is not None:
+        if not math.isfinite(months) or not 0 < months <= 60:
+            raise ApiError("Os meses de despesas têm de estar entre 1 e 60.")
+        target = None
+    elif target is None or not math.isfinite(target) or target <= 0:
+        raise ApiError("Indica o valor alvo em euros (ou os meses de despesas, para um fundo de emergência).")
+    deadline = None
+    if str(values.get("deadline") or "").strip():
+        try:
+            deadline = date.fromisoformat(str(values["deadline"]).strip()[:10])
+        except ValueError as exc:
+            raise ApiError("Data inválida.") from exc
+    fixed = _float(values["fixed"]) if str(values.get("fixed") or "").strip() else 0.0
+    rate = _float(values["rate"]) if str(values.get("rate") or "").strip() else 0.0
+    if not math.isfinite(fixed) or fixed < 0 or not math.isfinite(rate) or not 0 <= rate <= 15:
+        raise ApiError("O valor fixo não pode ser negativo e o rendimento tem de estar entre 0% e 15%.")
+    asset_ids = sorted(int(k.split("_", 1)[1]) for k, v in values.items()
+                       if k.startswith("asset_") and k[6:].isdigit() and str(v) in ("1", "on", "true"))
+    broker_ids = sorted(int(k.split("_", 1)[1]) for k, v in values.items()
+                        if k.startswith("broker_") and k[7:].isdigit() and str(v) in ("1", "on", "true"))
+    goal = _get(SavingsGoal, values["goal"]) if str(values.get("goal") or "").strip() else SavingsGoal()
+    goal.label, goal.target, goal.months, goal.deadline = label[:120], target, months, deadline
+    goal.fixed, goal.rate = fixed, rate / 100
+    goal.assets, goal.brokers = json.dumps(asset_ids), json.dumps(broker_ids)
+    if goal.id is None:
+        db.session.add(goal)
+    db.session.commit()
+    return "Objetivo guardado."
+
+
+@action
+def delete_goal(name):
+    from .models import SavingsGoal
+    db.session.delete(_get(SavingsGoal, name))
+    db.session.commit()
+    return "Objetivo apagado."
+
+
 @action
 def set_sale_discount(percent):
     value = _float(percent)
@@ -856,6 +906,8 @@ def reset_data(confirm=""):
         Setting.set(key, None)
     _reset_data_settings()
     db.session.commit()
+    from .services import goals
+    goals.forget_links()  # os objetivos ficam (são planos), sem os ativos e corretoras apagados
     return "Todos os dados foram apagados."
 
 

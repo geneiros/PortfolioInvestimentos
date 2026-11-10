@@ -169,6 +169,63 @@
     </table></div>
   </div></div>
 </div>
+
+{% macro goal_form(g=None) -%}
+  {% set o = goal_options %}
+  <form class="row g-2 small" data-pm-method="save_goal" data-pm-success="Objetivo guardado.">
+    {% if g %}<input type="hidden" name="goal" value="{{ g.name }}">{% endif %}
+    <div class="col-md-4"><label class="form-label mb-0 text-secondary">Nome</label>
+      <input name="label" class="form-control form-control-sm" required maxlength="120" placeholder="ex.: Entrada da casa" value="{{ g.label if g }}"></div>
+    <div class="col-6 col-md-2"><label class="form-label mb-0 text-secondary">Valor alvo (€)</label>
+      <input name="target" class="form-control form-control-sm" inputmode="decimal" placeholder="30 000" value="{{ ('%g' % g.target).replace('.', ',') if g and g.months is none and g.target }}"></div>
+    <div class="col-6 col-md-2"><label class="form-label mb-0 text-secondary">ou meses de despesas</label>
+      <input name="months" class="form-control form-control-sm" inputmode="decimal" placeholder="ex.: 6" title="Fundo de emergência: o alvo é este nº de meses das despesas do Planeamento" value="{{ ('%g' % g.months).replace('.', ',') if g and g.months is not none }}"></div>
+    <div class="col-6 col-md-2"><label class="form-label mb-0 text-secondary">Até</label>
+      <input name="deadline" type="date" class="form-control form-control-sm" value="{{ g.deadline.isoformat() if g and g.deadline }}"></div>
+    <div class="col-6 col-md-2"><label class="form-label mb-0 text-secondary">Rendimento</label>
+      <select name="rate" class="form-select form-select-sm">{% for r in o.rates %}<option value="{{ (r * 100)|int }}" {{ 'selected' if g and (g.rate - r)|abs < 0.0001 }}>{{ (r * 100)|int }}% ao ano</option>{% endfor %}</select></div>
+    <div class="col-12"><span class="text-secondary">Conta para o objetivo:</span>
+      {% for a in o.assets %}<label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="asset_{{ a.id }}" value="1" {{ 'checked' if g and a.id in g.asset_ids }}> {{ a.label }}</label>{% endfor %}
+      {% for b in o.brokers %}<label class="form-check form-check-inline mb-0"><input class="form-check-input" type="checkbox" name="broker_{{ b.id }}" value="1" {{ 'checked' if g and b.id in g.broker_ids }}> {{ b.broker_name }} <span class="text-secondary">(corretora)</span></label>{% endfor %}
+      {% if not o.assets and not o.brokers %}<span class="text-secondary">junta contas em <a href="/patrimonio">Património</a> ou usa o valor fixo</span>{% endif %}
+    </div>
+    <div class="col-6 col-md-3"><label class="form-label mb-0 text-secondary">Mais um valor fixo (€) {{ help("Dinheiro reservado para o objetivo que não está nas contas escolhidas.") }}</label>
+      <input name="fixed" class="form-control form-control-sm" inputmode="decimal" placeholder="0" value="{{ ('%g' % g.fixed).replace('.', ',') if g and g.fixed }}"></div>
+    <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">{{ 'Guardar' if g else 'Criar objetivo' }}</button></div>
+  </form>
+{%- endmacro %}
+
+<div class="pm-section-title">Objetivos de poupança</div>
+<div class="pm-card" id="goalsCard">
+  <div class="pm-label mb-2">Objetivos {{ help("Metas mais curtas do que a independência financeira (entrada da casa, carro, fundo de emergência…). O progresso soma os ativos do Património e as corretoras escolhidas (o valor total, com a caixa) e um valor fixo. «Por mês» é a entrada mensal necessária até à data, com o rendimento escolhido: o que já tens cresce a esse ritmo e cada entrada também. «Ao ritmo atual» usa o que entrou nos últimos 12 meses: os depósitos líquidos nas corretoras e a subida dos valores do Património.") }}</div>
+  {% for g in goals %}
+  <div class="py-2 {{ 'border-top' if not loop.first }}" data-goal="{{ g.name }}">
+    <div class="d-flex align-items-baseline gap-2 flex-wrap">
+      <b>{{ g.label }}</b>
+      <span class="text-secondary small">{% if g.months is not none %}{{ '%g' % g.months }} meses de despesas · {% endif %}<span class="money">{{ g.target|money }}</span>{% if g.deadline %} até {{ g.deadline.strftime('%m/%Y') }}{% endif %}</span>
+      <span class="ms-auto small">{% if g.current >= g.target and g.target %}<span class="badge text-bg-success">atingido</span>{% elif g.deadline and g.on_track %}<span class="badge text-bg-success">a tempo</span>{% elif g.deadline and g.eta %}<span class="badge text-bg-warning">atrasado</span>{% endif %}</span>
+    </div>
+    <div class="d-flex align-items-center gap-2 mt-1">
+      <div class="pm-progress flex-grow-1"><div style="width: {{ (g.progress * 100)|round(1) }}%"></div></div>
+      <b class="small" style="width: 3rem; text-align: right">{{ g.progress|pct(0, sign=False) }}</b>
+    </div>
+    <div class="row g-2 small mt-1">
+      <div class="col-6 col-md-3"><div class="text-secondary">Já tens</div><b class="money">{{ g.current|money }}</b></div>
+      <div class="col-6 col-md-3"><div class="text-secondary">Falta</div><b class="money">{{ g.missing|money }}</b></div>
+      <div class="col-6 col-md-3"><div class="text-secondary">Por mês{% if g.deadline %} até {{ g.deadline.strftime('%m/%Y') }}{% endif %}</div>
+        {% if g.needed is not none %}<b class="money">{{ g.needed|money }}</b> <span class="text-secondary">{{ g.months_left }} meses{% if g.rate %}, a {{ (g.rate * 100)|int }}%{% endif %}</span>{% else %}<span class="text-secondary">sem data</span>{% endif %}</div>
+      <div class="col-6 col-md-3"><div class="text-secondary">Ao ritmo atual</div>
+        {% if g.current >= g.target and g.target %}<span class="text-up">já chega</span>{% elif g.eta %}<b class="{{ 'text-up' if g.on_track or not g.deadline else 'text-down' }}">{{ g.eta.strftime('%m/%Y') }}</b> <span class="text-secondary money">{{ g.pace|money }}/mês</span>{% else %}<span class="text-secondary">sem entradas nos últimos 12 meses</span>{% endif %}</div>
+    </div>
+    {% if g.parts %}<div class="small text-secondary mt-1">{% for x in g.parts %}{{ x.name }} <span class="money">{{ x.value|money }}</span>{{ ' · ' if not loop.last }}{% endfor %}</div>{% endif %}
+    <details class="small mt-1"><summary class="text-secondary">Alterar</summary><div class="mt-2">{{ goal_form(g) }}
+      <button class="btn btn-sm btn-link text-danger mt-1 px-0" type="button" data-pm-action="delete_goal" data-args='{"name": "{{ g.name }}"}' data-confirm="Apagar o objetivo «{{ g.label }}»?">Apagar objetivo</button></div></details>
+  </div>
+  {% else %}
+  <p class="small text-secondary mb-2">Ainda não tens objetivos. Cria um para veres quanto já tens, quanto falta e quanto pôr por mês.</p>
+  {% endfor %}
+  <details class="mt-2" id="newGoal" {{ 'open' if not goals }}><summary class="small text-secondary">Novo objetivo</summary><div class="mt-2">{{ goal_form() }}</div></details>
+</div>
 {% endif %}
 {% endautoescape %}{% endblock %}
 

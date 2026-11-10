@@ -266,6 +266,22 @@ class OtherAsset(NameMixin, db.Model):
         return -self.value if self.debt else self.value
 
 
+class SavingsGoal(NameMixin, db.Model):
+    """Objetivo de poupança (ex.: entrada da casa): um valor alvo até uma data, com o progresso a partir de ativos
+    do Património, de corretoras e/ou de um valor fixo. Com `months`, o alvo é esse nº de meses de despesas
+    (fundo de emergência)."""
+    id = db.Column(db.Integer, primary_key=True)
+    label = db.Column(db.String(120), nullable=False)
+    target = db.Column(db.Float)            # € (vazio com `months`)
+    months = db.Column(db.Float)            # fundo de emergência: meses de despesas do Planeamento
+    deadline = db.Column(db.Date)           # vazio: sem data (só o progresso)
+    assets = db.Column(db.Text)             # JSON: ids de OtherAsset que contam
+    brokers = db.Column(db.Text)            # JSON: ids de Broker (o valor total, posições + caixa)
+    fixed = db.Column(db.Float, default=0.0)  # parte já reservada noutro sítio, em €
+    rate = db.Column(db.Float, default=0.0)   # rendimento esperado ao ano (fração), para o esforço mensal
+    creation = db.Column(db.DateTime, default=utcnow)
+
+
 class OtherAssetValue(db.Model):
     """Valor de um outro ativo em cada mês (o último registado no mês), para a evolução do património."""
     id = db.Column(db.Integer, primary_key=True)
