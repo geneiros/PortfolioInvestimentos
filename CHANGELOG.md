@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-10
 
+- **Visão Geral: variação do dia e rendimento em euros no cartão Carteira**  
+  Ao lado da «Variação» do período aparece a «Variação · dia»: a variação do último dia de mercado face ao anterior, em % e em €, sem contar depósitos e levantamentos desse dia. O «Rendimento» do período mostra também o valor em €: o rendimento (TWR) aplicado ao valor da carteira no início do período, ou seja, quanto terias ganho sem depósitos nem levantamentos. Muda com o período, como o resto do cartão.
 - **Retirada a carteira cerne (a pedido)**  
   Sai o cartão «Carteira cerne» da página Carteira (escalões, dinheiro novo e escolha dos ETF), a opção «Carteira cerne: um escalão novo a cada …%» em Definições e a faixa no topo das páginas que avisava de um escalão novo. As definições já guardadas dela ficam na base de dados sem uso.
 
