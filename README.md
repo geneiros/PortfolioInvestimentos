@@ -13,7 +13,7 @@ Gestor de carteira de investimentos local: desempenho, dividendos, fiscalidade (
 
 ## Como usar
 
-Precisas apenas do **Python 3.10 ou superior** ([python.org/downloads](https://www.python.org/downloads/); no Windows marca a opção *Add Python to PATH*).
+Sem Python, usa o **executável único** (abaixo). Com Python, precisas apenas do **Python 3.10 ou superior** ([python.org/downloads](https://www.python.org/downloads/); no Windows marca a opção *Add Python to PATH*).
 
 1. Descarrega o projeto: botão **Code → Download ZIP** no GitHub, ou `git clone https://github.com/geneiros/PortfolioInvestimentos`.
 2. Abre a pasta e inicia a aplicação:
@@ -27,6 +27,22 @@ Se instalaste com `git clone`, o `iniciar.bat` verifica a cada arranque se há u
 Na primeira vez, o script cria um ambiente Python (`.venv`) na pasta do projeto e instala as dependências. Isto demora um ou dois minutos. Nas vezes seguintes arranca de imediato.
 
 Para experimentar sem os teus dados, clica em **Ver demonstração**. São carregadas empresas fictícias com preços sintéticos, e depois podes apagá-las em Definições.
+
+### Executável único (sem instalar o Python)
+
+Se não queres instalar o Python, descarrega o executável do teu sistema na página [Releases](https://github.com/geneiros/PortfolioInvestimentos/releases/latest):
+
+| Sistema | Ficheiro | Como abrir |
+|---|---|---|
+| Windows | `PortfolioInvestimentos-windows.exe` | Duplo clique. Na primeira vez, o Windows pode mostrar «O Windows protegeu o computador» (o executável não tem assinatura paga): **Mais informações → Executar mesmo assim**. |
+| macOS (Apple Silicon) | `PortfolioInvestimentos-macos` | Na primeira vez: botão direito → **Abrir** → **Abrir** (o macOS bloqueia programas sem assinatura da Apple). Se disser que o ficheiro está danificado, corre no Terminal `xattr -d com.apple.quarantine ~/Downloads/PortfolioInvestimentos-macos` e `chmod +x` no mesmo ficheiro. |
+| Linux | `PortfolioInvestimentos-linux` | `chmod +x PortfolioInvestimentos-linux` e `./PortfolioInvestimentos-linux`. |
+
+- Abre uma janela de terminal e o browser em `http://127.0.0.1:5000`. Para terminar, fecha a janela.
+- Tem tudo dentro, incluindo o `yfinance` para atualizar as cotações. O primeiro arranque demora alguns segundos, porque o executável se descompacta numa pasta temporária.
+- Os dados ficam na mesma pasta que na instalação com Python (ver **Onde ficam os dados**), por isso podes passar de uma para a outra. Para atualizar, descarrega o executável novo e substitui o antigo: os dados não são afetados.
+- Aceita as mesmas opções da linha de comandos, por exemplo `PortfolioInvestimentos-windows.exe --port 5001` ou `--no-browser`.
+- Para o gerares tu próprio: `pip install -r requirements.txt pyinstaller pillow` e `pyinstaller packaging/portfolio-investimentos.spec`; o executável fica em `dist/`. O workflow **Executável único (PyInstaller)** do GitHub gera os três e, numa etiqueta `v*`, junta-os a uma release.
 
 ### Instalar como aplicação (PWA)
 
@@ -286,6 +302,7 @@ portfolio_investimentos/
 ├── api.py         # ações chamadas pelas páginas
 └── __main__.py    # arranque local
 tests/             # testes do motor e da aplicação
+packaging/         # executável único (PyInstaller): arranque e configuração
 iniciar.bat | iniciar.command | iniciar.sh
 ```
 

@@ -1,0 +1,80 @@
+name: Executável único (PyInstaller)
+
+# Gera o executável para Windows, macOS e Linux, para quem não quer instalar o Python, e confirma que arranca
+# e serve as páginas. Numa etiqueta v* (ex.: v0.3.0), junta os executáveis a uma release do GitHub.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths: ["packaging/**", ".github/workflows/executavel.yml", "requirements.txt", "pyproject.toml"]
+
+permissions:
+  contents: write
+
+jobs:
+  construir:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            ficheiro: PortfolioInvestimentos.exe
+            nome: PortfolioInvestimentos-windows.exe
+          - os: macos-latest
+            ficheiro: PortfolioInvestimentos
+            nome: PortfolioInvestimentos-macos
+          - os: ubuntu-22.04
+            ficheiro: PortfolioInvestimentos
+            nome: PortfolioInvestimentos-linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Dependências
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller pillow
+      - name: Gerar o executável
+        run: pyinstaller packaging/portfolio-investimentos.spec --noconfirm
+      - name: Experimentar (demonstração e páginas)
+        shell: bash
+        env:
+          PORTFOLIO_DATA_DIR: ${{ runner.temp }}/dados
+        run: |
+          set -e
+          cd "$RUNNER_TEMP"
+          EXE="$GITHUB_WORKSPACE/dist/${{ matrix.ficheiro }}"
+          "$EXE" --demo
+          "$EXE" --no-browser --port 5099 > servidor.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs -o /dev/null http://127.0.0.1:5099/ && break; sleep 1; done
+          for u in / /carteira /desempenho /dividendos /definicoes /static/css/pm.css; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:5099$u")
+            echo "$u $code"
+            test "$code" = 200
+          done
+      - name: Nome final
+        shell: bash
+        run: mv "dist/${{ matrix.ficheiro }}" "dist/${{ matrix.nome }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.nome }}
+          path: dist/${{ matrix.nome }}
+          retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: construir
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: executaveis
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: executaveis/*
+          generate_release_notes: true

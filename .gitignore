@@ -7,3 +7,5 @@ instance/
 .pytest_cache/
 dump.rdb
 uv.lock
+dist/
+build/

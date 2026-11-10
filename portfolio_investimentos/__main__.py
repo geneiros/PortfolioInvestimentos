@@ -1,5 +1,7 @@
 """Arranque local: `python -m portfolio_investimentos` abre a aplicação no browser."""
 import argparse
+import os
+import sys
 import threading
 import webbrowser
 
@@ -53,8 +55,11 @@ def main():
     port, running = _choose_port(args.host, args.port)
     if port is None:
         print(f"A porta {args.port} está ocupada por outro programa. Usa outra porta, por exemplo:")
-        print(f"  python -m portfolio_investimentos --port {args.port + 1}"
-              f"      (no Android: PORT={args.port + 1} bash iniciar-android.sh)")
+        if getattr(sys, "frozen", False):  # executável único (PyInstaller)
+            print(f"  {os.path.basename(sys.executable)} --port {args.port + 1}")
+        else:
+            print(f"  python -m portfolio_investimentos --port {args.port + 1}"
+                  f"      (no Android: PORT={args.port + 1} bash iniciar-android.sh)")
         raise SystemExit(1)
     url = f"http://127.0.0.1:{port}/"
     _announce(url)

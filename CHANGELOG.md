@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-10
 
+- **Executável único (PyInstaller), para quem não quer instalar o Python**  
+  Um só ficheiro para Windows (`PortfolioInvestimentos-windows.exe`), macOS e Linux, com tudo dentro (incluindo o yfinance para as cotações): duplo clique abre a aplicação no browser, como os scripts de arranque. Os dados ficam na mesma pasta que na instalação com Python. Configuração em `packaging/` (`portfolio-investimentos.spec` e o arranque, que deixa a janela aberta quando o programa termina com erro, para se ler a mensagem); o workflow «Executável único (PyInstaller)» gera os três, experimenta a demonstração e as páginas e, numa etiqueta `v*`, junta-os a uma release. Com a porta ocupada, a sugestão mostra o comando do executável. Instruções no README.
 - **Visão Geral: variação do dia e rendimento em euros no cartão Carteira**  
   Ao lado da «Variação» do período aparece a «Variação · dia»: a variação do último dia de mercado face ao anterior, em % e em €, sem contar depósitos e levantamentos desse dia. O «Rendimento» do período mostra também o valor em €: o rendimento (TWR) aplicado ao valor da carteira no início do período, ou seja, quanto terias ganho sem depósitos nem levantamentos. Muda com o período, como o resto do cartão.
 - **Retirada a carteira cerne (a pedido)**  
