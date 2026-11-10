@@ -7,7 +7,7 @@ from pathlib import Path
 
 from flask import Flask, session
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 
 def _adopt_legacy(old, new):

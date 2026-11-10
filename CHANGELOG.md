@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-10
 
+- **Versão 0.3.0: primeira release com os executáveis**  
+  A etiqueta v0.3.0 publica a primeira release no GitHub, com o executável único para Windows, macOS e Linux (gerados e experimentados pelo workflow «Executável único (PyInstaller)»). É a página para onde aponta o README.
 - **Executável único (PyInstaller), para quem não quer instalar o Python**  
   Um só ficheiro para Windows (`PortfolioInvestimentos-windows.exe`), macOS e Linux, com tudo dentro (incluindo o yfinance para as cotações): duplo clique abre a aplicação no browser, como os scripts de arranque. Os dados ficam na mesma pasta que na instalação com Python. Configuração em `packaging/` (`portfolio-investimentos.spec` e o arranque, que deixa a janela aberta quando o programa termina com erro, para se ler a mensagem); o workflow «Executável único (PyInstaller)» gera os três, experimenta a demonstração e as páginas e, numa etiqueta `v*`, junta-os a uma release. Com a porta ocupada, a sugestão mostra o comando do executável. Instruções no README.
 - **Visão Geral: variação do dia e rendimento em euros no cartão Carteira**  
