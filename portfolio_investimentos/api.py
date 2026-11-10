@@ -379,6 +379,60 @@ def upload_logo(ticker):
     return "Logótipo guardado."
 
 
+# ------------------------------------------------------------------ Raio-X dos ETF
+def _etf(ticker):
+    inst = db.session.get(Instrument, (ticker or "").strip())
+    if inst is None or inst.kind != "etf":
+        raise ApiError("Escolhe um ETF.")
+    return inst
+
+
+@action
+def upload_etf_holdings(ticker):
+    """Composição de um ETF a partir do ficheiro de posições do emitente (CSV ou XLSX)."""
+    from .services import xray
+    inst = _etf(ticker)
+    f = request.files.get("file")
+    if f is None:
+        raise ApiError("Escolhe o ficheiro das posições do ETF.")
+    try:
+        n = xray.save(inst.ticker, xray.parse_holdings(f.read(xray.MAX_BYTES + 1), f.filename or ""), "ficheiro")
+    except ValueError as exc:
+        raise ApiError(f"Não foi possível ler o ficheiro: {exc}") from exc
+    return f"Composição de {inst.ticker} guardada: {n} posições."
+
+
+@action
+def fetch_etf_holdings(ticker, url):
+    """Composição de um ETF descarregada do site do emitente (o endereço fica guardado para atualizar)."""
+    from .services import xray
+    inst = _etf(ticker)
+    try:
+        n = xray.save(inst.ticker, xray.parse_holdings(xray.download(url)), "url", url.strip())
+    except ValueError as exc:
+        raise ApiError(str(exc)) from exc
+    return f"Composição de {inst.ticker} descarregada: {n} posições."
+
+
+@action
+def refresh_etf_holdings():
+    from .services import xray
+    res = xray.refresh_urls()
+    if not res:
+        return "Nenhuma composição foi descarregada de um endereço."
+    bad = {k: v for k, v in res.items() if isinstance(v, str)}
+    ok = len(res) - len(bad)
+    msg = f"{ok} {'composição atualizada' if ok == 1 else 'composições atualizadas'}."
+    return msg + ("" if not bad else " Falhou: " + "; ".join(f"{k}: {v}" for k, v in bad.items()))
+
+
+@action
+def remove_etf_holdings(ticker):
+    from .services import xray
+    xray.remove(_etf(ticker).ticker)
+    return "Composição apagada."
+
+
 @action
 def remove_logo(ticker):
     """Tira o logótipo: ficam as iniciais."""
@@ -785,8 +839,10 @@ def reset_data(confirm=""):
     if confirm != "APAGAR":
         raise ApiError('Escreve APAGAR para confirmar.')
     _backup("apagar-tudo")
-    from .models import Fundamental, Logo, NewsItem
-    for model in (NewsItem, Logo, Transaction, ImportBatch, Alert, PortfolioAlert, WatchItem, Event, DividendHistory, Price, FxRate,
+    from .models import EtfHolding, Fundamental, Logo, NewsItem
+    for row in Setting.query.filter(Setting.key.like("xray:%")).all():
+        db.session.delete(row)
+    for model in (EtfHolding, NewsItem, Logo, Transaction, ImportBatch, Alert, PortfolioAlert, WatchItem, Event, DividendHistory, Price, FxRate,
                   OtherAssetValue, OtherAsset, Fundamental):
         model.query.delete()
     Broker.query.delete()

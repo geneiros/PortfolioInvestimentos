@@ -2866,3 +2866,68 @@ def test_import_ibkr_activity_statement(app, client):
     assert _upload(client, token, "ibkr", "U123_2024.csv", IBKR_CSV.encode()).status_code == 200
     with app.app_context():
         assert Transaction.query.count() == 6
+
+
+ISHARES_CSV = (
+    "iShares Core MSCI World UCITS ETF\n"
+    'Fund Holdings as of,"Nov 07, 2026"\n'
+    "\n"
+    "Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Shares,Price,Location,Exchange,Currency\n"
+    'DEMO-NVTX,NOVA TECH INC,Information Technology,Equity,"1,000,000",50.00,"1,000,000",10,1,United States,NASDAQ,USD\n'
+    "SOL,SOL PHARMA,Health Care,Equity,500000,30.00,500000,10,1,Switzerland,SIX,CHF\n"
+    "OTH,OUTRA EMPRESA SA,Financials,Equity,400000,20.00,400000,10,1,Japan,TSE,JPY\n"
+    "\n"
+    '"The content contained herein is owned or licensed by BlackRock"\n')
+
+
+def test_etf_xray_holdings_exposure_and_overlap(app, client):
+    from portfolio_investimentos.models import EtfHolding, Setting
+    from portfolio_investimentos.services import xray
+    rows = xray.parse_holdings(ISHARES_CSV.encode(), "holdings.csv")
+    assert [r["weight"] for r in rows] == pytest.approx([0.5, 0.3, 0.2])
+    assert rows[0]["country"] == "EUA" and rows[0]["sector"] == "Tecnologia" and rows[1]["country"] == "Suíça"
+    # pesos já em fração, com «;» e vírgula decimal
+    frac = xray.parse_holdings("Nome;Peso;País\nA Corp;0,6;Portugal\nB SA;0,4;Espanha\n".encode())
+    assert [r["weight"] for r in frac] == pytest.approx([0.6, 0.4])
+    with pytest.raises(ValueError):
+        xray.parse_holdings(b"a,b\n1,2\n")
+    assert xray.allowed_url("https://www.ishares.com/uk/x/1506575576011.ajax?fileType=csv")
+    assert not xray.allowed_url("http://www.ishares.com/x") and not xray.allowed_url("https://127.0.0.1/x")
+    assert not xray.allowed_url("https://ishares.com.evil.example/x")
+
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    html = client.get("/carteira").get_data(as_text=True)
+    assert 'id="xrayCard"' in html and "Falta a composição de" in html
+    r = client.post("/api/upload_etf_holdings", headers={"X-CSRF-Token": token},
+                    data={"ticker": "DEMO-WRLD", "file": (io.BytesIO(ISHARES_CSV.encode()), "holdings.csv")},
+                    content_type="multipart/form-data")
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert post(client, "upload_etf_holdings", token, ticker="DEMO-NVTX").status_code == 400  # não é um ETF
+    second = "Name,Weight (%)\nNova Tech Inc,40\nOutra Empresa,60\n"
+    client.post("/api/upload_etf_holdings", headers={"X-CSRF-Token": token},
+                data={"ticker": "DEMO-CASH", "file": (io.BytesIO(second.encode()), "b.csv")},
+                content_type="multipart/form-data")
+    with app.app_context():
+        p = data_portfolio()
+        x = xray.xray(p)
+        vals = {pos.asset.ticker: pos.value_eur for pos in p.open_positions}
+        nova = next(c for c in x["companies"] if "Nova" in c["name"])
+        # a Nova Tech direta mais 50% do DEMO-WRLD e 40% do DEMO-CASH (pelo ticker e pelo nome)
+        assert nova["value"] == pytest.approx(vals["DEMO-NVTX"] + 0.5 * vals["DEMO-WRLD"] + 0.4 * vals["DEMO-CASH"])
+        assert set(nova["via"]) == {"direto", "DEMO-WRLD", "DEMO-CASH"}
+        assert x["missing"] == [] and x["coverage"] == pytest.approx(1.0)
+        assert sum(r["value"] for r in x["countries"]) == pytest.approx(x["total"], rel=1e-6)
+        ov = x["overlap"][0]
+        assert {ov["a"], ov["b"]} == {"DEMO-WRLD", "DEMO-CASH"} and ov["share"] == pytest.approx(0.4 + 0.2)
+        assert EtfHolding.query.filter_by(etf="DEMO-WRLD").count() == 3
+    html = client.get("/carteira").get_data(as_text=True)
+    assert "Falta a composição" not in html and "Sobreposição entre ETF" in html
+    # descarregar só de emitentes; o endereço fica guardado para atualizar
+    assert post(client, "fetch_etf_holdings", token, ticker="DEMO-WRLD", url="https://exemplo.com/a.csv").status_code == 400
+    with app.app_context():
+        xray.save("DEMO-WRLD", rows, "url", "https://www.ishares.com/x.csv")
+        assert xray.refresh_urls(fetch=lambda url: ISHARES_CSV.encode()) == {"DEMO-WRLD": 3}
+    assert post(client, "reset_data", token, confirm="APAGAR").status_code == 200
+    with app.app_context():
+        assert EtfHolding.query.count() == 0 and Setting.get("xray:DEMO-WRLD") is None

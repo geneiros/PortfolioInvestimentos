@@ -156,6 +156,19 @@ class Logo(db.Model):
     fetched = db.Column(db.DateTime, default=utcnow)
 
 
+class EtfHolding(db.Model):
+    """Uma posição dentro de um ETF (a composição publicada pelo emitente ou carregada à mão), para o Raio-X:
+    `weight` em fração do ETF (0,05 = 5%)."""
+    id = db.Column(db.Integer, primary_key=True)
+    etf = db.Column(db.String(32), db.ForeignKey("instrument.ticker", ondelete="CASCADE"), nullable=False, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    isin = db.Column(db.String(12))
+    ticker = db.Column(db.String(32))
+    weight = db.Column(db.Float, nullable=False)
+    country = db.Column(db.String(60))
+    sector = db.Column(db.String(80))
+
+
 class NewsItem(db.Model):
     """Notícia de um ativo (`ticker`) ou do mercado em geral (`ticker` vazio), do Finnhub, do Yahoo Finance ou do
     Marketaux (`provider`)."""

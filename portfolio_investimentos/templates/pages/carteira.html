@@ -171,6 +171,74 @@
     {% endfor %}
   </div>
 
+  {% if xray %}
+  {% macro bars(rows, n=10) -%}
+    {% set top = rows[0].pct if rows else 1 %}
+    {% for r in rows[:n] %}
+    <div class="d-flex align-items-center gap-2 small mb-1" title="{{ r.name }}">
+      <div class="text-truncate" style="flex: 0 1 11rem; min-width: 0">{{ r.name }}</div>
+      <div class="pm-scorebar"><div style="width: {{ (r.pct / top * 100) if top else 0 }}%; background: var(--pm-accent)"></div></div>
+      <div class="text-end" style="width: 3.2rem">{{ r.pct|pct(1, sign=False) }}</div>
+    </div>
+    {% endfor %}
+  {%- endmacro %}
+  <div class="pm-card mt-3" id="xrayCard">
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+      <span class="pm-label">Raio-X dos ETF {{ help("A exposição real da carteira (posições abertas): as ações tidas diretamente mais as posições dentro de cada ETF, pelo peso de cada uma no ETF. A composição de cada ETF vem do ficheiro de posições do emitente (ex.: iShares: página do ETF → Posições → Descarregar), carregado em baixo. «Sobreposição» é a parte comum de dois ETF: a soma, empresa a empresa, do menor dos dois pesos.") }}</span>
+      <span class="small text-secondary ms-auto">{{ xray.count }} empresas · cobre {{ xray.coverage|pct(0, sign=False) }} da carteira</span>
+    </div>
+    {% if xray.missing %}<div class="alert alert-info small py-2 mb-2">Falta a composição de {{ xray.missing|join(', ') }}: carrega-a em «Composição dos ETF», em baixo. Até lá, {{ 'esse ETF conta' if xray.missing|length == 1 else 'esses ETF contam' }} como «ETF sem composição».</div>{% endif %}
+    <div class="row g-4">
+      <div class="col-xl-5"><div class="pm-label mb-2">Por empresa</div>
+        {% set top = xray.companies[0].pct if xray.companies else 1 %}
+        {% for c in xray.companies %}
+        <div class="d-flex align-items-center gap-2 small mb-1" title="{{ c.name }} · {{ c.via|join(', ') }}">
+          <div class="text-truncate" style="flex: 0 1 12rem; min-width: 0">{{ c.name }}</div>
+          <div class="pm-scorebar"><div style="width: {{ (c.pct / top * 100) if top else 0 }}%; background: var(--pm-accent)"></div></div>
+          <div class="text-end" style="width: 3.2rem">{{ c.pct|pct(1, sign=False) }}</div>
+          <div class="text-end money text-secondary d-none d-sm-block" style="width: 4.5rem">{{ c.value|money }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="col-md-6 col-xl-4"><div class="pm-label mb-2">Por país</div>{{ bars(xray.countries) }}</div>
+      <div class="col-md-6 col-xl-3"><div class="pm-label mb-2">Por setor</div>{{ bars(xray.sectors) }}</div>
+    </div>
+    {% if xray.overlap %}
+    <div class="pm-label mt-3 mb-1">Sobreposição entre ETF</div>
+    <div class="table-responsive"><table class="table pm-table mb-0"><thead><tr><th>ETF</th><th>ETF</th><th class="text-end">Em comum</th><th class="text-end">Empresas</th></tr></thead><tbody>
+      {% for o in xray.overlap %}<tr><td><b>{{ o.a }}</b></td><td><b>{{ o.b }}</b></td><td class="text-end">{{ o.share|pct(0, sign=False) }}</td><td class="text-end">{{ o.common }}</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% endif %}
+    <details class="small mt-3" id="xrayEtfs" {{ 'open' if xray.missing }}><summary class="text-secondary">Composição dos ETF</summary>
+      <table class="table pm-table mt-2 mb-2"><thead><tr><th>ETF</th><th class="text-end">Valor</th><th>Composição</th><th>Carregar</th></tr></thead><tbody>
+      {% for e in xray.etfs %}
+        <tr><td><b>{{ e.ticker }}</b><div class="sub">{{ e.name }}</div></td>
+          <td class="text-end money">{{ e.value|money }}</td>
+          <td>{% if e.count %}{{ e.count }} posições · {{ e.date[8:10] ~ '/' ~ e.date[5:7] ~ '/' ~ e.date[:4] if e.date else '' }}{% if e.stale %} <span class="badge text-bg-warning">antiga</span>{% endif %}
+              <button class="btn btn-sm btn-link text-danger p-0 ms-1" type="button" data-pm-action="remove_etf_holdings" data-args='{"ticker": "{{ e.ticker }}"}' data-confirm="Apagar a composição de {{ e.ticker }}?">Apagar</button>
+            {% else %}<span class="text-secondary">sem composição</span>{% endif %}</td>
+          <td>
+            <form class="d-flex flex-wrap gap-1 align-items-center mb-1" data-pm-method="upload_etf_holdings" data-pm-success="Composição guardada.">
+              <input type="hidden" name="ticker" value="{{ e.ticker }}">
+              <input type="file" name="file" accept=".csv,.xlsx,.txt" class="form-control form-control-sm" style="max-width: 15rem" required aria-label="Ficheiro das posições de {{ e.ticker }}">
+              <button class="btn btn-sm btn-outline-secondary" type="submit">Carregar</button>
+            </form>
+            <form class="d-flex flex-wrap gap-1 align-items-center" data-pm-method="fetch_etf_holdings" data-pm-success="Composição descarregada.">
+              <input type="hidden" name="ticker" value="{{ e.ticker }}">
+              <input type="url" name="url" class="form-control form-control-sm" style="max-width: 15rem" placeholder="ou o endereço do ficheiro no site do emitente" value="{{ e.url or '' }}" aria-label="Endereço das posições de {{ e.ticker }}">
+              <button class="btn btn-sm btn-outline-secondary" type="submit">Descarregar</button>
+            </form>
+          </td></tr>
+      {% endfor %}
+      </tbody></table>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        {% if xray.etfs|selectattr('url')|list %}<button class="btn btn-sm btn-outline-secondary" type="button" data-pm-action="refresh_etf_holdings"><i class="bi bi-arrow-repeat"></i> Atualizar as composições descarregadas</button>{% endif %}
+        <span class="text-secondary">O ficheiro de posições está na página de cada ETF no site do emitente (iShares: <i>Posições → Descarregar</i>; Vanguard, Xtrackers, Amundi, SPDR e Invesco têm um ficheiro parecido). Serve qualquer CSV ou XLSX com o nome e o peso de cada posição (e, se houver, o país, o setor, o ISIN e o ticker). Os endereços só podem ser dos sites dos emitentes.</span>
+      </div>
+    </details>
+  </div>
+  {% endif %}
+
   <div class="row g-3 mt-0">
     {% if crisis %}
     <div class="col-xl-6"><div class="pm-card h-100" id="crisisCard">

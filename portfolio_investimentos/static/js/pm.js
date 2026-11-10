@@ -88,7 +88,8 @@
       form.querySelectorAll("input[type=number][name]").forEach((el) => {
         if (typeof args[el.name] === "string") args[el.name] = args[el.name].replace(".", ",");
       });
-      await pm.call(form.dataset.pmMethod, args);
+      // com um campo de ficheiro, vai o formulário tal como está (multipart), para o ficheiro chegar ao servidor
+      await pm.call(form.dataset.pmMethod, form.querySelector("input[type=file]") ? new FormData(form) : args);
       if (form.dataset.pmSuccess) pm.toast(form.dataset.pmSuccess);
       if (form.dataset.pmReload !== "false") setTimeout(() => location.reload(), form.dataset.pmSuccess ? 600 : 0);
       else keepValues(form);

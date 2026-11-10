@@ -217,7 +217,7 @@ def carteira():
                "roi_base": sum((x.bought_eur or x.invested_eur) for x in p.open_positions)},
         alloc=ctx.js_json({k: p.allocation(k) for k in ("asset", "sector", "currency")}),
         crisis=stress.crisis_test(p), costs=_costs(p), valuations=_valuations(p),
-        aaa_yield=_aaa_yield() or valuation.AAA_YIELD,
+        aaa_yield=_aaa_yield() or valuation.AAA_YIELD, xray=_xray(p),
     )
     return render_template("pages/carteira.html", **c)
 
@@ -291,6 +291,17 @@ def _valuations(p):
                  updated=f.updated if f else None)
         out.append(v)
     return out
+
+
+def _xray(p):
+    """Raio-X dos ETF (exposição real) e o estado da composição de cada ETF; nunca parte a página."""
+    from .services import xray
+    try:
+        out = xray.xray(p)
+        return out and {**out, "etfs": xray.status(p)}
+    except Exception:
+        current_app.logger.exception("raio-x dos ETF")
+        return None
 
 
 def _costs(p):
