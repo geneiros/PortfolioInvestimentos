@@ -24,7 +24,7 @@
         <div class="col-md-7">
           <div class="pm-label">Carteira {{ help("Valor de mercado das posições abertas, em euros. O gráfico de fundo é a evolução desse valor no período escolhido no gráfico «Retorno total / Valor total».") }}</div>
           <div class="pm-hero-value money my-3">{{ p.holdings_value|money }}</div>
-          {% if networth %}<a href="/patrimonio" class="small text-secondary text-decoration-none d-inline-block mt-n2" id="netWorthLink">Património líquido <span class="money">{{ networth.total|money }}</span> · disponível <span class="money">{{ networth.available|money }}</span>{% if networth_late %} <span class="badge text-bg-warning" title="Valores do Património sem atualizar há mais de um mês"><i class="bi bi-calendar-check"></i> {{ networth_late }} por atualizar</span>{% endif %} <i class="bi bi-chevron-right"></i></a>{% endif %}
+          {% if networth %}<a href="/patrimonio" class="small text-secondary text-decoration-none d-inline-block mt-n2" id="netWorthLink">Património líquido <span class="money">{{ networth.total|money }}</span> · disponível <span class="money">{{ networth.available|money }}</span>{% if networth_late %} <span class="badge text-bg-warning" title="Valores do Património sem atualizar há mais de um mês"><i class="bi bi-calendar-check"></i> {{ networth_late }} por atualizar</span>{% endif %}</a>{% endif %}
           {% set h = hero or {"label": "ano corrente", "gain": 0, "gain_pct": 0, "twr": 0, "twr_annual": none} %}
           <div class="d-flex flex-wrap column-gap-5 row-gap-3 mt-4">
             <div>
