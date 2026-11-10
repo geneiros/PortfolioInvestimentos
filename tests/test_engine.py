@@ -650,44 +650,6 @@ def test_opening_positions_are_estimated_per_broker():
     assert any("já existiam antes" in w for w in both.warnings)
 
 
-# ------------------------------------------------------------------ carteira cerne
-def test_core_steps_and_table():
-    from portfolio_investimentos.engine import core
-    plan = core.DEFAULT_PLAN
-    steps = plan["steps"]
-    assert [s["drop"] for s in steps] == [0.1, 0.2, 0.3, 0.4, 0.5]
-    assert [core.step_for(d, steps) for d in (0.0, -0.0999, -0.10, -0.35, -0.5, -0.9)] == [0, 0, 1, 3, 5, 5]
-    assert [core.step_for(-0.05, core.steps_for_interval(0.05)), core.step_for(-0.26, core.steps_for_interval(0.05))] == [1, 5]
-    # a tabela do utilizador: retorno esperado, volatilidade e pior ano típico de cada mistura
-    table = {0: (45, 30, 25, 4.28, 3.95, -0.9), 1: (40, 35, 25, 4.47, 4.61, -1.5), 2: (35, 40, 25, 4.65, 5.26, -2.2),
-             3: (30, 50, 20, 5.05, 6.58, -3.5), 4: (25, 60, 15, 5.44, 7.90, -4.9), 5: (20, 70, 10, 5.84, 9.22, -6.2)}
-    for k, (e, f, x, mu, vol, p10) in table.items():
-        w = core.target_weights(plan, k)
-        assert [round(w[r] * 100) for r in core.ROLES] == [e, f, x]
-        st = core.mix_stats(plan, w)
-        assert abs(st["mu"] * 100 - mu) < 0.015 and abs(st["vol"] * 100 - vol) < 0.015
-        assert abs(st["p10"] * 100 - p10) < 0.11
-
-
-def test_core_status_orders_and_ratchet():
-    from portfolio_investimentos.engine import core
-    plan = core.DEFAULT_PLAN
-    values = {"reserve": 4500.0, "growth": 3000.0, "stable": 2500.0}
-    prices = {"reserve": 100.0, "growth": 10.0, "stable": 50.0}
-    st = core.core_status(plan, values, prices, [(1, 10.0), (2, 7.8)])  # −22% → escalão 2 (35/40/25)
-    assert st["step"] == 2 and st["step_now"] == 2 and st["new_step"]
-    rows = {r["role"]: r for r in st["rows"]}
-    assert abs(rows["growth"]["delta"] - 1000) < 1e-6 and abs(rows["reserve"]["delta"] + 1000) < 1e-6
-    assert abs(rows["growth"]["units"] - 100) < 1e-6
-    assert abs(st["next_price"] - 7.0) < 1e-9  # o escalão 3 a −30%
-    # recuperou, mas o escalão atingido mantém-se
-    st = core.core_status(plan, values, prices, [(1, 10.0), (2, 9.9)], reached=2)
-    assert st["step_now"] == 0 and st["step"] == 2 and not st["new_step"]
-    # dinheiro novo: só compra os que estão abaixo do alvo, sem vender
-    st = core.core_status(plan, values, prices, [(1, 10.0), (2, 7.8)], new_money=1000)
-    buys = {r["role"]: r["buy"] for r in st["rows"]}
-    assert abs(sum(buys.values()) - 1000) < 1e-6 and buys["reserve"] == 0 and buys["growth"] > 0
-
 
 def test_parse_number_portuguese_and_other_formats():
     import pytest as _pytest

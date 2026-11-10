@@ -7,7 +7,7 @@ from flask import request
 from ..engine.formatting import MONTHS
 from .. import auth
 from ..models import Setting
-from . import cerne, data, widgets
+from . import data, widgets
 from .market import market_status, refresh_state
 
 NAV = [
@@ -62,7 +62,6 @@ def build(active, title, **extra):
     if ctx["has_data"] and not ctx["is_demo"]:
         ctx["warnings"] += _refresh_warnings(p, active)
         ctx["stale_refresh"] = stale_refresh(p)
-        ctx["core_banner"] = cerne.banner(p, broker)
     try:
         ctx["widget_orders"] = widgets.orders(request.path)
     except RuntimeError:  # fora de um pedido (testes do motor)

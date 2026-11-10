@@ -1,18 +1,16 @@
 """Páginas da aplicação."""
-import math
 from datetime import date, timedelta
 from types import SimpleNamespace
 
 from flask import Blueprint, Response, abort, current_app, render_template, request
 
 from .engine import costs, stress, valuation
-from .engine.formatting import parse_number
 from .engine.portfolio import MERIT_BENCHMARK
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, Fundamental, ImportBatch,
                      Instrument, Price, Setting, Transaction, WatchItem, db)
 from . import auth
 from .services import context as ctx
-from .services import backups, cerne, data, insights, market, networth, portfolio_alerts, widgets
+from .services import backups, data, insights, market, networth, portfolio_alerts, widgets
 from .services import news as news_svc
 from .services.importer import BROKERS, INSTRUCTIONS
 from .services.market import check_alerts, refresh_state, upcoming_events, yfinance_available
@@ -220,24 +218,9 @@ def carteira():
         alloc=ctx.js_json({k: p.allocation(k) for k in ("asset", "sector", "currency")}),
         crisis=stress.crisis_test(p), costs=_costs(p), valuations=_valuations(p),
         aaa_yield=_aaa_yield() or valuation.AAA_YIELD,
-        core=_core(p), core_instruments=Instrument.query.filter(Instrument.kind != "index").order_by(Instrument.ticker).all(),
     )
     return render_template("pages/carteira.html", **c)
 
-
-def _core(p):
-    """A carteira cerne, com o dinheiro novo de ?investir= (vazio ou inválido = 0)."""
-    try:
-        money = parse_number(request.args.get("investir") or "0")
-    except ValueError:
-        money = 0.0
-    if not math.isfinite(money) or money < 0:
-        money = 0.0
-    try:
-        return cerne.status(p, new_money=money)
-    except Exception:  # o cartão nunca pode partir a página
-        current_app.logger.exception("carteira cerne")
-        return None
 
 
 def _dividend_per_share(p, ticker):
@@ -570,7 +553,7 @@ def definicoes():
              db_path=current_app.config["DB_PATH"], backups=backups.list_backups(current_app.config["DB_PATH"]),
              yfinance=yfinance_available(),
              risk_free_pct=round(data.risk_free() * 100, 2), last_refresh=Setting.get("last_refresh"), refresh_report=Setting.get("refresh_report"),
-             stale_days=ctx.stale_days(), core_plan=cerne.plan(), widget_pages=widgets.customized(),
+             stale_days=ctx.stale_days(), widget_pages=widgets.customized(),
              finnhub_env=news_svc.key_from_env(), finnhub_saved=bool(Setting.get("finnhub_key")),
              marketaux_env=news_svc.marketaux_from_env(), marketaux_saved=bool(Setting.get("marketaux_key")),
              news_providers=news_svc.PROVIDERS, news_sources=_news_sources(), news_stats=news_svc.stats(), news_last=news_svc.last_results(),

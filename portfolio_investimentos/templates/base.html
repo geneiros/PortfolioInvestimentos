@@ -153,19 +153,6 @@
     </script>
     {% endif %}
 
-    {% if core_banner %}
-    {% set cb = core_banner %}{% set gcode = cb.plan.assets|selectattr('role', 'equalto', 'growth')|map(attribute='code')|first %}
-    <div class="alert alert-info rounded-0 border-0 border-bottom mb-0 py-2 small d-flex align-items-center gap-2 flex-wrap" id="coreBanner">
-      <i class="bi bi-layers flex-shrink-0"></i>
-      <div style="flex: 1 1 14rem; min-width: 0">{% if cb.drawdown %}O {{ gcode }} está <b>{{ cb.drawdown.drawdown|pct(1) }}</b> abaixo do máximo: a{% else %}A{% endif %} carteira cerne passou para o <b>escalão {{ cb.step }}</b>
-        ({% for r in cb.rows %}{{ r.code }} {{ '%g' % ((r.target * 100)|round(2)) }}%{{ ' · ' if not loop.last }}{% endfor %}).</div>
-      <div class="d-flex align-items-center gap-2 ms-auto">
-        <a class="btn btn-sm btn-info text-nowrap" href="/carteira#coreCard">Ver na Carteira</a>
-        <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" data-pm-action="core_ack" data-args='{"step": {{ cb.step }}}' data-reload="false" onclick="this.closest('#coreBanner').remove()">Já vi</button>
-      </div>
-    </div>
-    {% endif %}
-
     <main class="pm-content">
       {% if warnings and active in ("overview", "carteira", "desempenho", "fiscal", "importar") %}
         {% for w in warnings %}

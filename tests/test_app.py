@@ -2020,89 +2020,6 @@ def test_portfolio_totals_match_rows(app, client):
     assert pct(roi / base, 2) in total
 
 
-def _core_portfolio(app, growth_last):
-    from portfolio_investimentos.models import Instrument, Price
-    with app.app_context():
-        db.session.add_all([
-            Instrument(ticker="ERNX", currency="EUR", data_symbol="ERNX.L"),
-            Instrument(ticker="FWIA", currency="EUR", data_symbol="FWIA.DE"),
-            Instrument(ticker="XEON", currency="EUR", data_symbol="XEON.DE"),
-            Transaction(date=date(2026, 1, 5), type="DEPOSIT", amount=10000, currency="EUR"),
-            Transaction(date=date(2026, 1, 5), type="BUY", instrument="ERNX", quantity=45, price=100.0, currency="EUR"),
-            Transaction(date=date(2026, 1, 5), type="BUY", instrument="FWIA", quantity=300, price=10.0, currency="EUR"),
-            Transaction(date=date(2026, 1, 5), type="BUY", instrument="XEON", quantity=50, price=50.0, currency="EUR"),
-            Price(instrument="ERNX", date=date(2026, 1, 6), close=100.0),
-            Price(instrument="XEON", date=date(2026, 1, 6), close=50.0),
-            Price(instrument="FWIA", date=date(2026, 1, 6), close=10.0),
-            Price(instrument="FWIA", date=date(2026, 1, 7), close=growth_last)])
-        db.session.commit()
-
-
-def _core_badge(client, url="/carteira"):
-    card = client.get(url).get_data(as_text=True).split('id="coreCard"', 1)[1]
-    m = re.search(r'<span class="badge [^"]*">([^<]+)</span>', card)
-    return m.group(1) if m else None
-
-
-def _set_fwia(app, close):
-    from portfolio_investimentos.models import Price
-    with app.app_context():
-        db.session.add(Price(instrument="FWIA", date=date(2026, 1, 8) + timedelta(days=db.session.query(Price).count()),
-                             close=close))
-        db.session.commit()
-
-
-def test_core_portfolio_card_banner_and_ratchet(app, client):
-    from portfolio_investimentos.models import Setting
-    _core_portfolio(app, 7.8)  # FWIA −22% → escalão 2
-    html = client.get("/carteira").get_data(as_text=True)
-    card = html.split('id="coreCard"', 1)[1]
-    assert _core_badge(client) == "Escalão 2" and "−22,0%" in card and 'id="coreLadder"' in card
-    assert 'id="coreBanner"' in html and "escalão 2" in html.split('id="coreBanner"', 1)[1][:600]
-    with app.app_context():
-        assert Setting.get("core_reached") == "2"
-    token = csrf(client)
-    assert post(client, "core_ack", token, step="2").status_code == 200
-    assert 'id="coreBanner"' not in client.get("/").get_data(as_text=True)
-    # recupera: mantém o escalão 2; cai até −30%: escalão 3 e aviso outra vez
-    _set_fwia(app, 9.9)
-    assert _core_badge(client) == "Escalão 2"
-    _set_fwia(app, 7.0)
-    html = client.get("/carteira").get_data(as_text=True)
-    assert _core_badge(client) == "Escalão 3" and 'id="coreBanner"' in html
-    # dinheiro novo e voltar à base
-    assert "Investir" in client.get("/carteira?investir=1000").get_data(as_text=True).split('id="coreCard"', 1)[1]
-    assert client.get("/carteira?investir=abc").status_code == 200
-    _set_fwia(app, 10.0)
-    assert post(client, "core_reset", token).status_code == 200
-    assert _core_badge(client) == "Alvo base"
-
-
-def test_core_portfolio_settings(app, client):
-    _core_portfolio(app, 9.4)  # −6%: na base com o intervalo de 10%
-    token = csrf(client)
-    assert _core_badge(client) == "Alvo base"
-    assert 'id="coreInterval"' in client.get("/definicoes").get_data(as_text=True)
-    r = post(client, "set_core_interval", token, percent="5")
-    assert r.status_code == 200 and "−5% / −10% / −15% / −20% / −25%" in r.get_json()["message"]
-    assert _core_badge(client) == "Escalão 1"
-    assert "<td class=\"text-end\">40%</td>" in client.get("/carteira").get_data(as_text=True)  # as misturas da tabela não mudam
-    for bad in ("0", "nan", "abc", "25", "31"):
-        assert post(client, "set_core_interval", token, percent=bad).status_code == 400, bad
-    assert post(client, "save_core_plan", token, ticker_growth="NAOEXISTE").status_code == 400
-    assert post(client, "save_core_plan", token, ticker_growth="XEON").status_code == 200
-    assert post(client, "save_core_plan", token).status_code == 200  # volta ao automático
-    assert post(client, "set_core_enabled", token, enabled="0").status_code == 200
-    assert 'id="coreCard"' not in client.get("/carteira").get_data(as_text=True)
-    assert post(client, "set_core_enabled", token, enabled="1").status_code == 200
-    assert 'id="coreCard"' in client.get("/carteira").get_data(as_text=True)
-
-
-def test_core_portfolio_missing_etfs_in_demo(client):
-    assert post(client, "load_demo", csrf(client)).status_code == 200
-    html = client.get("/carteira").get_data(as_text=True)
-    assert "Não encontrei" in html.split('id="coreCard"', 1)[1][:1500] and 'id="coreBanner"' not in html
-
 
 def test_widget_order_all_pages(client):
     from portfolio_investimentos.models import Setting
@@ -2252,11 +2169,6 @@ def test_thousands_separator_in_forms(app, client):
     from portfolio_investimentos.models import Setting
     token = csrf(client)
     assert post(client, "load_demo", token).status_code == 200
-    # carteira cerne: «1.000» de dinheiro novo são mil euros, não um
-    _core_portfolio(app, 7.8)
-    card = client.get("/carteira?investir=1.000").get_data(as_text=True).split('id="coreCard"', 1)[1]
-    assert 'value="1000"' in card
-    assert 'value="1000,5"' in client.get("/carteira?investir=1.000,50").get_data(as_text=True)
     # na API: texto livre à portuguesa; os campos numéricos chegam com vírgula decimal (pm.js)
     assert post(client, "set_risk_free", token, rate="2,5").status_code == 200
     with app.app_context():
@@ -2268,22 +2180,13 @@ def test_thousands_separator_in_forms(app, client):
 
 def test_reset_clears_data_settings(app, client):
     from portfolio_investimentos.models import Broker, Setting
-    from portfolio_investimentos.services import cerne
     token = csrf(client)
-    _core_portfolio(app, 7.8)  # FWIA −22% → escalão 2
-    client.get("/carteira")
-    assert post(client, "save_core_plan", token, ticker_growth="FWIA").status_code == 200
-    assert post(client, "set_core_interval", token, percent="5").status_code == 200
     assert post(client, "set_profile", token, profile="active").status_code == 200  # todas as corretoras
     with app.app_context():
         Setting.set("investor_profile:7", "income")
         Setting.set("widgets:/carteira", '{"g-x": ["a", "b"]}')
-        assert Setting.get("core_reached") == "2"
     assert post(client, "reset_data", token, confirm="APAGAR").status_code == 200
     with app.app_context():
-        assert Setting.get("core_reached") == "0" and Setting.get("core_ack") == "0"
-        plan = cerne.plan()
-        assert not any(a.get("ticker") for a in plan["assets"]) and abs(plan["interval"] - 0.05) < 1e-9
         assert Setting.get("investor_profile:7") is None
         assert Setting.get("investor_profile:all") == "active"  # preferências ficam
         assert Setting.get("widgets:/carteira")
@@ -2339,21 +2242,6 @@ def test_isin_to_ticker_keeps_logo_fundamentals_ter_sector(app, client):
         assert db.session.get(Logo, "ADB.DE").data == PNG and db.session.get(Instrument, "ADB.DE").ter == 0.001
 
 
-def test_core_growth_change_resets_reached_step(app, client):
-    from portfolio_investimentos.models import Setting
-    token = csrf(client)
-    _core_portfolio(app, 7.8)  # FWIA −22% → escalão 2
-    assert _core_badge(client) == "Escalão 2"
-    r = post(client, "save_core_plan", token, ticker_growth="FWIA")  # o mesmo ETF: o escalão fica
-    assert r.status_code == 200 and "voltou ao alvo base" not in r.get_json()["message"]
-    with app.app_context():
-        assert Setting.get("core_reached") == "2"
-    r = post(client, "save_core_plan", token, ticker_growth="XEON")  # outro ETF de crescimento: volta à base
-    assert r.status_code == 200 and "voltou ao alvo base" in r.get_json()["message"]
-    with app.app_context():
-        assert Setting.get("core_reached") == "0" and Setting.get("core_ack") == "0"
-    assert _core_badge(client) == "Alvo base"
-
 
 def test_broker_position_counts_match_engine_without_computing(app, client):
     from portfolio_investimentos.models import Broker
@@ -2396,22 +2284,6 @@ def test_bulk_ops_on_other_tables_keep_portfolio_cache(app):
         db.session.commit()
         assert data._state["rev"] == rev + 1  # nas tabelas da carteira, sim
 
-
-def test_core_banner_cached_until_data_changes(app, client):
-    from portfolio_investimentos.services import cerne
-    _core_portfolio(app, 7.8)
-    calls = []
-    orig = cerne.status
-    cerne.status = lambda *a, **k: calls.append(1) or orig(*a, **k)
-    try:
-        for _ in range(3):
-            assert 'id="coreBanner"' in client.get("/radar").get_data(as_text=True)
-        assert len(calls) == 1  # calculada uma vez
-        _set_fwia(app, 7.0)  # cotação nova: volta a calcular (escalão 3)
-        html = client.get("/radar").get_data(as_text=True)
-        assert len(calls) == 2 and "escalão 3" in html.split('id="coreBanner"', 1)[1][:600]
-    finally:
-        cerne.status = orig
 
 
 def test_warm_computes_every_broker(app, client):
@@ -2859,3 +2731,12 @@ def test_news_hidden_when_source_unselected(app, client, monkeypatch):
         Setting.set("news_sources", None)
         db.session.commit()
     assert "Do Yahoo" in client.get("/noticias").get_data(as_text=True)  # ligado outra vez, volta a aparecer
+
+
+def test_core_portfolio_removed(client):
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    for url in ("/carteira", "/definicoes", "/"):
+        html = client.get(url).get_data(as_text=True)
+        assert "coreCard" not in html and "coreInterval" not in html and "core_ack" not in html, url
+    assert post(client, "core_reset", token).status_code in (400, 404)

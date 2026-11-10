@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-10
+
+- **Retirada a carteira cerne (a pedido)**  
+  Sai o cartão «Carteira cerne» da página Carteira (escalões, dinheiro novo e escolha dos ETF), a opção «Carteira cerne: um escalão novo a cada …%» em Definições e a faixa no topo das páginas que avisava de um escalão novo. As definições já guardadas dela ficam na base de dados sem uso.
+
 ## 2026-11-08
 
 - **Desempenho: o mesmo «Comparar com» da Visão Geral**  
