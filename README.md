@@ -2,7 +2,7 @@
 
 [![Testes](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml/badge.svg)](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml) [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/geneiros)
 
-Gestor de carteira de investimentos local: desempenho, dividendos, património, planeamento FIRE, notícias, fiscalidade (PT) e importação de extratos da Trading 212, XTB e Trade Republic. **Corre no teu computador**, com alertas de preço e da carteira e lista de observação.
+Gestor de carteira de investimentos local: desempenho, dividendos, património, planeamento FIRE, notícias, fiscalidade (PT) e importação de extratos da Trading 212, XTB, Trade Republic, DEGIRO e Interactive Brokers. **Corre no teu computador**, com alertas de preço e da carteira e lista de observação.
 
 - **Sem servidor e sem base de dados para instalar.** Os dados ficam num único ficheiro SQLite no teu computador.
 - **Abre-se com um duplo clique.** O script de arranque prepara tudo na primeira vez e abre o browser; sem Python, há um **executável único** para Windows, macOS e Linux.
@@ -212,7 +212,7 @@ O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro o
 | **Notícias** | As notícias dos últimos 7 dias dos ativos da carteira selecionada (ou de todas), com filtro por ativo, um separador «Mercado» e um separador «Radar», com as notícias dos ativos que segues em Radar e alertas. Fontes: Finnhub (com a tua chave gratuita de finnhub.io, em Definições ou na variável `FINNHUB_API_KEY`; no plano gratuito só empresas cotadas nos EUA e no Canadá, encontradas pelo ISIN), Google Notícias (sem chave, pelo nome do ativo, em português; só as notícias cujo título fala do ativo, e sem os ETF), Yahoo Finance (sem chave, pelo feed RSS do Yahoo por símbolo, de preferência o dos EUA) e Marketaux (com a tua chave gratuita de marketaux.com ou `MARKETAUX_API_KEY`; 100 pedidos por dia, por isso guardam-se 6 horas), sem repetir a mesma notícia. Obtêm-se ao abrir a página e guardam-se 1 hora. No topo da página, cada fonte é um botão que esconde ou mostra as notícias dela. Em Definições escolhes as fontes (as notícias de uma fonte desligada deixam de aparecer), vês quantas notícias há de cada uma e o que cada uma devolveu na última atualização, e atualizas todas (o botão mostra o progresso, ativo a ativo). A página não carrega imagens de outros sites. No PythonAnywhere gratuito, cada fonte só funciona se o site estiver na lista de sites permitidos. |
 | **Radar e alertas** | Alertas de preço (acima, abaixo, variação diária), os alertas da carteira criados na Carteira (pausar, reativar, apagar e o último disparo) e lista de observação com preço-alvo. |
 | **Fiscal** | Por ano: mais-valias pelo método FIFO resumidas por ativo (as linhas de cada lote abrem a pedido e vão todas no CSV), dividendos com o crédito de imposto estrangeiro limitado a cada dividendo, juros e estimativa de imposto a 28% (Portugal). |
-| **Importar** | Extratos da Trading 212 (CSV), XTB (XLSX), Trade Republic (CSV) e CSV genérico, com deduplicação (podes carregar o mesmo ficheiro várias vezes) e histórico de extratos. Antes de importar fica uma cópia automática da base de dados. |
+| **Importar** | Extratos da Trading 212 (CSV), XTB (XLSX), Trade Republic (CSV), DEGIRO (Transações e Extrato de conta, CSV), Interactive Brokers (Activity Statement, CSV) e CSV genérico, com deduplicação (podes carregar o mesmo ficheiro várias vezes) e histórico de extratos. Antes de importar fica uma cópia automática da base de dados. |
 | **Transações** | Lista filtrável, inserção manual (com validação da quantidade detida nas vendas) e exportação CSV. |
 | **Definições** | Corretoras; ativos com filtro (posições abertas, sem cotações, todos), pesquisa, último fecho e «Juntar» para o mesmo título com dois tickers; logótipo de cada ativo (imagem carregada ou ícone do site; sem ele, as iniciais); atualização de cotações (todas ou só as posições abertas, com o progresso ativo a ativo); taxa sem risco; aviso de cotações antigas (os dias configuram-se; 5 por omissão, 0 desliga); notícias: chaves do Finnhub e do Marketaux, escolha das fontes, notícias de cada fonte e «Atualizar todas as fontes»; repor a ordem dos cartões (por página ou todas); disponível offline; cópias de segurança automáticas com «Restaurar» e «Eliminar»; demonstração e limpeza de dados. |
 
@@ -259,6 +259,19 @@ Na XTB (xStation): **Histórico da conta → Exportar** para Excel (`.xlsx`). O 
 Na Trade Republic: **Perfil → Atividade → Exportar** para CSV. O importador trata compras, vendas, dividendos (com retenção), juros, depósitos, levantamentos, pagamentos com o cartão e comissões. As restantes linhas são ignoradas e contadas no resumo da importação.
 
 A Trade Republic identifica os ativos pelo ISIN. Se o mesmo ISIN já existir noutra corretora, a aplicação usa o mesmo ativo, de modo que a carteira consolidada soma as posições. Os ativos que só existem na Trade Republic ficam com o ISIN como símbolo. Ao atualizar as cotações, a aplicação procura o símbolo do Yahoo Finance pelo ISIN; se não o encontrar, podes defini-lo em **Definições → Ativos**.
+
+## Importação: DEGIRO
+
+Na DEGIRO (web): **Caixa → Transações** e **Caixa → Extrato de conta**, cada um com o período desde a abertura da conta e **Exportar → CSV**. Carrega os dois ficheiros (`Transactions.csv` e `Account.csv`), um de cada vez.
+
+- **Transações:** compras e vendas, com o preço na moeda da bolsa, a taxa de câmbio do dia e os custos da ordem (convertidos para a moeda do ativo).
+- **Extrato de conta:** dividendos com a retenção na fonte (juntos numa só linha), depósitos, levantamentos, juros e custos de conectividade com as bolsas. As compras, as vendas e os custos das ordens que também aparecem no extrato ficam de fora, para não se contarem duas vezes, tal como as conversões de moeda e o fundo do mercado monetário.
+- Os ficheiros leem-se pela posição das colunas, por isso funcionam em português, inglês, espanhol, alemão ou neerlandês.
+- Como na Trade Republic, os ativos são identificados pelo ISIN e unificados com o mesmo ativo noutra corretora; o símbolo do Yahoo Finance procura-se pelo ISIN ao atualizar as cotações.
+
+## Importação: Interactive Brokers
+
+No Portal do Cliente: **Desempenho e relatórios → Extratos → Atividade**, período anual ou personalizado desde a abertura da conta, formato **CSV**. São importadas as ações e os ETF (*Trades*), os dividendos com a retenção na fonte (*Dividends* e *Withholding Tax*), os depósitos e levantamentos, os juros e as comissões (*Fees*). As conversões de moeda (*Forex*) e as linhas de totais ficam de fora. O ISIN de cada ativo vem da secção *Financial Instrument Information*.
 
 ## Valores comparados com as corretoras
 

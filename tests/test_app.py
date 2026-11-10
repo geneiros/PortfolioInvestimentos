@@ -2759,3 +2759,110 @@ def test_desempenho_shadow_index(app, client):
     # o dinheiro posto no índice é o mesmo da carteira: o valor final − o ganho dá igual nos dois
     carteira_put = perf["value"][-1] - perf["gain"][-1]
     assert all(abs((x["final"] - x["gain"]) - carteira_put) < 0.01 for x in sh)
+
+
+DEGIRO_TX = (
+    "Data,Hora,Produto,ISIN,Bolsa de referência,Bolsa,Quantidade,Preços,,Valor local,,Valor,,Taxa de Câmbio,"
+    "Custos de transação e/ou de terceiros,,Total,,ID da Ordem\n"
+    "15-03-2024,15:30,APPLE INC. - COMMON ST,US0378331005,NDQ,XNAS,10,\"170,50\",USD,\"-1705,00\",USD,\"-1570,90\",EUR,"
+    "\"1,0854\",\"-2,00\",EUR,\"-1572,90\",EUR,abc-1\n"
+    "02-05-2024,09:10,VANGUARD FTSE ALL-WORLD UCITS ETF USD DIS,IE00B3RBWM25,EAM,XAMS,5,\"110,20\",EUR,\"-551,00\",EUR,"
+    "\"-551,00\",EUR,,\"-1,00\",EUR,\"-552,00\",EUR,def-2\n"
+    "10-10-2024,16:00,APPLE INC. - COMMON ST,US0378331005,NDQ,XNAS,-4,\"225,00\",USD,\"900,00\",USD,\"820,00\",EUR,"
+    "\"1,0976\",\"-2,00\",EUR,\"818,00\",EUR,ghi-3\n")
+DEGIRO_ACCOUNT = (
+    "Data,Hora,Data Valor,Produto,ISIN,Descrição,T.,Variação,,Saldo,,ID da Ordem\n"
+    "01-03-2024,10:00,01-03-2024,,,flatex Deposit,,EUR,\"2000,00\",EUR,\"2000,00\",\n"
+    "15-03-2024,15:30,15-03-2024,APPLE INC. - COMMON ST,US0378331005,\"Compra 10 Apple Inc@170,5 USD (US0378331005)\",,"
+    "USD,\"-1705,00\",USD,\"-1705,00\",abc-1\n"
+    "15-03-2024,15:30,15-03-2024,APPLE INC. - COMMON ST,US0378331005,Custos de transação e/ou de terceiros DEGIRO,,EUR,"
+    "\"-2,00\",EUR,\"1998,00\",abc-1\n"
+    "15-03-2024,15:31,15-03-2024,,,Levantamento Câmbio de Divisa,\"1,0854\",EUR,\"-1570,90\",EUR,\"427,10\",\n"
+    "16-05-2024,07:30,15-05-2024,APPLE INC. - COMMON ST,US0378331005,Dividendo,,USD,\"2,50\",USD,\"2,50\",\n"
+    "16-05-2024,07:30,15-05-2024,APPLE INC. - COMMON ST,US0378331005,Imposto sobre dividendo,,USD,\"-0,38\",USD,\"2,12\",\n"
+    "05-11-2024,09:00,05-11-2024,,,Levantamento,,EUR,\"-300,00\",EUR,\"100,00\",\n"
+    "31-12-2024,08:00,31-12-2024,,,Comissão de conectividade com a bolsa 2024 (Nasdaq - NDQ),,EUR,\"-2,50\",EUR,"
+    "\"97,50\",\n")
+
+IBKR_CSV = (
+    "Statement,Header,Field Name,Field Value\n"
+    "Statement,Data,BrokerName,Interactive Brokers Ireland Limited\n"
+    "Trades,Header,DataDiscriminator,Asset Category,Currency,Symbol,Date/Time,Quantity,T. Price,C. Price,Proceeds,"
+    "Comm/Fee,Basis,Realized P/L,MTM P/L,Code\n"
+    'Trades,Data,Order,Stocks,USD,MSFT,"2024-02-01, 10:30:00",5,400.00,401.00,-2000.00,-1.00,2001.00,0,5,O\n'
+    'Trades,Data,Order,Stocks,EUR,VWCE,"2024-03-01, 09:05:00",10,110.00,110.5,-1100.00,-1.25,1101.25,0,5,O\n'
+    "Trades,SubTotal,,Stocks,USD,MSFT,,5,,,-2000,-1,2001,0,5,\n"
+    'Trades,Data,Order,Forex,EUR,EUR.USD,"2024-02-01, 10:00:00",-1900,1.08,,,-2,,,,\n'
+    "Trades,Total,,Stocks,EUR,,,,,,,,,,,\n"
+    "Dividends,Header,Currency,Date,Description,Amount\n"
+    "Dividends,Data,USD,2024-06-13,MSFT(US5949181045) Cash Dividend USD 0.75 per Share (Ordinary Dividend),3.75\n"
+    "Dividends,Data,Total,,,3.75\n"
+    "Withholding Tax,Header,Currency,Date,Description,Amount,Code\n"
+    "Withholding Tax,Data,USD,2024-06-13,MSFT(US5949181045) Cash Dividend USD 0.75 per Share - US Tax,-0.56,\n"
+    "Deposits & Withdrawals,Header,Currency,Settle Date,Description,Amount\n"
+    "Deposits & Withdrawals,Data,EUR,2024-01-15,Electronic Fund Transfer,5000\n"
+    "Deposits & Withdrawals,Data,Total,,,5000\n"
+    "Interest,Header,Currency,Date,Description,Amount\n"
+    "Interest,Data,EUR,2024-07-03,EUR Credit Interest for Jun-2024,4.10\n"
+    "Fees,Header,Subtitle,Currency,Date,Description,Amount\n"
+    "Fees,Data,Other Fees,USD,2024-05-03,Market data fee,-1.50\n"
+    "Financial Instrument Information,Header,Asset Category,Symbol,Description,Conid,Security ID,Listing Exch,"
+    "Multiplier,Type,Code\n"
+    "Financial Instrument Information,Data,Stocks,MSFT,MICROSOFT CORP,272093,US5949181045,NASDAQ,1,COMMON,\n"
+    "Financial Instrument Information,Data,Stocks,VWCE,VANGUARD FTSE ALL-WORLD UCITS ETF,128831206,IE00BK5BQT80,"
+    "IBIS2,1,ETF,\n")
+
+
+def test_import_degiro_transactions_and_account(app, client):
+    from portfolio_investimentos.models import Instrument
+    from portfolio_investimentos.services.importer import detect_broker
+    assert detect_broker("Transactions.csv", DEGIRO_TX.encode()) == "degiro"
+    assert detect_broker("Account.csv", DEGIRO_ACCOUNT.encode()) == "degiro"
+    token = csrf(client)
+    for name, content in (("Transactions.csv", DEGIRO_TX), ("Account.csv", DEGIRO_ACCOUNT)):
+        r = _upload(client, token, "degiro", name, content.encode())
+        assert r.status_code == 200, r.get_data(as_text=True)
+    with app.app_context():
+        tx = {(t.type, t.instrument): t for t in Transaction.query.all()}
+        buy = tx[("BUY", "US0378331005")]
+        assert buy.quantity == 10 and buy.price == pytest.approx(170.5) and buy.currency == "USD"
+        assert buy.fees == pytest.approx(2.0 * 1.0854)  # os custos em EUR passam para a moeda do ativo
+        sell = tx[("SELL", "US0378331005")]
+        assert sell.quantity == 4 and sell.price == pytest.approx(225)
+        etf = tx[("BUY", "IE00B3RBWM25")]
+        assert etf.fees == pytest.approx(1.0) and db.session.get(Instrument, "IE00B3RBWM25").kind == "etf"
+        div = tx[("DIVIDEND", "US0378331005")]
+        assert div.amount == pytest.approx(2.50) and div.tax == pytest.approx(0.38) and div.currency == "USD"
+        kinds = sorted(t.type for t in Transaction.query.all())
+        # a compra e os custos do extrato de conta e a conversão de moeda não se repetem
+        assert kinds == ["BUY", "BUY", "DEPOSIT", "DIVIDEND", "FEE", "SELL", "WITHDRAWAL"]
+        assert Transaction.query.filter_by(type="FEE").one().amount == pytest.approx(2.5)
+    # importar outra vez não duplica
+    for name, content in (("Transactions.csv", DEGIRO_TX), ("Account.csv", DEGIRO_ACCOUNT)):
+        assert _upload(client, token, "degiro", name, content.encode()).status_code == 200
+    with app.app_context():
+        assert Transaction.query.count() == 7
+
+
+def test_import_ibkr_activity_statement(app, client):
+    from portfolio_investimentos.models import Instrument
+    from portfolio_investimentos.services.importer import detect_broker
+    assert detect_broker("U123.csv", IBKR_CSV.encode()) == "ibkr"
+    token = csrf(client)
+    r = _upload(client, token, "ibkr", "U123_2024.csv", IBKR_CSV.encode())
+    assert r.status_code == 200, r.get_data(as_text=True)
+    with app.app_context():
+        msft = Transaction.query.filter_by(type="BUY", instrument="MSFT").one()
+        assert msft.quantity == 5 and msft.price == 400 and msft.fees == 1.0 and msft.currency == "USD"
+        assert db.session.get(Instrument, "MSFT").isin == "US5949181045"
+        vwce = Transaction.query.filter_by(type="BUY", instrument="VWCE").one()
+        assert vwce.currency == "EUR" and db.session.get(Instrument, "VWCE").isin == "IE00BK5BQT80"
+        div = Transaction.query.filter_by(type="DIVIDEND").one()
+        assert div.instrument == "MSFT" and div.amount == pytest.approx(3.75) and div.tax == pytest.approx(0.56)
+        assert Transaction.query.filter_by(type="DEPOSIT").one().amount == 5000
+        assert Transaction.query.filter_by(type="INTEREST").one().amount == pytest.approx(4.10)
+        assert Transaction.query.filter_by(type="FEE").one().amount == pytest.approx(1.50)
+        assert Transaction.query.count() == 6  # sem Forex, SubTotal e Total
+    assert _upload(client, token, "ibkr", "U123_2024.csv", IBKR_CSV.encode()).status_code == 200
+    with app.app_context():
+        assert Transaction.query.count() == 6

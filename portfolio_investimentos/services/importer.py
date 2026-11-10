@@ -28,12 +28,13 @@ TYPE_ALIASES = {
 BROKERS = [
     {"key": "generic", "name": "CSV genérico", "format": "CSV", "parser": "generic", "color": "#64748b"},
     {"key": "trading212", "name": "Trading 212", "format": "Extrato CSV", "parser": "trading212", "color": "#0ea5e9"},
-    {"key": "degiro", "name": "DEGIRO", "format": "Extrato CSV", "parser": None, "color": "#38bdf8"},
+    {"key": "degiro", "name": "DEGIRO", "format": "Transações e conta (CSV)", "parser": "degiro",
+     "color": "#38bdf8"},
     {"key": "xtb", "name": "XTB", "format": "Extrato XLSX", "parser": "xtb", "color": "#ef4444"},
     {"key": "revolut", "name": "Revolut", "format": "Extrato PDF", "parser": None, "color": "#e2e8f0"},
     {"key": "traderepublic", "name": "Trade Republic", "format": "Extrato CSV", "parser": "traderepublic",
      "color": "#f8fafc"},
-    {"key": "ibkr", "name": "IBKR", "format": "Extrato CSV", "parser": None, "color": "#dc2626"},
+    {"key": "ibkr", "name": "IBKR", "format": "Activity Statement (CSV)", "parser": "ibkr", "color": "#dc2626"},
     {"key": "etoro", "name": "eToro", "format": "Extrato PDF", "parser": None, "color": "#22c55e"},
 ]
 
@@ -56,6 +57,17 @@ def broker_logo(name_or_key):
 
 
 INSTRUCTIONS = {
+    "degiro": [
+        "Inicia sessão na <b>DEGIRO</b> (web) e abre <b>Caixa → Transações</b>.",
+        "Escolhe o período desde a <b>abertura da conta</b> e clica em <b>Exportar → CSV</b>: é o ficheiro <code>Transactions.csv</code> (compras, vendas e custos).",
+        "Abre <b>Caixa → Extrato de conta</b>, com o mesmo período, e exporta também em <b>CSV</b>: é o <code>Account.csv</code> (dividendos e a retenção na fonte, depósitos, levantamentos, juros e custos de conectividade).",
+        "Carrega aqui os dois ficheiros, um de cada vez. Os ativos são identificados pelo ISIN; os custos das ordens vêm só do ficheiro de transações, para não se contarem duas vezes.",
+    ],
+    "ibkr": [
+        "Inicia sessão no <b>Portal do Cliente</b> da Interactive Brokers e abre <b>Desempenho e relatórios → Extratos</b>.",
+        "Escolhe o extrato <b>Atividade</b> (<i>Activity</i>), o período <b>Anual</b> ou <b>Personalizado</b> desde a abertura da conta, e o formato <b>CSV</b>.",
+        "Carrega aqui o ficheiro (um por ano, se for preciso). São importadas as secções <i>Trades</i> (ações e ETF), <i>Dividends</i>, <i>Withholding Tax</i>, <i>Deposits &amp; Withdrawals</i>, <i>Interest</i> e <i>Fees</i>; as conversões de moeda (<i>Forex</i>) ficam de fora.",
+    ],
     "generic": [
         "Cria um ficheiro CSV com o cabeçalho: <code>date,type,ticker,quantity,price,amount,fees,tax,currency,name</code>.",
         "<code>type</code>: BUY, SELL, DIVIDEND, DEPOSIT, WITHDRAWAL, FEE ou INTEREST (também em português).",
@@ -582,8 +594,230 @@ def _xtb_positions(wb):
     return [dict(zip(header, r)) for r in rows[idx + 1:] if r[0] not in (None, "Total")]
 
 
+# ------------------------------------------------------------------ DEGIRO
+def _csv_rows(data):
+    text = data.decode("utf-8-sig", errors="replace") if isinstance(data, bytes) else data
+    sample = text[:4096]
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+    except csv.Error:
+        dialect = csv.excel
+    return [r for r in csv.reader(io.StringIO(text), dialect=dialect) if any(c.strip() for c in r)]
+
+
+def _degiro_kind(header):
+    """'transactions', 'account' ou None, pelo cabeçalho (os nomes vêm na língua da conta, as posições não)."""
+    h = [c.strip().lower() for c in header]
+    if len(h) >= 19 and h[3] == "isin":
+        return "transactions"
+    if len(h) >= 12 and h[4] == "isin":
+        return "account"
+    return None
+
+
+def _degiro_date(v):
+    v = v.strip()
+    for fmt in ("%d-%m-%Y", "%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(v, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"data inválida: {v!r}")
+
+
+# descrições do extrato de conta (em várias línguas da DEGIRO), por ordem: a primeira que bater conta
+_DEGIRO_ACCOUNT = (
+    ("tax", ("dividend tax", "imposto sobre dividendo", "retenção", "impuesto sobre dividendo",
+             "dividendsteuer", "dividendbelasting")),
+    ("dividend", ("dividend", "dividendo", "dividende", "capital return", "rendimento de capital")),
+    ("connection", ("connection fee", "conectividade", "conectividad", "aansluitingskosten",
+                    "verbindungskosten")),
+    ("interest", ("interest", "juros", "intereses", "zinsen", "rente")),
+    ("deposit", ("deposit", "depósito", "deposito", "ingreso", "einzahlung", "storting")),
+    ("withdrawal", ("withdrawal", "levantamento", "retirada", "auszahlung", "terugstorting", "processed flatex")),
+)
+# movimentos que não mudam a carteira ou que já vêm do ficheiro de transações (compras, vendas e os seus custos)
+_DEGIRO_SKIP = ("transaction", "transação", "transacción", "money market", "monetário", "monetario",
+                "câmbio", "fx credit", "fx debit", "compra ", "venda ", "buy ", "sell ")
+
+
+def parse_degiro(data):
+    """Ficheiros CSV da DEGIRO: «Transações» (compras e vendas) e «Extrato de conta» (o resto).
+
+    Lê-se pelas posições das colunas, porque o cabeçalho vem na língua da conta e repete nomes vazios
+    (as moedas). Transações: Data, Hora, Produto, ISIN, Bolsa de referência, Bolsa, Quantidade (negativa nas
+    vendas), Preço, moeda, Valor local, moeda, Valor (EUR), moeda, Taxa de câmbio (moeda local por 1 EUR),
+    Custos de transação (EUR), moeda, Total, moeda, ID da ordem. Extrato de conta: Data, Hora, Data valor,
+    Produto, ISIN, Descrição, Câmbio, moeda, Variação, moeda, Saldo, ID da ordem.
+    """
+    rows = _csv_rows(data)
+    if not rows:
+        raise ValueError("ficheiro vazio")
+    kind = _degiro_kind(rows[0])
+    if kind is None:
+        raise ValueError("não parece um ficheiro de transações nem um extrato de conta da DEGIRO")
+    if kind == "transactions":
+        yield from _degiro_transactions(rows[1:])
+    else:
+        yield from _degiro_account(rows[1:])
+
+
+def _degiro_transactions(rows):
+    seen = {}
+    for r in rows:
+        r = r + [""] * (19 - len(r))
+        isin = r[3].strip().upper() or None
+        qty = _num(r[6])
+        if not isin or not qty:
+            yield {"type": None, "_ignored": r[2] or "(sem ISIN)"}
+            continue
+        d = _degiro_date(r[0])
+        price, cur = _num(r[7]), (r[8].strip() or r[10].strip() or "EUR").upper()
+        rate = _num(r[13]) or 1.0  # moeda local por 1 EUR
+        costs = abs(_num(r[14]))
+        costs_cur = (r[15].strip() or "EUR").upper()
+        fees = costs * (rate if cur != "EUR" and costs_cur == "EUR" else 1.0)  # na moeda do ativo
+        order = r[18].strip()
+        key = (order, r[0], r[1], qty, price)
+        seen[key] = seen.get(key, 0) + 1
+        ext = f"degiro-{order}-{r[0]}-{r[1]}-{qty}-{price}-{seen[key]}" if order else None
+        obs = {"_fx": (cur, rate)} if cur != "EUR" and abs(rate - 1.0) > 1e-9 else {}
+        yield {"date": d, "external_id": ext, "ticker": isin, "name": r[2].strip() or None, "isin": isin,
+               "type": "BUY" if qty > 0 else "SELL", "quantity": abs(qty), "price": price, "amount": 0.0,
+               "fees": fees, "tax": 0.0, "currency": cur, "result": None, "note": None, "_price": price,
+               "_kind": _guess_kind(r[2]), **obs}
+
+
+def _degiro_account(rows):
+    dividends = {}  # (data, ISIN, moeda) → [bruto, imposto, produto]
+    for r in rows:
+        r = r + [""] * (12 - len(r))
+        desc = r[5].strip()
+        low = desc.lower()
+        what = next((k for k, words in _DEGIRO_ACCOUNT if any(w in low for w in words)), None)
+        if what is None or any(w in low for w in _DEGIRO_SKIP):
+            yield {"type": None, "_ignored": desc or "(vazio)"}
+            continue
+        d = _degiro_date(r[0])
+        cur, amount = (r[7].strip() or "EUR").upper(), _num(r[8])
+        isin = r[4].strip().upper() or None
+        base = {"date": d, "external_id": None, "ticker": None, "name": None, "isin": None, "quantity": 0.0,
+                "price": 0.0, "amount": 0.0, "fees": 0.0, "tax": 0.0, "currency": cur, "result": None, "note": desc}
+        if what in ("dividend", "tax"):
+            if not isin:
+                yield {"type": None, "_ignored": desc}
+                continue
+            entry = dividends.setdefault((d, isin, cur), [0.0, 0.0, r[3].strip()])
+            if what == "tax":
+                entry[1] += -amount  # a retenção vem negativa (um acerto devolvido, positivo)
+            else:
+                entry[0] += amount
+        elif what == "connection":
+            yield {**base, "type": "FEE", "amount": abs(amount)}
+        elif what == "interest":
+            yield {**base, "type": "INTEREST" if amount >= 0 else "FEE", "amount": abs(amount)}
+        elif amount:
+            yield {**base, "type": "DEPOSIT" if amount > 0 else "WITHDRAWAL", "amount": abs(amount)}
+        else:
+            yield {"type": None, "_ignored": desc}
+    for (d, isin, cur), (gross, tax, name) in dividends.items():
+        if gross > 0:
+            yield {"date": d, "external_id": None, "ticker": isin, "name": name or None, "isin": isin,
+                   "type": "DIVIDEND", "quantity": 0.0, "price": 0.0, "amount": gross, "fees": 0.0,
+                   "tax": max(tax, 0.0), "currency": cur, "result": None, "note": None}
+
+
+# ------------------------------------------------------------------ Interactive Brokers
+_IBKR_REF = re.compile(r"^\s*([A-Za-z0-9.\- ]+?)\s*\(([A-Z]{2}[A-Z0-9]{9}[0-9])\)")
+
+
+def _ibkr_sections(rows):
+    """Activity Statement em CSV: cada linha começa pela secção e por Header/Data/Total/SubTotal."""
+    out, headers = {}, {}
+    for r in rows:
+        if len(r) < 2:
+            continue
+        sec, kind = r[0].strip(), r[1].strip()
+        if kind == "Header":
+            headers[sec] = [c.strip() for c in r[2:]]
+        elif kind == "Data" and sec in headers:
+            out.setdefault(sec, []).append(dict(zip(headers[sec], [c.strip() for c in r[2:]])))
+    return out
+
+
+def parse_ibkr(data):
+    """Activity Statement da Interactive Brokers (CSV): ações e ETF, dividendos, retenções, depósitos, juros e
+    comissões. As linhas «Total»/«SubTotal» e as conversões de moeda (Forex) ficam de fora."""
+    sec = _ibkr_sections(_csv_rows(data))
+    if not ({"Trades", "Dividends", "Deposits & Withdrawals"} & set(sec)):
+        raise ValueError("não parece um Activity Statement da Interactive Brokers em CSV")
+    isins = {}
+    for r in sec.get("Financial Instrument Information", []):
+        isin = (r.get("Security ID") or "").upper()
+        if _ISIN.match(isin):
+            for sym in (r.get("Symbol") or "").split(","):
+                if sym.strip():
+                    isins[sym.strip()] = (isin, r.get("Description") or None)
+
+    def base(d, cur, note=None):
+        return {"date": d, "external_id": None, "ticker": None, "name": None, "isin": None, "quantity": 0.0,
+                "price": 0.0, "amount": 0.0, "fees": 0.0, "tax": 0.0, "currency": (cur or "EUR").upper(),
+                "result": None, "note": note}
+
+    def is_total(r):
+        cur = (r.get("Currency") or "").upper()
+        return not cur or cur.startswith("TOTAL")
+
+    for r in sec.get("Trades", []):
+        cat = (r.get("Asset Category") or "").lower()
+        if r.get("DataDiscriminator", "Order") not in ("Order", "Trade") or not ("stock" in cat or "etf" in cat):
+            yield {"type": None, "_ignored": f"Trades: {r.get('Asset Category') or '?'}"}
+            continue
+        d = _date((r.get("Date/Time") or "").replace(",", "")[:10])
+        sym, qty, price = (r.get("Symbol") or "").strip(), _num(r.get("Quantity")), _num(r.get("T. Price"))
+        cur = (r.get("Currency") or "USD").upper()
+        isin, name = isins.get(sym, (None, None))
+        yield {**base(d, cur), "type": "BUY" if qty > 0 else "SELL", "ticker": sym, "name": name, "isin": isin,
+               "quantity": abs(qty), "price": price, "fees": abs(_num(r.get("Comm/Fee"))), "_price": price,
+               "_symbol": yahoo_symbol(sym, cur)}
+
+    dividends = {}  # (data, símbolo, moeda) → [bruto, imposto, ISIN]
+    for secname in ("Dividends", "Withholding Tax"):
+        for r in sec.get(secname, []):
+            if is_total(r):
+                continue
+            m = _IBKR_REF.match(r.get("Description") or "")
+            if not m:
+                yield {"type": None, "_ignored": f"{secname}: {r.get('Description') or '?'}"}
+                continue
+            key = (_date(r.get("Date") or ""), m.group(1).strip(), r["Currency"].upper())
+            e = dividends.setdefault(key, [0.0, 0.0, m.group(2)])
+            if secname == "Dividends":
+                e[0] += _num(r.get("Amount"))
+            else:
+                e[1] += -_num(r.get("Amount"))
+    for (d, sym, cur), (gross, tax, isin) in dividends.items():
+        if gross > 0:
+            yield {**base(d, cur), "type": "DIVIDEND", "ticker": sym, "name": isins.get(sym, (None, None))[1],
+                   "isin": isin, "amount": gross, "tax": max(tax, 0.0), "_symbol": yahoo_symbol(sym, cur)}
+
+    for r in sec.get("Deposits & Withdrawals", []):
+        amount = _num(r.get("Amount"))
+        if not is_total(r) and amount:
+            yield {**base(_date(r.get("Settle Date") or r.get("Date") or ""), r["Currency"], r.get("Description")),
+                   "type": "DEPOSIT" if amount > 0 else "WITHDRAWAL", "amount": abs(amount)}
+    for secname in ("Interest", "Fees"):
+        for r in sec.get(secname, []):
+            amount = _num(r.get("Amount"))
+            if is_total(r) or not r.get("Date") or not amount:
+                continue
+            typ = "INTEREST" if secname == "Interest" and amount > 0 else "FEE"
+            yield {**base(_date(r["Date"]), r["Currency"], r.get("Description") or None), "type": typ,
+                   "amount": abs(amount)}
+
+
 PARSERS = {"generic": parse_generic, "trading212": parse_trading212, "traderepublic": parse_traderepublic}
-BINARY_PARSERS = {"xtb": parse_xtb}
+BINARY_PARSERS = {"xtb": parse_xtb, "degiro": parse_degiro, "ibkr": parse_ibkr}
 
 
 def detect_broker(filename, data):
@@ -594,6 +828,10 @@ def detect_broker(filename, data):
     cols = {c.strip().strip('"').lower() for c in re.split(r"[,;\t]", lines[0])} if lines else set()
     if {"transaction_id", "asset_class"} <= cols:
         return "traderepublic"
+    if lines and lines[0].replace('"', "").startswith("Statement,Header"):
+        return "ibkr"
+    if lines and _degiro_kind(next(csv.reader([lines[0]]), [])):
+        return "degiro"
     if "action" in cols and ({"time", "time (utc)"} & cols):
         return "trading212"
     return "generic"

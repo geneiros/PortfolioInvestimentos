@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-10
 
+- **Importar extratos da DEGIRO e da Interactive Brokers (#55)**  
+  DEGIRO: o CSV de Transações (compras e vendas, com o câmbio do dia e os custos da ordem passados para a moeda do ativo) e o do Extrato de conta (dividendos com a retenção juntos, depósitos, levantamentos, juros e custos de conectividade; as compras, os custos das ordens, as conversões de moeda e o fundo do mercado monetário ficam de fora para não se contarem duas vezes). Lê-se pela posição das colunas, por isso funciona em qualquer língua da DEGIRO; os ativos são identificados pelo ISIN. Interactive Brokers: o Activity Statement em CSV (ações e ETF, dividendos e retenções, depósitos e levantamentos, juros e comissões, sem o Forex e os totais), com o ISIN de cada ativo. Os dois são detetados pelo conteúdo, não se duplicam ao importar de novo e têm instruções na página Importar.
 - **Desempenho: «E se tivesse investido no índice?» (#60)**  
   Um cartão novo em «1 · Que retorno tiveste?» simula o mesmo dinheiro, nos mesmos dias, em cada índice da Visão Geral: o valor da carteira no início do período compra unidades do índice no primeiro dia, cada depósito compra ao fecho desse dia e cada levantamento vende (em euros, ao câmbio de cada dia). Mostra, por índice, o valor hoje, o ganho, o IRR e quanto a carteira tem a mais ou a menos, e um gráfico do valor da carteira e do mesmo dinheiro nos índices escolhidos em «Comparar com». Ao contrário do TWR, conta quando se pôs e tirou dinheiro. Não inclui comissões nem o custo de um ETF.
 - **Visão Geral: sem a seta no «Património líquido»**  
