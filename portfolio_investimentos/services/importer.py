@@ -42,7 +42,8 @@ BROKERS = [
 # para servir também às corretoras criadas na importação com um nome próprio (ex.: "XTB – conta EUR")
 _LOGO_DIR = Path(__file__).resolve().parent.parent / "static" / "icons" / "brokers"
 _LOGO_NAMES = (("trading212", ("trading 212", "trading212")), ("xtb", ("xtb",)),
-               ("traderepublic", ("trade republic", "traderepublic")))
+               ("traderepublic", ("trade republic", "traderepublic")), ("degiro", ("degiro",)),
+               ("ibkr", ("ibkr", "interactive brokers")))
 
 
 def broker_logo(name_or_key):

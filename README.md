@@ -166,6 +166,7 @@ As capturas usam os dados de demonstração (empresas e preços fictícios).
 | **Carteira: alerta da carteira** | **Carteira: gerir índices** |
 | ![Alerta da carteira](docs/screenshots/25-carteira-alerta.png) | ![Gerir índices](docs/screenshots/26-carteira-indices.png) |
 | ![Notícias](docs/screenshots/27-noticias.png) | ![Notícias do Radar](docs/screenshots/28-noticias-radar.png) |
+| ![E se tivesse investido no índice?](docs/screenshots/29-desempenho-indice.png) | ![Raio-X dos ETF](docs/screenshots/30-carteira-raio-x.png) |
 
 ### Modo escuro
 
@@ -197,6 +198,7 @@ As capturas usam os dados de demonstração (empresas e preços fictícios).
 | **Carteira: alerta da carteira** | **Carteira: gerir índices** |
 | ![Alerta da carteira (escuro)](docs/screenshots/escuro/25-carteira-alerta.png) | ![Gerir índices (escuro)](docs/screenshots/escuro/26-carteira-indices.png) |
 | ![Notícias (escuro)](docs/screenshots/escuro/27-noticias.png) | ![Notícias do Radar (escuro)](docs/screenshots/escuro/28-noticias-radar.png) |
+| ![E se tivesse investido no índice? (escuro)](docs/screenshots/escuro/29-desempenho-indice.png) | ![Raio-X dos ETF (escuro)](docs/screenshots/escuro/30-carteira-raio-x.png) |
 
 O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro ou Automático.
 

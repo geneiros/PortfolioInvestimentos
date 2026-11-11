@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-11
 
+- **Logótipos da DEGIRO e da IBKR; capturas de ecrã atualizadas**  
+  A DEGIRO e a Interactive Brokers passam a ter logótipo na página Importar e no seletor de corretoras (também para contas com nomes como «DEGIRO – conta» ou «Interactive Brokers»). Capturas novas de todas as páginas (claro e escuro), mais duas: «E se tivesse investido no índice?» (Desempenho) e o Raio-X dos ETF (Carteira).
 - **Barra de progresso no topo ao mudar de página, só no computador**  
   Volta a barra fina no topo (à maneira do Pace), agora só ao mudar de página: começa logo no clique num link (ou no envio de um formulário), ainda na página antiga, enquanto o servidor responde, e acaba quando a página nova aparece. Só no browser do computador (rato e ecrã largo); no telemóvel e nos tablets táteis não aparece. Os pedidos à aplicação dentro da página (ex.: mudar o período na Visão Geral) não a mostram. Nunca fica presa: acaba ao voltar atrás e ao fim de 15 s.
 - **Gráficos: o sombreado da área já aparece completo ao abrir a página**  
