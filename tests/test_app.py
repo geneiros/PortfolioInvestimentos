@@ -2750,9 +2750,9 @@ def test_desempenho_shadow_index(app, client):
     html = client.get("/desempenho").get_data(as_text=True)
     card = html.split('id="shadowCard"', 1)[1].split('id="shadowTable"', 1)[1].split("</table>", 1)[0]
     assert "E se tivesse investido no índice?" in html and 'id="shadowChart"' in html
-    assert html.count('class="pm-chip shadow-pick"') >= 3  # os índices do gráfico escolhem-se no cartão
-    journey = html.split('id="journeyPick"', 1)[1].split("</div>\n</div>", 1)[0]
-    assert journey.count('class="pm-chip bench') >= 3  # também em «2 · Como foi a jornada?»
+    # os índices escolhem-se só no «Comparar com» do topo (sem botões em cada gráfico)
+    assert "shadow-pick" not in html and 'id="journeyPick"' not in html and "dd-pick" not in html
+    assert html.count('class="pm-chip bench') == 4
     assert card.count("<tr>") >= 4  # cabeçalho + pelo menos 3 dos 4 índices da Visão Geral
     with app.app_context():
         from portfolio_investimentos.views import OVERVIEW_TICKERS
