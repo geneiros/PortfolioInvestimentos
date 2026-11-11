@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-11
 
+- **Gráficos: o sombreado da área já aparece completo ao abrir a página**  
+  O degradê da área dos gráficos de linha (Visão Geral, cartão Carteira e Desempenho) era calculado antes de o gráfico ter o tamanho final, com a altura provisória do canvas: em muitos ecrãs acabava a meio e a parte de baixo, à volta do €0, ficava sem cor até se mudar um filtro. Agora calcula-se quando o gráfico se desenha, a partir da área real.
 - **Visão Geral: o gráfico «Retorno total / Valor total» anima uma só vez ao abrir a página**  
   Com «As minhas posições» ligado, o gráfico era desenhado com a carteira e, quando chegavam as posições, apagado e desenhado de novo, por isso a animação de entrada repetia-se (mais visível no PythonAnywhere, onde as posições demoram mais). Agora as posições juntam-se ao gráfico já desenhado, sem o recriar.
 - **Retirados os objetivos de poupança (a pedido)**  

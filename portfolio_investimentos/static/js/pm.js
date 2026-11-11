@@ -389,11 +389,21 @@
     return pm.charts[id];
   };
 
-  pm.gradient = (ctx, color) => {
-    const g = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height || 300);
-    g.addColorStop(0, color + "55");
-    g.addColorStop(1, color + "00");
-    return g;
+  // degradê da área de um gráfico de linha, do topo ao fundo da área do gráfico. É calculado quando o gráfico se
+  // desenha (já com o tamanho final): calculado antes, com a altura provisória do canvas, acabava a meio e a parte
+  // de baixo (ex.: à volta do €0) ficava sem cor. O 1.º argumento (ctx) fica por compatibilidade.
+  pm.gradient = (_ctx, color) => (context) => {
+    const chart = context.chart, area = chart.chartArea;
+    if (!area) return color + "33";  // antes do primeiro desenho
+    const key = `${area.top}|${area.bottom}`;
+    if (!chart.$pmGradients || chart.$pmGradients.key !== key) chart.$pmGradients = { key };
+    if (!chart.$pmGradients[color]) {
+      const g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+      g.addColorStop(0, color + "55");
+      g.addColorStop(1, color + "00");
+      chart.$pmGradients[color] = g;
+    }
+    return chart.$pmGradients[color];
   };
 
   pm.yearTicks = (labels) => (value, index) => {
