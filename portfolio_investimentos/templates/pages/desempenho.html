@@ -105,7 +105,13 @@
 </div>
 {% endif %}
 
-<div class="pm-section-title">2 · Como foi a jornada?</div>
+<div class="d-flex flex-wrap align-items-center gap-2" style="margin: 2rem 0 1rem" id="journeyPick">
+  <div class="pm-section-title m-0 me-auto">2 · Como foi a jornada?</div>
+  <span class="small text-secondary">Comparar com:</span>
+  {% for x in bench_options %}
+  <button type="button" class="pm-chip bench {{ 'active' if x.ticker in bench_chosen }}" data-t="{{ x.ticker }}" style="--chip: {{ x.color }}"><span class="sw" style="background: {{ x.color }}"></span>{{ x.name }}</button>
+  {% endfor %}
+</div>
 <div class="row g-3">
   <div class="col-xl-6"><div class="pm-card"><div class="pm-label mb-3">TWR anual</div><div style="height: 280px"><canvas id="yearChart"></canvas></div></div></div>
   <div class="col-xl-6"><div class="pm-card"><div class="pm-label mb-3">TWR acumulado</div><div style="height: 280px"><canvas id="cumChart"></canvas></div></div></div>
@@ -284,9 +290,10 @@
         scales: { y: pctAxis, x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14, callback: (v, i) => monthLabel(rows[i][0]) } } } } });
   }
   document.addEventListener("DOMContentLoaded", () => {
+    // os botões do topo e os de «2 · Como foi a jornada?» são a mesma escolha: um clique muda os dois
     document.querySelectorAll(".pm-chip.bench").forEach((b) => b.addEventListener("click", () => {
-      b.classList.toggle("active");
       active.has(b.dataset.t) ? active.delete(b.dataset.t) : active.add(b.dataset.t);
+      document.querySelectorAll(`.pm-chip.bench[data-t="${CSS.escape(b.dataset.t)}"]`).forEach((x) => x.classList.toggle("active", active.has(b.dataset.t)));
       // fica no endereço (e nos links dos períodos), para a escolha se manter ao mudar de período
       const q = [...active].join(",");
       history.replaceState(null, "", `?periodo={{ period }}${q ? "&bench=" + encodeURIComponent(q) : ""}`);

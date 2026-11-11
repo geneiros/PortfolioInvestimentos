@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-11
 
+- **Desempenho: escolher os índices também em «2 · Como foi a jornada?»**  
+  Ao lado do título da secção estão os mesmos botões do «Comparar com» do topo, para ligar ou desligar os índices nos gráficos TWR anual, TWR acumulado e drawdown sem subir a página. São a mesma escolha: um clique num muda o outro (e fica no endereço, para se manter ao mudar de período).
 - **Desempenho: escolher os índices no gráfico «E se tivesse investido no índice?»**  
   O cartão tem os seus próprios botões (S&P 500, MSCI World, FTSE All-World, STOXX Europe 600) para escolher, um ou vários, que índices aparecem no gráfico ao lado da carteira, sem mexer nos outros gráficos. Por omissão, os escolhidos em «Comparar com» ou, sem nenhum, o S&P 500.
 
