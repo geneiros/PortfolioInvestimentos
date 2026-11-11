@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-11
+
+- **Desempenho: escolher os índices no gráfico «E se tivesse investido no índice?»**  
+  O cartão tem os seus próprios botões (S&P 500, MSCI World, FTSE All-World, STOXX Europe 600) para escolher, um ou vários, que índices aparecem no gráfico ao lado da carteira, sem mexer nos outros gráficos. Por omissão, os escolhidos em «Comparar com» ou, sem nenhum, o S&P 500.
+
 ## 2026-11-10
 
 - **Planeamento: objetivos de poupança (#63)**  

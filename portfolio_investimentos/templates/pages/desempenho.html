@@ -94,8 +94,13 @@
         {% endfor %}</tbody>
       </table></div>
     </div>
-    <div class="col-12"><div style="height: 260px"><canvas id="shadowChart"></canvas></div>
-      <div class="small text-secondary mt-1">O valor da carteira e, para os índices escolhidos em «Comparar com», o valor do mesmo dinheiro no índice.</div></div>
+    <div class="col-12">
+      <div class="d-flex align-items-center gap-2 flex-wrap small mb-2" id="shadowPick">
+        <span class="text-secondary">No gráfico:</span>
+        {% for s in shadows %}<button type="button" class="pm-chip shadow-pick" data-t="{{ s.ticker }}" style="--chip: {{ s.color }}"><span class="sw" style="background: {{ s.color }}"></span>{{ s.name }}</button>{% endfor %}
+      </div>
+      <div style="height: 260px"><canvas id="shadowChart"></canvas></div>
+      <div class="small text-secondary mt-1">O valor da carteira e o do mesmo dinheiro nos índices escolhidos acima.</div></div>
   </div>
 </div>
 {% endif %}
@@ -232,14 +237,7 @@
     const lineOpts = { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
       plugins: { legend: { position: "bottom", align: "end" }, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.pct(it.parsed.y, 2)}` } } },
       scales: { y: pctAxis, x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 0, callback: pm.yearTicks(d.dates) } } } };
-    if (document.getElementById("shadowChart")) {
-      const sctx = document.getElementById("shadowChart").getContext("2d");
-      const sds = [{ label: "Carteira", data: d.value, borderColor: accent, backgroundColor: pm.gradient(sctx, accent), fill: true, borderWidth: 2, pointRadius: 0, tension: .15 }];
-      benches.filter((b) => b.shadow).forEach((b) => sds.push({ label: `Mesmo dinheiro no ${b.name}`, data: b.shadow, borderColor: b.color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .15 }));
-      pm.chart("shadowChart", { type: "line", data: { labels: d.dates, datasets: sds },
-        options: { ...lineOpts, plugins: { ...lineOpts.plugins, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y)}` } } },
-          scales: { ...lineOpts.scales, y: { ticks: { callback: (v) => pm.money(v) } } } } });
-    }
+    drawShadow();
     pm.chart("cumChart", { type: "line", data: { labels: d.dates, datasets: lineDs("twr", true) }, options: lineOpts });
     pm.chart("ddChart", { type: "line", data: { labels: d.dates, datasets: lineDs("drawdown", "origin") }, options: lineOpts });
 
@@ -251,6 +249,31 @@
         { type: "bar", label: "Carteira", data: s.map((x) => x[0]), backgroundColor: s.map((x) => (x[0] >= 0 ? up : down)), borderRadius: 2 },
       ] }, options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.pct(it.parsed.y, 2)}` } } },
         scales: { y: pctAxis, x: { type: "category", grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, title: { display: true, text: `mês (1 = pior · ${s.length} = melhor)` } } } } });
+    }
+  }
+  // «E se tivesse investido no índice?»: os índices do gráfico escolhem-se no próprio cartão (por omissão, os do
+  // «Comparar com» ou, sem nenhum, o primeiro)
+  const shadowOn = new Set(d.chosen.length ? d.chosen : d.benches.filter((b) => b.shadow).slice(0, 1).map((b) => b.ticker));
+  document.querySelectorAll(".shadow-pick").forEach((b) => {
+    b.classList.toggle("active", shadowOn.has(b.dataset.t));
+    b.addEventListener("click", () => {
+      shadowOn.has(b.dataset.t) ? shadowOn.delete(b.dataset.t) : shadowOn.add(b.dataset.t);
+      b.classList.toggle("active", shadowOn.has(b.dataset.t));
+      drawShadow();
+    });
+  });
+  function drawShadow() {
+    const accent = pm.css("--pm-accent");
+    const lineOpts = { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { position: "bottom", align: "end" } },
+      scales: { x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 0, callback: pm.yearTicks(d.dates) } } } };
+    if (document.getElementById("shadowChart")) {
+      const sctx = document.getElementById("shadowChart").getContext("2d");
+      const sds = [{ label: "Carteira", data: d.value, borderColor: accent, backgroundColor: pm.gradient(sctx, accent), fill: true, borderWidth: 2, pointRadius: 0, tension: .15 }];
+      d.benches.filter((b) => b.shadow && shadowOn.has(b.ticker)).forEach((b) => sds.push({ label: `Mesmo dinheiro no ${b.name}`, data: b.shadow, borderColor: b.color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0, fill: false, tension: .15 }));
+      pm.chart("shadowChart", { type: "line", data: { labels: d.dates, datasets: sds },
+        options: { ...lineOpts, plugins: { ...lineOpts.plugins, tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y)}` } } },
+          scales: { ...lineOpts.scales, y: { ticks: { callback: (v) => pm.money(v) } } } } });
     }
   }
   function drawExcess(g) {

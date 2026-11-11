@@ -341,7 +341,7 @@ def desempenho():
         years = [k for k, _ in perf["yearly"]]
         # «E se tivesse investido no índice?»: o resumo de cada índice, para a tabela
         final = perf["value"][-1]
-        shadows = [{"name": b["name"], "color": b["color"], "final": b["shadow"]["final"], "gain": b["shadow"]["gain"],
+        shadows = [{"ticker": b["ticker"], "name": b["name"], "color": b["color"], "final": b["shadow"]["final"], "gain": b["shadow"]["gain"],
                     "irr": b["shadow"]["irr"], "diff": final - b["shadow"]["final"]}
                    for b in perf["benchmarks"] if b.get("shadow")]
         c.update(
