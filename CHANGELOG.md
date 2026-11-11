@@ -4,13 +4,13 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-11
 
+- **Retirados os objetivos de poupança (a pedido)**  
+  Sai a secção «Objetivos de poupança» do Planeamento (#63). A tabela savings_goal que já exista na base de dados fica sem uso.
 - **Desempenho: os índices escolhem-se só no «Comparar com» do topo**  
   Os índices ligados no «Comparar com» aplicam-se a todos os gráficos com índices: TWR anual, TWR acumulado, drawdown e «E se tivesse investido no índice?». Saem os botões próprios do cartão «E se tivesse investido no índice?» e os de «2 · Como foi a jornada?», para haver uma só escolha.
 
 ## 2026-11-10
 
-- **Planeamento: objetivos de poupança (#63)**  
-  Uma secção nova no Planeamento para metas mais curtas do que o FIRE (ex.: «Entrada da casa €30 000 até 12/2028»): cada objetivo soma os ativos do Património e as corretoras escolhidas (o valor total, com a caixa) e um valor fixo, e mostra o progresso, o que falta, a entrada mensal necessária até à data com o rendimento escolhido (0%, 3%, 5% ou 7% ao ano) e a data prevista ao ritmo dos últimos 12 meses (depósitos líquidos nas corretoras e subida dos valores do Património), com «a tempo», «atrasado» ou «atingido». Um objetivo pode ter o alvo em meses de despesas do Planeamento (fundo de emergência). Criar, alterar e apagar no próprio cartão. Tabela nova savings_goal; «Apagar todos os dados» mantém os objetivos (são planos), sem as ligações aos dados apagados.
 - **Carteira: Raio-X dos ETF (#57)**  
   Um cartão novo mostra a exposição real da carteira: as ações tidas diretamente mais as posições dentro de cada ETF, pelo peso de cada uma, por empresa (as 15 maiores, com o valor e de onde vem), por país e por setor, e a sobreposição entre cada par de ETF (a soma, empresa a empresa, do menor dos dois pesos). A composição de cada ETF vem do ficheiro de posições do emitente (CSV ou XLSX, ex.: iShares «Posições → Descarregar»), carregado no cartão ou descarregado de um endereço do site do emitente (só de emitentes conhecidos, em https), que fica guardado para «Atualizar as composições descarregadas». O leitor encontra sozinho a linha de cabeçalho, aceita pesos em % ou em fração e traduz os países e setores mais comuns. A mesma empresa junta-se pelo ISIN, pelo ticker ou pelo nome. Aviso quando falta a composição de um ETF ou quando tem mais de 4 meses. Tabela nova etf_holding; «Apagar todos os dados» apaga também as composições. O envio de formulários com ficheiro (pm.js) passa a ir em multipart.
 - **Importar extratos da DEGIRO e da Interactive Brokers (#55)**  

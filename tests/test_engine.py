@@ -695,22 +695,3 @@ def test_shadow_investment_same_money_in_index():
     r = shadow_investment(days, closes, 0.0, [500.0, 0.0, 0.0], years=1.0)
     assert r["final"] == 1500.0
     assert shadow_investment(days, [None, None, None], 1000.0, [0.0, 0.0, 0.0], years=1.0) is None
-
-
-def test_savings_goal_math():
-    from datetime import date
-    from portfolio_investimentos.services.goals import monthly_needed, months_between, months_to_reach
-    assert months_between(date(2026, 1, 15), date(2028, 1, 15)) == 24
-    assert months_between(date(2026, 1, 15), date(2028, 1, 14)) == 23
-    assert months_between(date(2026, 5, 1), date(2026, 1, 1)) == 0
-    assert monthly_needed(6000, 30000, 24, 0.0) == pytest.approx(1000)
-    with_return = monthly_needed(6000, 30000, 24, 0.05)
-    assert 0 < with_return < 1000  # com rendimento, é preciso menos por mês
-    # confirmação: 24 meses a juntar esse valor a 5%/ano chegam ao alvo
-    v = 6000.0
-    for _ in range(24):
-        v = v * (1 + 0.05 / 12) + with_return
-    assert v == pytest.approx(30000, rel=1e-9)
-    assert monthly_needed(40000, 30000, 24, 0.05) == 0
-    assert months_to_reach(6000, 30000, 1000, 0.0) == 24
-    assert months_to_reach(0, 30000, 0, 0.0) is None
