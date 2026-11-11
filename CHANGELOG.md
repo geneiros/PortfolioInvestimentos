@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-11
 
+- **Visão Geral: o gráfico «Retorno total / Valor total» anima uma só vez ao abrir a página**  
+  Com «As minhas posições» ligado, o gráfico era desenhado com a carteira e, quando chegavam as posições, apagado e desenhado de novo, por isso a animação de entrada repetia-se (mais visível no PythonAnywhere, onde as posições demoram mais). Agora as posições juntam-se ao gráfico já desenhado, sem o recriar.
 - **Retirados os objetivos de poupança (a pedido)**  
   Sai a secção «Objetivos de poupança» do Planeamento (#63). A tabela savings_goal que já exista na base de dados fica sem uso.
 - **Desempenho: os índices escolhem-se só no «Comparar com» do topo**  

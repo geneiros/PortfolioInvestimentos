@@ -2304,6 +2304,8 @@ def test_overview_carteira_widget_follows_period(app, client):
     assert post(client, "load_demo", token).status_code == 200
     html = client.get("/").get_data(as_text=True)
     assert 'id="heroGainLabel">Variação · ano corrente' in html and 'id="heroTwrLabel">Rendimento · ano corrente' in html
+    # ao abrir, as posições juntam-se ao gráfico sem o recriar (uma só animação)
+    assert "loadPositions().then(() => draw({ quiet: true }))" in html
     m3 = post(client, "performance", token, period="3M").get_json()["message"]
     assert m3["summary"]["label"] == "3 meses" and len(m3["holdings"]) == len(m3["dates"])
     with app.app_context():

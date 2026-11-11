@@ -233,7 +233,7 @@
     });
     document.addEventListener("pm:theme", draw);
     draw();  // a carteira primeiro; as posições juntam-se quando chegarem
-    if (showPos) loadPositions().then(draw).catch(() => {});
+    if (showPos) loadPositions().then(() => draw({ quiet: true })).catch(() => {});
   });
 
   // legenda das posições: cor, nome e ganho no período; um clique esconde/mostra a linha
@@ -264,7 +264,7 @@
     pos.lines.forEach((l) => chip(l.others ? l.name : l.ticker, l.color, l.total, l.pct, l.name));
   }
 
-  function draw() {
+  function draw(opts = {}) {
     if (!perf) return;
     const fmt = (d) => new Date(d).toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" });
     document.getElementById("periodLabel").textContent = fmt(perf.start) + " – hoje";
@@ -285,17 +285,24 @@
       });
     }
     drawLegend();
-    pm.chart("perfChart", {
-      type: "line",
-      data: { labels: perf.dates, datasets },
-      options: {
-        maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
-        plugins: { legend: { display: datasets.length > 1 && !showPos, position: "bottom" },
-          tooltip: { callbacks: { title: (it) => fmt(it[0].label), label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0, mode === "gain")}` } } },
-        scales: { x: { ticks: { maxTicksLimit: 8, callback: (v, i) => perf.dates[i].slice(0, 7) }, grid: { display: false } },
-                  y: { position: "right", ticks: { callback: (v) => pm.money(v, 0, mode === "gain") } } },
-      },
-    });
+    const options = {
+      maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: datasets.length > 1 && !showPos, position: "bottom" },
+        tooltip: { callbacks: { title: (it) => fmt(it[0].label), label: (it) => `${it.dataset.label}: ${pm.money(it.parsed.y, 0, mode === "gain")}` } } },
+      scales: { x: { ticks: { maxTicksLimit: 8, callback: (v, i) => perf.dates[i].slice(0, 7) }, grid: { display: false } },
+                y: { position: "right", ticks: { callback: (v) => pm.money(v, 0, mode === "gain") } } },
+    };
+    // ao abrir a página, as posições chegam depois da carteira: juntam-se ao gráfico já desenhado, sem o
+    // recriar (senão a animação de entrada repetia-se)
+    const chart = pm.charts.perfChart;
+    if (opts.quiet && chart && chart.canvas === document.getElementById("perfChart")) {
+      chart.data.labels = perf.dates;
+      chart.data.datasets = datasets;
+      chart.options = options;
+      chart.update("none");
+      return;
+    }
+    pm.chart("perfChart", { type: "line", data: { labels: perf.dates, datasets }, options });
   }
 })();
 </script>
