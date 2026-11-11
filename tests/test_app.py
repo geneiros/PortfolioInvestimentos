@@ -2936,3 +2936,11 @@ def test_etf_xray_holdings_exposure_and_overlap(app, client):
     assert post(client, "reset_data", token, confirm="APAGAR").status_code == 200
     with app.app_context():
         assert EtfHolding.query.count() == 0 and Setting.get("xray:DEMO-WRLD") is None
+
+
+def test_page_progress_bar_desktop_only(client):
+    html = client.get("/").get_data(as_text=True)
+    assert html.index('id="pmProgress"') < html.index('class="pm-shell"')  # logo no início, antes do conteúdo
+    js = client.get("/static/js/pm.js").get_data(as_text=True)
+    assert "pm.progress" in js and "(pointer: fine)" in js and "beforeunload" in js
+    assert "progress: false" not in js  # os pedidos à API não usam a barra

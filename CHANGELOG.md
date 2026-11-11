@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-11
 
+- **Barra de progresso no topo ao mudar de página, só no computador**  
+  Volta a barra fina no topo (à maneira do Pace), agora só ao mudar de página: começa logo no clique num link (ou no envio de um formulário), ainda na página antiga, enquanto o servidor responde, e acaba quando a página nova aparece. Só no browser do computador (rato e ecrã largo); no telemóvel e nos tablets táteis não aparece. Os pedidos à aplicação dentro da página (ex.: mudar o período na Visão Geral) não a mostram. Nunca fica presa: acaba ao voltar atrás e ao fim de 15 s.
 - **Gráficos: o sombreado da área já aparece completo ao abrir a página**  
   O degradê da área dos gráficos de linha (Visão Geral, cartão Carteira e Desempenho) era calculado antes de o gráfico ter o tamanho final, com a altura provisória do canvas: em muitos ecrãs acabava a meio e a parte de baixo, à volta do €0, ficava sem cor até se mudar um filtro. Agora calcula-se quando o gráfico se desenha, a partir da área real.
 - **Visão Geral: o gráfico «Retorno total / Valor total» anima uma só vez ao abrir a página**  

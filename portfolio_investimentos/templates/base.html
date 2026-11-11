@@ -29,6 +29,11 @@
 </head>
 {% from "macros.html" import broker_badge %}
 <body data-offline="{{ 1 if offline_enabled else 0 }}" data-generated="{{ generated_at }}">
+<div id="pmProgress" aria-hidden="true"></div>
+<script>(function () {  // barra de progresso ao abrir a página, só no computador (rato e ecrã largo)
+  if (!matchMedia("(hover: hover) and (pointer: fine) and (min-width: 768px)").matches) return;
+  const b = document.getElementById("pmProgress"); b.classList.add("pm-on"); b.style.width = "30%";
+})();</script>
 <div class="pm-shell">
   <aside class="pm-sidebar d-flex flex-column p-3 bg-body-tertiary border-end">
     <div class="d-flex align-items-start gap-2 mb-3">

@@ -18,6 +18,71 @@
   pm.tone = (v) => (!v ? "text-secondary" : v > 0 ? "text-up" : "text-down");
   pm.css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
+  // ---------------------------------------------------------------- barra de progresso ao mudar de página
+  // À maneira do Pace: começa logo no clique (na página antiga, enquanto o servidor responde) e acaba quando a página
+  // nova aparece. Só no computador (rato e ecrã largo); no telemóvel e nos tablets táteis não aparece. Os pedidos à
+  // API (ex.: mudar o período) não a usam.
+  const DESKTOP = window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 768px)").matches;
+  pm.progress = (() => {
+    const bar = DESKTOP ? document.getElementById("pmProgress") : null;
+    let count = 0, value = 0, timer = null, hide = null, guard = null;
+    const set = (v) => { value = v; if (bar) bar.style.width = (v * 100).toFixed(1) + "%"; };
+    const tick = () => set(value + (0.9 - value) * 0.08);  // cada vez mais devagar, sem passar dos 90%
+    const finish = () => {
+      if (!bar) return;
+      clearInterval(timer); clearTimeout(guard);
+      timer = null;
+      set(1);
+      bar.classList.add("pm-done");
+      hide = setTimeout(() => { bar.classList.remove("pm-on", "pm-done"); set(0); }, 350);
+    };
+    const start = () => {
+      if (!bar) return;
+      count += 1;
+      clearTimeout(hide);
+      if (timer) return;
+      bar.classList.remove("pm-done");
+      bar.classList.add("pm-on");
+      set(Math.max(value, 0.08));
+      timer = setInterval(tick, 200);
+      clearTimeout(guard);
+      guard = setTimeout(() => { count = 0; finish(); }, 15000);  // nunca fica presa
+    };
+    const done = () => { count = Math.max(count - 1, 0); if (!count && timer) finish(); };
+    const reset = () => { count = 0; if (timer) finish(); };
+    // o arranque inline (base.html) já mostrou a barra enquanto a página carregava: acaba no «load»
+    if (bar && bar.classList.contains("pm-on")) {
+      value = parseFloat(bar.style.width) / 100 || 0.08;
+      count = 1;
+      timer = setInterval(tick, 200);
+      guard = setTimeout(reset, 15000);
+      if (document.readyState === "complete") setTimeout(done, 0);
+      else window.addEventListener("load", done, { once: true });
+    }
+    return { start, done, reset };
+  })();
+
+  if (DESKTOP) {
+    // clique num link da aplicação, envio de um formulário normal ou saída da página
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest && e.target.closest("a[href]");
+      if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (a.target && a.target !== "_self") return;
+      if (a.hasAttribute("download") || a.hasAttribute("data-bs-toggle") || a.closest("[data-bs-toggle]")) return;
+      const url = new URL(a.href, location.href);
+      if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) return;
+      if (url.pathname === location.pathname && url.search === location.search && url.hash) return;  // âncora
+      if (url.pathname.startsWith("/static/") || url.pathname.startsWith("/api/")) return;
+      pm.progress.start();
+    });
+    document.addEventListener("submit", (e) => {
+      const f = e.target;
+      if (!e.defaultPrevented && f && !f.hasAttribute("data-pm-method") && (!f.target || f.target === "_self")) pm.progress.start();
+    });
+    window.addEventListener("beforeunload", () => pm.progress.start());
+    window.addEventListener("pageshow", (e) => { if (e.persisted) pm.progress.reset(); });  // voltar atrás (cache)
+  }
+
   // ---------------------------------------------------------------- API Frappe
   pm.call = async (method, args = {}, opts = {}) => {
     const body = args instanceof FormData ? args : new URLSearchParams(
