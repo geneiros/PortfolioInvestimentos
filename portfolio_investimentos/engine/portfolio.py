@@ -12,7 +12,7 @@ só importa compras/vendas continue a obter retornos corretos.
 """
 from bisect import bisect_right
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 
 EPS = 1e-9
@@ -218,6 +218,68 @@ ASSET_TYPES = {"BUY", "SELL", "DIVIDEND", "TRANSFER_IN", "TRANSFER_OUT", "CONVER
 TX_ORDER = {"DEPOSIT": 0, "INTEREST": 1, "DIVIDEND": 1, "BUY": 2, "TRANSFER_IN": 2, "CONVERT_OUT": 2.4,
             "CONVERT_IN": 2.5, "SELL": 3, "TRANSFER_OUT": 3, "FEE": 4, "WITHDRAWAL": 5}
 IN_TYPES, OUT_TYPES = ("BUY", "TRANSFER_IN", "CONVERT_IN"), ("SELL", "TRANSFER_OUT", "CONVERT_OUT")
+
+
+TRANSIT_DAYS = 7  # dias, no máximo, entre a saída de uma corretora e a chegada à outra
+
+
+def bridge_transfers(txs, isin_of=None, days=TRANSIT_DAYS):
+    """Na carteira de todas as corretoras, junta as passagens entre as tuas corretoras: um levantamento numa e um
+    depósito noutra com montante parecido (até 1% ou €5 de diferença), ou a saída e a entrada do mesmo ativo (mesmo
+    ISIN ou, sem ele, o mesmo símbolo sem a bolsa; mesma quantidade, mesmo que a entrada venha em várias linhas), até `days` dias depois.
+
+    A saída passa para o dia da chegada: enquanto o dinheiro (ou as ações) está a caminho, continua a contar na
+    corretora de onde saiu, e o valor total não cai nesses dias. Devolve a lista nova (as outras ficam iguais)."""
+    isin_of = isin_of or {}
+
+    def same_asset(a, b):  # o mesmo ISIN ou, sem ele, o mesmo símbolo sem a bolsa (F50A.DE = F50A)
+        ia, ib = isin_of.get(a), isin_of.get(b)
+        if ia and ib:
+            return ia == ib
+        return a.split(".")[0].upper() == b.split(".")[0].upper()
+    out = list(txs)
+    moved = {}
+    # dinheiro
+    deposits = [(i, t) for i, t in enumerate(out) if t.type == "DEPOSIT" and t.amount > 0]
+    used = set()
+    for i, w in sorted(((i, t) for i, t in enumerate(out) if t.type == "WITHDRAWAL" and t.amount > 0),
+                       key=lambda x: x[1].date):
+        best = None
+        for j, d in deposits:
+            gap = (d.date - w.date).days
+            if (j in used or d.broker == w.broker or d.currency != w.currency or not 0 <= gap <= days
+                    or abs(d.amount - w.amount) > max(0.01 * w.amount, 5.0)):
+                continue
+            rank = (gap, abs(d.amount - w.amount))
+            if best is None or rank < best[0]:
+                best = (rank, j, d)
+        if best:
+            used.add(best[1])
+            if best[2].date > w.date:
+                moved[i] = best[2].date
+    # ativos: as entradas do mesmo ativo, corretora e dia somam-se (ex.: 229 ações que chegam em 77 + 152)
+    arrivals = defaultdict(float)
+    for t in out:
+        if t.type == "TRANSFER_IN" and t.asset:
+            arrivals[(t.asset.ticker, t.broker, t.date)] += t.quantity
+    taken = set()
+    for i, t in sorted(((i, t) for i, t in enumerate(out) if t.type == "TRANSFER_OUT" and t.asset),
+                       key=lambda x: x[1].date):
+        best = None
+        for (k, b, d), q in arrivals.items():
+            gap = (d - t.date).days
+            if ((k, b, d) in taken or not same_asset(k, t.asset.ticker) or b == t.broker or not 0 <= gap <= days
+                    or abs(q - t.quantity) > max(1e-6, 0.001 * t.quantity)):
+                continue
+            if best is None or gap < best[0]:
+                best = (gap, (k, b, d))
+        if best:
+            taken.add(best[1])
+            if best[1][2] > t.date:
+                moved[i] = best[1][2]
+    for i, d in moved.items():
+        out[i] = replace(out[i], date=d)
+    return out
 
 
 def open_counts(rows):

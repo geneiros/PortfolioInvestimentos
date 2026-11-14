@@ -695,3 +695,43 @@ def test_shadow_investment_same_money_in_index():
     r = shadow_investment(days, closes, 0.0, [500.0, 0.0, 0.0], years=1.0)
     assert r["final"] == 1500.0
     assert shadow_investment(days, [None, None, None], 1000.0, [0.0, 0.0, 0.0], years=1.0) is None
+
+
+def test_bridge_transfers_between_brokers():
+    from portfolio_investimentos.engine.portfolio import Instrument, Tx, bridge_transfers
+    f50, f50de = Instrument("F50A"), Instrument("F50A.DE")
+    other = Instrument("XYZ")
+    txs = [
+        Tx(date(2026, 4, 9), "WITHDRAWAL", amount=9000.0, broker="t212"),
+        Tx(date(2026, 4, 11), "WITHDRAWAL", amount=8616.57, broker="t212"),       # chega com €16,57 a menos
+        Tx(date(2026, 4, 13), "DEPOSIT", amount=8600.0, broker="xtb"),
+        Tx(date(2026, 4, 13), "DEPOSIT", amount=9000.0, broker="xtb"),
+        Tx(date(2026, 4, 21), "TRANSFER_OUT", f50, 229, 31.39, broker="t212"),
+        Tx(date(2026, 4, 23), "TRANSFER_IN", f50de, 77, 31.39, broker="xtb"),    # chega em duas linhas
+        Tx(date(2026, 4, 23), "TRANSFER_IN", f50de, 152, 31.39, broker="xtb"),
+        # não são passagens entre corretoras: montante diferente, demasiado tarde, mesma corretora, outro ativo
+        Tx(date(2026, 5, 1), "WITHDRAWAL", amount=1181.34, broker="t212"),
+        Tx(date(2026, 5, 1), "DEPOSIT", amount=1000.0, broker="xtb"),
+        Tx(date(2026, 6, 1), "WITHDRAWAL", amount=500.0, broker="t212"),
+        Tx(date(2026, 6, 20), "DEPOSIT", amount=500.0, broker="xtb"),
+        Tx(date(2026, 7, 1), "WITHDRAWAL", amount=300.0, broker="xtb"),
+        Tx(date(2026, 7, 2), "DEPOSIT", amount=300.0, broker="xtb"),
+        Tx(date(2026, 8, 1), "TRANSFER_OUT", other, 10, 5.0, broker="t212"),
+        Tx(date(2026, 8, 2), "TRANSFER_IN", f50de, 10, 5.0, broker="xtb"),
+    ]
+    out = bridge_transfers(txs, {"F50A": "IE0009DRDY20"})
+    assert [t.date for t in out[:2]] == [date(2026, 4, 13)] * 2   # o dinheiro sai no dia em que chega
+    assert out[4].date == date(2026, 4, 23)                        # as ações também
+    assert [t.date for t in out[7:]] == [t.date for t in txs[7:]]  # o resto fica igual
+    assert out[2:4] == txs[2:4] and out[5:7] == txs[5:7]
+
+
+def test_bridge_transfers_keep_total_value_in_transit():
+    from portfolio_investimentos.engine.portfolio import Portfolio, PriceBook, Tx, bridge_transfers
+    txs = [Tx(date(2026, 4, 1), "DEPOSIT", amount=10000.0, broker="a"),
+           Tx(date(2026, 4, 6), "WITHDRAWAL", amount=10000.0, broker="a"),
+           Tx(date(2026, 4, 8), "DEPOSIT", amount=10000.0, broker="b")]
+    raw = Portfolio(txs, PriceBook({}, {}), []).series
+    assert min(raw.value) == 0.0                                    # sem a junção, cai a zero dois dias
+    s = Portfolio(bridge_transfers(txs), PriceBook({}, {}), []).series
+    assert min(s.value) == pytest.approx(10000.0) and s.value[-1] == pytest.approx(10000.0)

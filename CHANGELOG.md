@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-14
 
+- **Todas as corretoras: o valor total já não desce quando passas dinheiro ou ações de uma corretora para outra**  
+  Um levantamento numa corretora e o depósito noutra com montante parecido (até 1% ou €5 de diferença), ou a saída e a entrada do mesmo ativo (mesmo ISIN ou, sem ele, o mesmo símbolo sem a bolsa, mesma quantidade, mesmo que chegue em várias linhas), até 7 dias depois, contam como uma passagem: enquanto estão a caminho, continuam no valor total. Antes, o gráfico do valor total descia nesses dias (ex.: €9 000 e €8 617 da Trading 212 para a XTB, entre 9 e 13/04, e 229 F50A entre 21 e 23/04). Os retornos não mudam. A vista de cada corretora fica como estava.
 - **Visão Geral: o gráfico de fundo do cartão Carteira sem picos falsos**  
   O gráfico de fundo desenhava o valor só das posições, por isso vender num dia e voltar a comprar no seguinte (ex.: trocar um ETF monetário por outro) fazia uma queda de um dia do tamanho da venda, enquanto o dinheiro estava em caixa. Passa a desenhar a evolução do valor total da carteira (posições + caixa), como o gráfico «Valor total»: o dinheiro de uma venda conta enquanto está em caixa.
 - **Capturas de ecrã e README atualizados**  

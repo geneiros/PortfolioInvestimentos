@@ -8,7 +8,7 @@ from flask import g
 from sqlalchemy import event, func
 from sqlalchemy.orm import Session
 
-from ..engine.portfolio import (IN_TYPES, OUT_TYPES, RISK_FREE, Instrument as EngineInstrument, Portfolio, PriceBook, Tx,
+from ..engine.portfolio import (IN_TYPES, OUT_TYPES, bridge_transfers, RISK_FREE, Instrument as EngineInstrument, Portfolio, PriceBook, Tx,
                                 open_counts)
 from ..models import Broker, FxRate, Instrument, Price, Setting, Transaction, db
 
@@ -227,6 +227,10 @@ def _compute_portfolio(broker):
     insts = instruments({r.instrument for r in rows if r.instrument} | set(benches))
     txs = [Tx(r.date, r.type, insts.get(r.instrument), r.quantity or 0.0, r.price or 0.0, r.amount or 0.0,
               r.fees or 0.0, r.tax or 0.0, r.currency or "EUR", r.broker, r.result) for r in rows]
+    if broker is None and len({r.broker for r in rows}) > 1:
+        # dinheiro e ações a caminho entre as tuas corretoras não fazem descer o valor total nesses dias
+        isins = dict(db.session.query(Instrument.ticker, Instrument.isin).filter(Instrument.isin.isnot(None)))
+        txs = bridge_transfers(txs, isins)
     currencies = {r.currency for r in rows} | {i.currency for i in insts.values()} | {"USD"}
     fx = _fx(currencies)
     book = PriceBook(_with_trade_prices(_prices(list(insts)), insts, PriceBook(fx=fx)), fx)
