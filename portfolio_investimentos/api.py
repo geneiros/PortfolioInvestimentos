@@ -645,6 +645,43 @@ def refresh_market(only_open=""):
     return "Atualização de cotações em curso. Pode demorar alguns minutos; o aviso na Visão Geral desaparece quando terminar."
 
 
+def quick_quotes_now(force=False):
+    """Atualização rápida dos preços das posições abertas (de todas as corretoras). Para a página e para a tarefa
+    em segundo plano do computador."""
+    from .services.context import _regions
+    p_all = data.load_portfolio(None)
+    tickers = [pos.asset.ticker for pos in p_all.open_positions if not pos.asset.ticker.startswith("DEMO-")]
+    insts = Instrument.query.filter(Instrument.ticker.in_(tickers or [""])).all()
+    if not insts:
+        return {"updated": 0, "fx": 0, "at": Setting.get("quick_quotes_at"), "skipped": "empty"}
+    return market.quick_quotes(insts, regions=_regions(p_all), force=force)
+
+
+@action
+def quick_quotes():
+    """Chamada pela página de 5 em 5 minutos (com a opção ligada): atualiza os preços de hoje das posições abertas,
+    se as bolsas estiverem abertas, e devolve os valores do cartão Carteira e da variação do dia."""
+    if not market.quick_quotes_enabled():
+        return {"enabled": False}
+    res = quick_quotes_now()
+    from flask import g
+    g.pop("pm_portfolios", None)  # a carteira deste pedido foi calculada antes das cotações novas
+    p = data.load_portfolio(data.selected_broker())
+    eur, pct = p.day_change()
+    at = res.get("at")
+    return {"enabled": True, **res, "at_label": at[11:16] if at else None,
+            "holdings": p.holdings_value, "total_return": p.total_return, "total_return_pct": p.total_return_pct,
+            "day": eur, "day_pct": pct, "as_of": p.as_of.strftime("%d/%m") if p.as_of else None}
+
+
+@action
+def set_quick_quotes(enabled):
+    on = str(enabled).lower() in ("1", "true", "on", "sim")
+    Setting.set("quick_quotes", "1" if on else None)
+    return ("Os preços das posições abertas atualizam-se de 5 em 5 minutos, com o mercado aberto."
+            if on else "Atualização automática dos preços desligada.")
+
+
 @action
 def refresh_step(only_open="", restart=""):
     """Faz o bocado seguinte da atualização de cotações (a página chama até terminar; sem threads no servidor)."""

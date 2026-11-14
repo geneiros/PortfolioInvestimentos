@@ -122,6 +122,7 @@ def create_app(config=None):
         from datetime import datetime
         from .models import Setting
         return {"offline_enabled": Setting.get("offline_enabled") == "1",
+                "quick_quotes": Setting.get("quick_quotes") == "1",
                 "generated_at": datetime.now().isoformat(timespec="minutes")}
 
     @app.after_request

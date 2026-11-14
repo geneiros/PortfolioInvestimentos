@@ -511,4 +511,46 @@
     rows.sort((a, b) => (val(a) > val(b) ? 1 : val(a) < val(b) ? -1 : 0) * (asc ? 1 : -1));
     rows.forEach((r) => table.tBodies[0].appendChild(r));
   });
+  // ---------------------------------------------------------------- preços rápidos de 5 em 5 minutos (Definições)
+  // Só com a opção ligada e a página visível; o servidor só pede ao Yahoo com o mercado aberto e no máximo de
+  // 4 em 4 minutos, por isso várias páginas abertas não multiplicam os pedidos. Atualiza o cartão Carteira e a pílula
+  // do topo sem recarregar.
+  (() => {
+    if (document.body?.dataset.quick !== "1") return;
+    const EVERY = 5 * 60 * 1000;
+    let last = 0, timer = null;
+    const $ = (id) => document.getElementById(id);
+    const text = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+    const tone = (id, v) => {
+      const el = $(id); if (!el) return;
+      el.classList.remove("text-up", "text-down", "text-secondary"); el.classList.add(pm.tone(v));
+    };
+    const apply = (r) => {
+      text("heroValue", pm.money(r.holdings));
+      text("heroDayPct", pm.pct(r.day_pct)); text("heroDayEur", pm.money(r.day, 0, true)); tone("heroDayTone", r.day);
+      text("heroTotalPct", pm.pct(r.total_return_pct)); text("heroTotalEur", pm.money(r.total_return, 0, true));
+      tone("heroTotalTone", r.total_return);
+      if (r.as_of) { text("heroDayDate", r.as_of); text("dayPillDate", r.as_of); }
+      text("dayPillEur", pm.money(r.day, 2, true)); text("dayPillPct", pm.pct(r.day_pct, 2));
+      const pill = $("dayPill");
+      if (pill) {
+        pill.classList.remove("text-bg-success", "text-bg-danger", "text-bg-secondary");
+        pill.classList.add(r.day > 0 ? "text-bg-success" : r.day < 0 ? "text-bg-danger" : "text-bg-secondary");
+      }
+      if (r.at_label) text("quickAt", "· atualizado às " + r.at_label);
+    };
+    const run = async () => {
+      if (document.visibilityState !== "visible") return;
+      last = Date.now();
+      try {
+        const r = await pm.call("quick_quotes", {}, { silent: true });
+        if (r && r.enabled) apply(r);
+      } catch (e) { /* sem rede ou servidor ocupado: tenta na próxima */ }
+    };
+    const schedule = () => { clearInterval(timer); timer = setInterval(run, EVERY); };
+    setTimeout(() => { run(); schedule(); }, 3000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && Date.now() - last >= EVERY) { run(); schedule(); }
+    });
+  })();
 })();

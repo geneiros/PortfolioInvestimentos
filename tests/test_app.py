@@ -2945,3 +2945,78 @@ def test_page_progress_bar_desktop_only(client):
     js = client.get("/static/js/pm.js").get_data(as_text=True)
     assert "pm.progress" in js and "(pointer: fine)" in js and "beforeunload" in js
     assert "progress: false" not in js  # os pedidos à API não usam a barra
+
+
+class _QuickYf:
+    calls = []
+
+    class Ticker:
+        def __init__(self, symbol):
+            import pandas as pd
+            _QuickYf.calls.append(symbol)
+            self.symbol = symbol
+            cur = "USD" if symbol in ("ADBE", "EURUSD=X") else "EUR"
+            self.history_metadata = {"currency": cur}
+            self._df = pd.DataFrame({"Close": [1.1 if symbol.endswith("=X") else 230.0]},
+                                    index=pd.DatetimeIndex([pd.Timestamp(date.today())]))
+
+        def history(self, **kw):
+            return self._df
+
+
+def _quick_setup(app):
+    from portfolio_investimentos.models import Instrument
+    with app.app_context():
+        db.session.add_all([
+            Instrument(ticker="ADB", currency="EUR", data_symbol="ADB.DE"),
+            Instrument(ticker="WRONG", currency="EUR", data_symbol="ADBE"),  # cotação noutra moeda: ignorada
+            Transaction(date=date(2026, 8, 27), type="BUY", instrument="ADB", quantity=2, price=200.0, currency="EUR"),
+            Transaction(date=date(2026, 8, 27), type="BUY", instrument="WRONG", quantity=1, price=10.0, currency="EUR"),
+        ])
+        db.session.commit()
+
+
+def test_quick_quotes_disabled_by_default(app, client):
+    token = csrf(client)
+    assert post(client, "quick_quotes", token).get_json()["message"] == {"enabled": False}
+    assert 'data-quick="1"' not in client.get("/").get_data(as_text=True)
+
+
+def test_quick_quotes_throttle_closed_market_and_currency(app, client, monkeypatch):
+    from datetime import datetime
+    from portfolio_investimentos.models import Price
+    from portfolio_investimentos.services import market
+    _quick_setup(app)
+    _QuickYf.calls = []
+    monkeypatch.setattr(market, "_yahoo_client", lambda: _QuickYf)
+    monkeypatch.setattr(market, "market_status", lambda regions=None, now=None: {"open": True})
+    token = csrf(client)
+    assert "atualizam-se de 5 em 5" in post(client, "set_quick_quotes", token, enabled="1").get_json()["message"]
+    assert 'data-quick="1"' in client.get("/").get_data(as_text=True)
+    r = post(client, "quick_quotes", token).get_json()["message"]
+    assert (r["enabled"], r["updated"], r["skipped"]) == (True, 1, None)
+    assert r["holdings"] == pytest.approx(460.0 + 10.0) and r["at_label"]
+    with app.app_context():
+        assert [p.close for p in Price.query.filter_by(instrument="ADB")] == [230.0]
+        assert Price.query.filter_by(instrument="WRONG").count() == 0
+    n = len(_QuickYf.calls)
+    assert post(client, "quick_quotes", token).get_json()["message"]["skipped"] == "recent"
+    assert len(_QuickYf.calls) == n  # sem pedidos novos
+    monkeypatch.setattr(market, "market_status", lambda regions=None, now=None: {"open": False})
+    with app.app_context():
+        assert market.quick_quotes([], now=datetime.now())["skipped"] == "closed"
+    assert "desligada" in post(client, "set_quick_quotes", token, enabled="0").get_json()["message"]
+    assert post(client, "quick_quotes", token).get_json()["message"] == {"enabled": False}
+
+
+def test_quick_quotes_local_loop(app, monkeypatch):
+    from portfolio_investimentos import __main__ as main, api
+    from portfolio_investimentos.models import Setting
+    seen = []
+    monkeypatch.setattr(api, "quick_quotes_now", lambda force=False: seen.append(1))
+    main._quick_quotes_loop(app, every=0, rounds=1)
+    assert seen == []
+    with app.app_context():
+        Setting.set("quick_quotes", "1")
+    main._quick_quotes_loop(app, every=0, rounds=2)
+    assert seen == [1, 1]

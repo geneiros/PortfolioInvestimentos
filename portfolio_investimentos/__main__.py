@@ -82,6 +82,8 @@ def main():
     if not args.no_browser:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
 
+    threading.Thread(target=_quick_quotes_loop, args=(app,), daemon=True, name="cotacoes-rapidas").start()
+
     try:
         from waitress import serve
         serve(app, host=args.host, port=args.port, threads=4)
@@ -90,6 +92,26 @@ def main():
 
 
 DEFAULT_PORT = 5000
+QUICK_EVERY = 300  # segundos
+
+
+def _quick_quotes_loop(app, every=QUICK_EVERY, rounds=None):
+    """No computador: com a opção «de 5 em 5 minutos» ligada, atualiza os preços das posições abertas mesmo com o
+    browser fechado (o servidor só pede ao Yahoo com o mercado aberto). No PythonAnywhere quem o faz é a página."""
+    import logging
+    import time
+    n = 0
+    while rounds is None or n < rounds:
+        n += 1
+        time.sleep(every)
+        try:
+            with app.app_context():
+                from . import api
+                from .services import market
+                if market.quick_quotes_enabled():
+                    api.quick_quotes_now()
+        except Exception as exc:  # nunca deixa a thread morrer
+            logging.getLogger(__name__).info("cotações rápidas falharam: %s", exc)
 
 
 def _choose_port(host, wanted):

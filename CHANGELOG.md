@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-14
 
+- **Preços das posições abertas de 5 em 5 minutos (opcional)**  
+  Em Definições → Dados de mercado, «Ligar» atualiza só o último preço das posições abertas e o câmbio do dia, com as bolsas delas abertas (feriados incluídos). Com uma página aberta e visível, um temporizador de 5 em 5 minutos atualiza sem recarregar o cartão Carteira (valor, variação diária e retorno total) e a pílula do topo, com «atualizado às HH:MM». No computador, uma tarefa em segundo plano faz o mesmo com o browser fechado. No PythonAnywhere é a página que o pede. O servidor pede ao Yahoo no máximo uma vez a cada 4 minutos, mesmo com várias páginas abertas, até 20 s por atualização, e não interfere com uma atualização completa em curso; ignora cotações noutra moeda e dias com desdobramento. Desligado por omissão.
 - **Visão Geral: cartão Carteira com a variação diária, o retorno total e o período**  
   Como na captura pedida: à esquerda, por baixo do valor, a «Variação diária · dd/mm» (o último dia de mercado, em % e €); à direita, o «Retorno total» e, por baixo, a variação do período escolhido na barra de períodos, com o nome do período («Ano corrente» por omissão, «1 ano», «Desde o início»…), em % e €, que muda com o filtro. Sai o «Rendimento» (TWR) do cartão, que continua em Desempenho.
 

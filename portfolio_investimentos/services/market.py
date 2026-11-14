@@ -761,6 +761,67 @@ def refresh_step(only_open=False, restart=False, budget=STEP_BUDGET):
             "missing": job["missing"]}
 
 
+QUICK_MIN_GAP = 240      # segundos entre pedidos rápidos (várias páginas abertas não multiplicam os pedidos)
+QUICK_BUDGET = 20.0      # segundos no máximo por atualização rápida
+
+
+def quick_quotes_enabled():
+    return Setting.get("quick_quotes") == "1"
+
+
+def quick_quotes(instruments, regions=("EU",), force=False, client=None, now=None):
+    """Atualização rápida: só os preços de hoje das posições abertas (`instruments`) e os câmbios das moedas
+    delas, um pedido curto por ativo (os últimos dias de cotações; durante a sessão, o último preço do dia).
+
+    Não faz pedidos com as bolsas fechadas, nem antes de passarem `QUICK_MIN_GAP` segundos desde o último pedido
+    (a não ser com `force`). Devolve {"updated", "fx", "at", "skipped"} ("skipped": o motivo, sem pedidos)."""
+    now = now or datetime.now()
+    last = Setting.get("quick_quotes_at")
+    if not force:
+        if not market_status(regions=regions)["open"]:
+            return {"updated": 0, "fx": 0, "at": last, "skipped": "closed"}
+        try:
+            if last and (now - datetime.fromisoformat(last)).total_seconds() < QUICK_MIN_GAP:
+                return {"updated": 0, "fx": 0, "at": last, "skipped": "recent"}
+        except ValueError:
+            pass
+    if refresh_state()[0]:  # a atualização completa está a correr: ela já trata dos preços
+        return {"updated": 0, "fx": 0, "at": last, "skipped": "busy"}
+    yf = client or _yahoo_client()
+    since = date.today() - timedelta(days=6)
+    t0, updated, fx = _time.monotonic(), 0, 0
+    for inst in instruments:
+        symbol = getattr(inst, "data_symbol", None)
+        if not symbol or getattr(inst, "kind", None) == "index" or _time.monotonic() - t0 > QUICK_BUDGET:
+            continue
+        try:
+            t = yf.Ticker(symbol)
+            hist = t.history(start=since, auto_adjust=False)
+            if hist is None or hist.empty:
+                continue
+            cur = (getattr(t, "history_metadata", None) or {}).get("currency")
+            cur, scale = SUBUNITS.get(cur, (cur, 1.0))
+            if cur and cur != inst.currency:
+                continue  # outra moeda (o símbolo mudou?): a atualização completa resolve
+            if any(split for _, row in hist.iterrows() for split in [_split(row)]):
+                continue  # desdobramento recente: precisa do histórico todo
+            if _upsert(Price, "instrument", inst.ticker, "close", hist, scale):
+                updated += 1
+        except Exception as exc:  # um ativo que falha não impede os outros
+            log.info("cotação rápida de %s falhou: %s", symbol, exc)
+    for cur in sorted({getattr(i, "currency", "EUR") for i in instruments} - {"EUR"}):
+        if _time.monotonic() - t0 > QUICK_BUDGET:
+            break
+        try:
+            if _upsert(FxRate, "currency", cur, "rate", yf.Ticker(f"EUR{cur}=X").history(start=since)):
+                fx += 1
+        except Exception as exc:
+            log.info("câmbio rápido de %s falhou: %s", cur, exc)
+    at = now.isoformat(timespec="seconds")
+    Setting.set("quick_quotes_at", at)
+    return {"updated": updated, "fx": fx, "at": at, "skipped": None}
+
+
 def refresh_in_background(app, only_open=False):
     """Corre a atualização numa thread e guarda o estado para as páginas o mostrarem."""
     if _lock.locked():
