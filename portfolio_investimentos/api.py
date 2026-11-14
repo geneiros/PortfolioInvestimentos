@@ -678,6 +678,21 @@ def simulate_sale(asset="", qty="", price="", fees=""):
 
 
 @action
+def simulate_harvest(keys="", fee="", fx_pct="", rebuy="1", asset="", qty="", price="", fees=""):
+    """Vender (e voltar a comprar) as posições com menos-valia escolhidas: poupança no imposto do ano, custos e
+    imposto adiado. O saldo de partida inclui a venda simulada no formulário de cima, se houver."""
+    base = sale_sim.year_balance()
+    if asset:
+        base = simulate_sale_result(asset, qty, price, fees)["balance_after"]
+    ks = [k for k in (keys.split(",") if isinstance(keys, str) else keys) if k]
+    try:
+        return sale_sim.harvest_plan(ks, base, _float(fee), _float(fx_pct),
+                                     str(rebuy).lower() in ("1", "true", "on", "sim"))
+    except sale_sim.SimulationError as exc:
+        raise ApiError(str(exc)) from exc
+
+
+@action
 def quick_quotes():
     """Chamada pela página de 5 em 5 minutos (com a opção ligada): atualiza os preços de hoje das posições abertas,
     se as bolsas estiverem abertas, e devolve os valores do cartão Carteira e da variação do dia."""

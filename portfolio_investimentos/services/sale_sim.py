@@ -46,7 +46,8 @@ def _open_losses(skip=None):
             loss = pos.value_eur - pos.invested_eur
             if loss < -0.005:
                 out.append({"key": key, "ticker": pos.asset.ticker, "name": pos.asset.name or pos.asset.ticker,
-                            "broker": bname, "qty": pos.qty, "loss": loss})
+                            "broker": bname, "qty": pos.qty, "loss": loss, "currency": pos.asset.currency,
+                            "value": pos.value_eur, "cost": pos.invested_eur})
     return sorted(out, key=lambda r: r["loss"])
 
 
@@ -103,3 +104,38 @@ def simulate(key, qty=None, price=None, fees=0.0, today=None):
         "tax_before": tax["before"], "tax_after": tax["after"], "tax_delta": tax["delta"], "rate": TAX_RATE,
         "harvest": harvest(balance + gain, skip=key),
     }
+
+
+def harvest_plan(keys, balance, fee_per_order=0.0, fx_pct=0.0, rebuy=True):
+    """Vender (e, opcionalmente, voltar a comprar) as posições `keys` com menos-valia, ao último preço.
+
+    Por posição: a menos-valia realizada (o valor de realização já desconta a comissão da venda e o câmbio), os custos
+    da operação e, com a recompra, o novo custo de aquisição (o valor de mercado mais a comissão e o câmbio da compra).
+    No total: quanto baixa o imposto das mais-valias do ano (`balance` = saldo antes destas vendas), os custos, o
+    benefício líquido agora e o imposto adiado: com a recompra, o custo de aquisição desce e a diferença volta a ser
+    tributada numa venda futura (se o preço não mudar)."""
+    if fee_per_order < 0 or fx_pct < 0:
+        raise SimulationError("As comissões e o custo de câmbio não podem ser negativos.")
+    wanted = set(keys or [])
+    rows = [r for r in _open_losses() if r["key"] in wanted]
+    if not rows:
+        raise SimulationError("Escolhe pelo menos uma posição com menos-valia.")
+    out, total_loss, costs, deferred = [], 0.0, 0.0, 0.0
+    for r in rows:
+        fx_cost = r["value"] * fx_pct / 100 if r["currency"] != "EUR" else 0.0
+        sell_cost = fee_per_order + fx_cost
+        loss = (r["value"] - sell_cost) - r["cost"]
+        buy_cost = (fee_per_order + fx_cost) if rebuy else 0.0
+        new_cost = r["value"] + buy_cost if rebuy else None
+        # sem recompra não há custo novo; com ela, o custo desce e esse valor volta a contar numa venda futura
+        defer = max(r["cost"] - new_cost, 0.0) * TAX_RATE if rebuy else 0.0
+        total_loss += loss
+        costs += sell_cost + buy_cost
+        deferred += defer
+        out.append({**r, "realized": loss, "costs": sell_cost + buy_cost, "new_cost": new_cost, "deferred": defer})
+    tax = tax_delta(balance, total_loss)
+    saving = -tax["delta"]
+    return {"rows": out, "rebuy": bool(rebuy), "fee_per_order": fee_per_order, "fx_pct": fx_pct,
+            "balance_before": balance, "balance_after": balance + total_loss, "loss": total_loss,
+            "tax_before": tax["before"], "tax_after": tax["after"], "saving": saving, "costs": costs,
+            "net": saving - costs, "deferred": deferred, "unused_loss": min(balance + total_loss, 0.0) - min(balance, 0.0)}

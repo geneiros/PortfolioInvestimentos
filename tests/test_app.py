@@ -3066,3 +3066,34 @@ def test_sale_simulator(app, client):
     assert "Data aquisição;Quantidade;Valor aquisição;Valor realização;Mais/menos-valia" in text
     assert "Imposto estimado (28%)" in text
     assert client.get("/fiscal/simulacao.csv?ativo=999:NADA").status_code == 400
+
+
+def test_sale_simulator_harvest_and_rebuy(app, client):
+    from portfolio_investimentos.services import sale_sim
+    token = csrf(client)
+    post(client, "load_demo", token)
+    with app.app_context():
+        losses = sale_sim._open_losses()
+        assert losses
+        keys = [r["key"] for r in losses]
+        balance = 1000.0
+        plan = sale_sim.harvest_plan(keys, balance, fee_per_order=2.0, fx_pct=0.5, rebuy=True)
+        total = sum(r["loss"] for r in losses)
+        # a comissão da venda e o câmbio entram no valor de realização (a menos-valia aumenta)
+        assert plan["loss"] == pytest.approx(total - 2.0 * len(losses)
+                                             - sum(r["value"] * 0.005 for r in losses if r["currency"] != "EUR"))
+        assert plan["saving"] == pytest.approx((max(balance, 0) - max(balance + plan["loss"], 0)) * 0.28)
+        assert plan["costs"] == pytest.approx(sum(2 * (2.0 + (r["value"] * 0.005 if r["currency"] != "EUR" else 0))
+                                                  for r in losses))
+        assert plan["net"] == pytest.approx(plan["saving"] - plan["costs"])
+        for row in plan["rows"]:  # recompra: o custo passa a ser o de hoje e a diferença fica para uma venda futura
+            assert row["new_cost"] < row["cost"]
+            assert row["deferred"] == pytest.approx((row["cost"] - row["new_cost"]) * 0.28)
+        sold = sale_sim.harvest_plan(keys[:1], 0.0, rebuy=False)
+        assert sold["saving"] == 0 and sold["deferred"] == 0 and sold["rows"][0]["new_cost"] is None
+        assert sold["unused_loss"] == pytest.approx(sold["loss"])  # saldo a zero: a perda não abate nada este ano
+        with pytest.raises(sale_sim.SimulationError):
+            sale_sim.harvest_plan([], balance)
+    r = post(client, "simulate_harvest", token, keys=",".join(keys), fee="1,5", rebuy="1").get_json()["message"]
+    assert r["rebuy"] and len(r["rows"]) == len(keys) and r["fee_per_order"] == 1.5
+    assert post(client, "simulate_harvest", token, keys="").status_code == 400
