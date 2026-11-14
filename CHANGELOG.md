@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-14
+
+- **Visão Geral: cartão Carteira com a variação diária, o retorno total e o período**  
+  Como na captura pedida: à esquerda, por baixo do valor, a «Variação diária · dd/mm» (o último dia de mercado, em % e €); à direita, o «Retorno total» e, por baixo, a variação do período escolhido na barra de períodos, com o nome do período («Ano corrente» por omissão, «1 ano», «Desde o início»…), em % e €, que muda com o filtro. Sai o «Rendimento» (TWR) do cartão, que continua em Desempenho.
+
 ## 2026-11-11
 
 - **Logótipos da DEGIRO e da IBKR; capturas de ecrã atualizadas**  

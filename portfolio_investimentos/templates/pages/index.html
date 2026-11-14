@@ -26,23 +26,17 @@
           <div class="pm-hero-value money my-3">{{ p.holdings_value|money }}</div>
           {% if networth %}<a href="/patrimonio" class="small text-secondary text-decoration-none d-inline-block mt-n2" id="netWorthLink">Património líquido <span class="money">{{ networth.total|money }}</span> · disponível <span class="money">{{ networth.available|money }}</span>{% if networth_late %} <span class="badge text-bg-warning" title="Valores do Património sem atualizar há mais de um mês"><i class="bi bi-calendar-check"></i> {{ networth_late }} por atualizar</span>{% endif %}</a>{% endif %}
           {% set h = hero or {"label": "ano corrente", "gain": 0, "gain_pct": 0, "twr": 0, "twr_annual": none} %}
-          <div class="d-flex flex-wrap column-gap-5 row-gap-3 mt-4">
-            <div>
-              <div class="pm-label"><span id="heroGainLabel">Variação · {{ h.label }}</span> {{ help("Ganho no período escolhido no gráfico, sem contar depósitos e levantamentos. Em %: sobre o máximo de capital investido no período, como em Desempenho.") }}</div>
-              <div class="pm-big {{ h.gain|tone }}" id="heroGain"><span id="heroGainPct">{{ h.gain_pct|pct(1) }}</span> <small class="fs-5">· <span class="money" id="heroGainEur">{{ h.gain|money(sign=True) }}</span></small></div>
-            </div>
-            {% set dc = day_change %}
-            <div id="heroDay">
-              <div class="pm-label">Variação · dia {{ help("Variação do último dia de mercado face ao dia anterior, sem contar depósitos e levantamentos desse dia. Em %: sobre o valor da carteira no dia anterior.") }}</div>
-              <div class="pm-big {{ dc[0]|tone }}">{{ dc[1]|pct(1) }} <small class="fs-5">· <span class="money">{{ dc[0]|money(sign=True) }}</span></small></div>
-            </div>
+          {% set dc = day_change %}
+          <div class="mt-4" id="heroDay">
+            <div class="pm-label">Variação diária · {{ p.as_of|ddmm }} {{ help("Variação do último dia de mercado face ao dia anterior, sem contar depósitos e levantamentos desse dia. Em %: sobre o valor da carteira no dia anterior.") }}</div>
+            <div class="pm-big {{ dc[0]|tone }}">{{ dc[1]|pct(1) }} <small class="fs-5">· <span class="money">{{ dc[0]|money(sign=True) }}</span></small></div>
           </div>
         </div>
         <div class="col-md-5 mt-4 mt-md-0">
           <div class="pm-label mt-md-4">Retorno total {{ help("Em euros: valor total (posições + caixa) menos o dinheiro líquido depositado (depósitos − levantamentos). Em %: esse ganho dividido pelo máximo de dinheiro líquido que chegaste a ter investido. O retorno ponderado no tempo (TWR) está em Desempenho.") }}</div>
           <div class="pm-big {{ p.total_return|tone }}">{{ p.total_return_pct|pct(1) }} <small class="fs-5 money">· {{ p.total_return|money(sign=True) }}</small></div>
-          <div class="pm-label mt-4"><span id="heroTwrLabel">Rendimento · {{ h.label }}</span> {{ help("Rendimento ponderado pelo tempo (TWR) no período escolhido: mede só as escolhas de investimento, sem depender de quando puseste ou tiraste dinheiro (como em Desempenho). Com mais de 1 ano, também o rendimento anual: a taxa por ano que, composta, dá o rendimento do período (o CAGR de Desempenho).") }}</div>
-          <div class="pm-big {{ h.twr|tone }}" id="heroTwr"><span id="heroTwrPct">{{ h.twr|pct(1) }}</span> <small class="fs-5{{ '' if h.twr_annual is not none else ' d-none' }}" id="heroTwrYearBox" title="Rendimento anual (TWR anualizado)">· <span id="heroTwrYear">{{ h.twr_annual|pct(1) if h.twr_annual is not none else '' }}</span>/ano</small></div>
+          <div class="pm-label mt-4"><span id="heroGainLabel">{{ h.label|capitalize }}</span> {{ help("Ganho no período escolhido na barra de períodos (por omissão, o ano corrente), sem contar depósitos e levantamentos. Em %: sobre o máximo de capital investido no período, como em Desempenho.") }}</div>
+          <div class="pm-big {{ h.gain|tone }}" id="heroGain"><span id="heroGainPct">{{ h.gain_pct|pct(1) }}</span> <small class="fs-5">· <span class="money" id="heroGainEur">{{ h.gain|money(sign=True) }}</span></small></div>
         </div>
       </div>
       </div>
@@ -190,18 +184,11 @@
         options: { maintainAspectRatio: false, animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } } },
       });
       const tone = (el, v) => { el.classList.remove("text-up", "text-down", "text-secondary"); el.classList.add(pm.tone(v)); };
-      document.getElementById("heroGainLabel").textContent = `Variação · ${h.label}`;
-      document.getElementById("heroTwrLabel").textContent = `Rendimento · ${h.label}`;
+      // o período da barra (por omissão, o ano corrente): «Ano corrente», «1 ano», «Desde o início»…
+      document.getElementById("heroGainLabel").textContent = (h.label || "").charAt(0).toUpperCase() + (h.label || "").slice(1);
       document.getElementById("heroGainPct").textContent = pm.pct(h.gain_pct, 1);
       document.getElementById("heroGainEur").textContent = pm.money(h.gain, 0, true);
       tone(document.getElementById("heroGain"), h.gain);
-      const twr = document.getElementById("heroTwr");
-      document.getElementById("heroTwrPct").textContent = pm.pct(h.twr, 1);
-      tone(twr, h.twr);
-      // com mais de 1 ano (3A, 5A, Max), o rendimento anual ao lado
-      const annual = h.twr_annual !== null && h.twr_annual !== undefined;
-      document.getElementById("heroTwrYearBox").classList.toggle("d-none", !annual);
-      document.getElementById("heroTwrYear").textContent = annual ? pm.pct(h.twr_annual, 1) : "";
     };
     drawHero();
 

@@ -2303,7 +2303,8 @@ def test_overview_carteira_widget_follows_period(app, client):
     token = csrf(client)
     assert post(client, "load_demo", token).status_code == 200
     html = client.get("/").get_data(as_text=True)
-    assert 'id="heroGainLabel">Variação · ano corrente' in html and 'id="heroTwrLabel">Rendimento · ano corrente' in html
+    # como no cartão pedido: variação diária, retorno total e o período da barra (por omissão, o ano corrente)
+    assert 'id="heroGainLabel">Ano corrente' in html and 'id="heroTwrLabel"' not in html
     # ao abrir, as posições juntam-se ao gráfico sem o recriar (uma só animação)
     assert "loadPositions().then(() => draw({ quiet: true }))" in html
     m3 = post(client, "performance", token, period="3M").get_json()["message"]
@@ -2312,9 +2313,9 @@ def test_overview_carteira_widget_follows_period(app, client):
         perf = data_portfolio().performance("3M")
     assert abs(m3["summary"]["twr"] - perf["twr_total"]) < 1e-9
     assert abs(m3["summary"]["gain"] - round(perf["return_eur"], 2)) < 0.01
-    assert m3["summary"]["twr_annual"] is None and 'id="heroTwrYearBox"' in html
+    assert m3["summary"]["twr_annual"] is None
     assert "twr_eur" not in m3["summary"]  # o rendimento (TWR) só em %: sem um valor em € que faça sentido
-    assert 'id="heroDay"' in html and "Variação · dia" in html and 'id="heroTwrEur"' not in html  # até 1 ano não há rendimento anual
+    assert 'id="heroDay"' in html and "Variação diária · " in html
     m5 = post(client, "performance", token, period="5A").get_json()["message"]["summary"]
     with app.app_context():
         p5 = data_portfolio().performance("5A")
