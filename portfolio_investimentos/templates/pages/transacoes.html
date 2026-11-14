@@ -44,22 +44,18 @@
   {% else %}<tr><td colspan="10" class="text-secondary">Sem transações.</td></tr>{% endfor %}</tbody>
 </table></div>
 {% if pages > 1 %}
-{# só a primeira, a última e as vizinhas da atual: com muitas páginas, os números não saem do ecrã #}
-{% set win = 1 %}
+{# todas as páginas no HTML; o script mostra as que cabem na largura da tabela (a primeira, a última e as vizinhas
+   da atual, com «…»). Sem o script, os números passam para a linha seguinte em vez de saírem do ecrã. #}
 {% set q = '&tipo=' ~ tipo if tipo else '' %}
-{% macro link(i) %}<li class="page-item {{ 'active' if i == page }}"><a class="page-link" href="?pagina={{ i }}{{ q }}"{% if i == page %} aria-current="page"{% endif %}>{{ i }}</a></li>{% endmacro %}
-{% set gap = '<li class="page-item disabled"><span class="page-link">…</span></li>'|safe %}
-<nav class="mt-3 d-flex flex-wrap align-items-center gap-2" aria-label="Páginas">
+<nav class="mt-3 d-flex flex-wrap align-items-center gap-2" aria-label="Páginas" id="txPages" data-page="{{ page }}" data-pages="{{ pages }}">
 <ul class="pagination pagination-sm flex-wrap m-0">
-  <li class="page-item {{ 'disabled' if page <= 1 }}"><a class="page-link" href="?pagina={{ page - 1 }}{{ q }}" aria-label="Anterior">‹</a></li>
-  {{ link(1) }}
-  {% if page - win > 2 %}{{ gap }}{% endif %}
-  {% for i in range([2, page - win]|max, [pages - 1, page + win]|min + 1) %}{{ link(i) }}{% endfor %}
-  {% if page + win < pages - 1 %}{{ gap }}{% endif %}
-  {{ link(pages) }}
-  <li class="page-item {{ 'disabled' if page >= pages }}"><a class="page-link" href="?pagina={{ page + 1 }}{{ q }}" aria-label="Seguinte">›</a></li>
+  <li class="page-item {{ 'disabled' if page <= 1 }}" data-nav><a class="page-link" href="?pagina={{ page - 1 }}{{ q }}" aria-label="Anterior">‹</a></li>
+  {% for i in range(1, pages + 1) %}<li class="page-item {{ 'active' if i == page }}" data-p="{{ i }}"><a class="page-link" href="?pagina={{ i }}{{ q }}"{% if i == page %} aria-current="page"{% endif %}>{{ i }}</a></li>
+  {% if i == 1 %}<li class="page-item disabled d-none" data-gap="l"><span class="page-link">…</span></li>{% endif %}
+  {% if i == pages - 1 %}<li class="page-item disabled d-none" data-gap="r"><span class="page-link">…</span></li>{% endif %}{% endfor %}
+  <li class="page-item {{ 'disabled' if page >= pages }}" data-nav><a class="page-link" href="?pagina={{ page + 1 }}{{ q }}" aria-label="Seguinte">›</a></li>
 </ul>
-<span class="small text-secondary">Página {{ page }} de {{ pages }}</span>
+<span class="small text-secondary ms-auto" id="txPagesInfo">Página {{ page }} de {{ pages }}</span>
 </nav>
 {% endif %}
 {% endautoescape %}{% endblock %}
@@ -76,5 +72,43 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   sel.addEventListener("change", sync); sync();
 });
+
+// paginação: tantos números quantos cabem na largura da tabela, à volta da página atual
+(() => {
+  const nav = document.getElementById("txPages");
+  if (!nav) return;
+  const page = +nav.dataset.page, pages = +nav.dataset.pages;
+  const items = [...nav.querySelectorAll("[data-p]")];
+  const gapL = nav.querySelector('[data-gap="l"]'), gapR = nav.querySelector('[data-gap="r"]');
+  const fit = () => {
+    items.forEach((li) => li.classList.remove("d-none"));
+    [gapL, gapR].forEach((g) => g && g.classList.remove("d-none"));
+    const w = items.map((li) => li.getBoundingClientRect().width);
+    const gw = gapL ? gapL.getBoundingClientRect().width : 0;
+    const fixed = [...nav.querySelectorAll("[data-nav]")].reduce((t, li) => t + li.getBoundingClientRect().width, 0);
+    const avail = nav.clientWidth - document.getElementById("txPagesInfo").getBoundingClientRect().width - 12;
+    // largura de: 1, a…b, última e os «…» que forem precisos
+    const cost = (a, b) => {
+      let t = fixed + w[0] + (pages > 1 ? w[pages - 1] : 0);
+      for (let i = Math.max(a, 2); i <= Math.min(b, pages - 1); i++) t += w[i - 1];
+      return t + gw * ((a > 2) + (b < pages - 1));
+    };
+    let a = page, b = page, grew = true, left = true;
+    while (grew) {
+      grew = false;
+      for (const side of left ? ["l", "r"] : ["r", "l"]) {
+        if (side === "l" && a > 1 && cost(a - 1, b) <= avail) { a--; grew = true; break; }
+        if (side === "r" && b < pages && cost(a, b + 1) <= avail) { b++; grew = true; break; }
+      }
+      left = !left;
+    }
+    items.forEach((li, i) => { const p = i + 1; li.classList.toggle("d-none", !(p === 1 || p === pages || (p >= a && p <= b))); });
+    if (gapL) gapL.classList.toggle("d-none", !(a > 2));
+    if (gapR) gapR.classList.toggle("d-none", !(b < pages - 1));
+  };
+  fit();
+  let t = null;
+  window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(fit, 100); });
+})();
 </script>
 {% endblock %}

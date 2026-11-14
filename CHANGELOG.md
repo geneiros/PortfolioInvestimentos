@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-14
 
+- **Transações: a paginação ocupa a largura da tabela**  
+  Os números das páginas enchem a linha até à largura da tabela (menos «Página X de N»), à volta da página atual, sempre com a primeira e a última e «…» onde faltam páginas. São mais números no computador e menos no telemóvel, e ajustam-se ao redimensionar a janela.
 - **Transações: a paginação já não sai do ecrã**  
   Com muitas transações, aparecia um botão por página (100 transações cada) numa só linha, que passava a largura do ecrã e obrigava a deslizar na horizontal. Agora mostra «‹», a primeira página, as vizinhas da atual, a última e «›», com «…» entre elas e «Página X de N» ao lado; se mesmo assim não couber, passa para a linha seguinte. Um número de página acima da última abre a última.
 - **Preços das posições abertas de 5 em 5 minutos (opcional)**  

@@ -3029,6 +3029,6 @@ def test_transactions_pagination_window(app, client):
         db.session.commit()
     html = client.get("/transacoes?pagina=12").get_data(as_text=True)
     links = set(re.findall(r'href="\?pagina=(\d+)"', html))
-    assert {"1", "11", "12", "13", "25"} <= links and "5" not in links and "…" in html
+    assert links == {str(i) for i in range(1, 26)} and 'data-gap="l"' in html  # o script mostra as que cabem
     assert "Página 12 de 25" in html
     assert "Página 25 de 25" in client.get("/transacoes?pagina=999").get_data(as_text=True)
