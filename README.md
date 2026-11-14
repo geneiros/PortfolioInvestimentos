@@ -138,73 +138,79 @@ As capturas usam os dados de demonstração (empresas e preços fictícios).
 
 ### Modo claro
 
-| Visão Geral | Evolução, as minhas posições e próximos eventos |
+| Visão Geral | Evolução e próximos eventos |
 | --- | --- |
-| ![Visão Geral](docs/screenshots/01-visao-geral.png) | ![Evolução](docs/screenshots/02-visao-geral-evolucao.png) |
+| ![Visão Geral](docs/screenshots/01-visao-geral.png) | ![Evolução e próximos eventos](docs/screenshots/02-visao-geral-evolucao.png) |
 | **Peso vs retorno e alocação** | **Perfil de investidor** |
 | ![Peso vs retorno e alocação](docs/screenshots/03-visao-geral-peso-alocacao.png) | ![Perfil de investidor](docs/screenshots/04-perfil-investidor.png) |
 | **Carteira** | **Alocação** |
 | ![Carteira](docs/screenshots/05-carteira.png) | ![Alocação](docs/screenshots/06-carteira-alocacao.png) |
 | **Desempenho** | **Como foi a jornada** |
-| ![Desempenho](docs/screenshots/07-desempenho.png) | ![Jornada](docs/screenshots/08-desempenho-jornada.png) |
+| ![Desempenho](docs/screenshots/07-desempenho.png) | ![Como foi a jornada](docs/screenshots/08-desempenho-jornada.png) |
 | **Retornos mensais** | **Mérito vs mercado** |
-| ![Retornos mensais](docs/screenshots/09-desempenho-mensal.png) | ![Mérito](docs/screenshots/10-desempenho-merito.png) |
+| ![Retornos mensais](docs/screenshots/09-desempenho-mensal.png) | ![Mérito vs mercado](docs/screenshots/10-desempenho-merito.png) |
 | **Risco e análise avançada** | **Dividendos** |
-| ![Risco](docs/screenshots/11-desempenho-risco.png) | ![Dividendos](docs/screenshots/12-dividendos.png) |
-| **Mapa de rendimento e datas ex-dividendo** | **Fiscal** **Relatório anual** («Imprimir / PDF», também em Desempenho): um ano numa só página, pronta a imprimir ou a guardar em PDF no browser para guardar ou enviar ao contabilista: resumo (valor no início e no fim, depósitos, ganho, TWR e IRR do ano, comparação com o MSCI World e os outros índices em euros, gráfico do valor e dos dividendos por mês), dividendos por ativo e por país com a retenção na fonte, mais-valias FIFO por ativo, juros e imposto estimado, património no início e no fim do ano (se usas a página Património) e as posições a 31/12. |
+| ![Risco e análise avançada](docs/screenshots/11-desempenho-risco.png) | ![Dividendos](docs/screenshots/12-dividendos.png) |
+| **Mapa de dividendos** | **Fiscal** |
 | ![Mapa de dividendos](docs/screenshots/13-dividendos-mapa.png) | ![Fiscal](docs/screenshots/14-fiscal.png) |
 | **Planeamento (FIRE)** | **Evolução e projeção** |
-| ![Planeamento](docs/screenshots/15-planeamento.png) | ![Projeção](docs/screenshots/16-planeamento-projecao.png) |
+| ![Planeamento (FIRE)](docs/screenshots/15-planeamento.png) | ![Evolução e projeção](docs/screenshots/16-planeamento-projecao.png) |
 | **Radar e alertas** | **Importar extrato** |
-| ![Radar](docs/screenshots/17-radar.png) | ![Importar](docs/screenshots/18-importar.png) |
+| ![Radar e alertas](docs/screenshots/17-radar.png) | ![Importar extrato](docs/screenshots/18-importar.png) |
 | **Transações** | **Definições** |
 | ![Transações](docs/screenshots/19-transacoes.png) | ![Definições](docs/screenshots/20-definicoes.png) |
-| **Património** | **Carteira: as crises e os custos** |
-| ![Património](docs/screenshots/21-patrimonio.png) | ![Crises e custos](docs/screenshots/22-carteira-crises-custos.png) |
-| **Património: de onde veio o crescimento** | **Carteira: o valor de cada ação** |
-| ![Crescimento](docs/screenshots/23-patrimonio-crescimento.png) | ![Valor de cada ação](docs/screenshots/24-carteira-valor-acoes.png) |
-| **Carteira: alerta da carteira** | **Carteira: gerir índices** |
+| **Património** | **As crises e os custos** |
+| ![Património](docs/screenshots/21-patrimonio.png) | ![As crises e os custos](docs/screenshots/22-carteira-crises-custos.png) |
+| **De onde veio o crescimento** | **O valor de cada ação** |
+| ![De onde veio o crescimento](docs/screenshots/23-patrimonio-crescimento.png) | ![O valor de cada ação](docs/screenshots/24-carteira-valor-acoes.png) |
+| **Alerta da carteira** | **Gerir índices** |
 | ![Alerta da carteira](docs/screenshots/25-carteira-alerta.png) | ![Gerir índices](docs/screenshots/26-carteira-indices.png) |
 | **Notícias** | **Notícias do Radar** |
 | ![Notícias](docs/screenshots/27-noticias.png) | ![Notícias do Radar](docs/screenshots/28-noticias-radar.png) |
 | **E se tivesse investido no índice?** | **Raio-X dos ETF** |
 | ![E se tivesse investido no índice?](docs/screenshots/29-desempenho-indice.png) | ![Raio-X dos ETF](docs/screenshots/30-carteira-raio-x.png) |
-| **Definições: dados de mercado (preços de 5 em 5 minutos)** | |
-| ![Dados de mercado](docs/screenshots/31-definicoes-dados-mercado.png) | |
+| **Dados de mercado** | **Simulador de venda** |
+| ![Dados de mercado](docs/screenshots/31-definicoes-dados-mercado.png) | ![Simulador de venda](docs/screenshots/32-fiscal-simulador.png) |
+| **Vender e recomprar** | **Relatório anual** |
+| ![Vender e recomprar](docs/screenshots/33-fiscal-vender-recomprar.png) | ![Relatório anual](docs/screenshots/34-relatorio-anual.png) |
 
 ### Modo escuro
 
-| Visão Geral | Evolução, as minhas posições e próximos eventos |
+| Visão Geral | Evolução e próximos eventos |
 | --- | --- |
-| ![Visão Geral (escuro)](docs/screenshots/escuro/01-visao-geral.png) | ![Evolução (escuro)](docs/screenshots/escuro/02-visao-geral-evolucao.png) |
+| ![Visão Geral (escuro)](docs/screenshots/escuro/01-visao-geral.png) | ![Evolução e próximos eventos (escuro)](docs/screenshots/escuro/02-visao-geral-evolucao.png) |
 | **Peso vs retorno e alocação** | **Perfil de investidor** |
 | ![Peso vs retorno e alocação (escuro)](docs/screenshots/escuro/03-visao-geral-peso-alocacao.png) | ![Perfil de investidor (escuro)](docs/screenshots/escuro/04-perfil-investidor.png) |
 | **Carteira** | **Alocação** |
 | ![Carteira (escuro)](docs/screenshots/escuro/05-carteira.png) | ![Alocação (escuro)](docs/screenshots/escuro/06-carteira-alocacao.png) |
 | **Desempenho** | **Como foi a jornada** |
-| ![Desempenho (escuro)](docs/screenshots/escuro/07-desempenho.png) | ![Jornada (escuro)](docs/screenshots/escuro/08-desempenho-jornada.png) |
+| ![Desempenho (escuro)](docs/screenshots/escuro/07-desempenho.png) | ![Como foi a jornada (escuro)](docs/screenshots/escuro/08-desempenho-jornada.png) |
 | **Retornos mensais** | **Mérito vs mercado** |
-| ![Retornos mensais (escuro)](docs/screenshots/escuro/09-desempenho-mensal.png) | ![Mérito (escuro)](docs/screenshots/escuro/10-desempenho-merito.png) |
+| ![Retornos mensais (escuro)](docs/screenshots/escuro/09-desempenho-mensal.png) | ![Mérito vs mercado (escuro)](docs/screenshots/escuro/10-desempenho-merito.png) |
 | **Risco e análise avançada** | **Dividendos** |
-| ![Risco (escuro)](docs/screenshots/escuro/11-desempenho-risco.png) | ![Dividendos (escuro)](docs/screenshots/escuro/12-dividendos.png) |
-| **Mapa de rendimento e datas ex-dividendo** | **Fiscal** |
+| ![Risco e análise avançada (escuro)](docs/screenshots/escuro/11-desempenho-risco.png) | ![Dividendos (escuro)](docs/screenshots/escuro/12-dividendos.png) |
+| **Mapa de dividendos** | **Fiscal** |
 | ![Mapa de dividendos (escuro)](docs/screenshots/escuro/13-dividendos-mapa.png) | ![Fiscal (escuro)](docs/screenshots/escuro/14-fiscal.png) |
 | **Planeamento (FIRE)** | **Evolução e projeção** |
-| ![Planeamento (escuro)](docs/screenshots/escuro/15-planeamento.png) | ![Projeção (escuro)](docs/screenshots/escuro/16-planeamento-projecao.png) |
+| ![Planeamento (FIRE) (escuro)](docs/screenshots/escuro/15-planeamento.png) | ![Evolução e projeção (escuro)](docs/screenshots/escuro/16-planeamento-projecao.png) |
 | **Radar e alertas** | **Importar extrato** |
-| ![Radar (escuro)](docs/screenshots/escuro/17-radar.png) | ![Importar (escuro)](docs/screenshots/escuro/18-importar.png) |
+| ![Radar e alertas (escuro)](docs/screenshots/escuro/17-radar.png) | ![Importar extrato (escuro)](docs/screenshots/escuro/18-importar.png) |
 | **Transações** | **Definições** |
 | ![Transações (escuro)](docs/screenshots/escuro/19-transacoes.png) | ![Definições (escuro)](docs/screenshots/escuro/20-definicoes.png) |
-| **Património** | **Carteira: as crises e os custos** |
-| ![Património (escuro)](docs/screenshots/escuro/21-patrimonio.png) | ![Crises e custos (escuro)](docs/screenshots/escuro/22-carteira-crises-custos.png) |
-| **Património: de onde veio o crescimento** | **Carteira: o valor de cada ação** |
-| ![Crescimento (escuro)](docs/screenshots/escuro/23-patrimonio-crescimento.png) | ![Valor de cada ação (escuro)](docs/screenshots/escuro/24-carteira-valor-acoes.png) |
-| **Carteira: alerta da carteira** | **Carteira: gerir índices** |
+| **Património** | **As crises e os custos** |
+| ![Património (escuro)](docs/screenshots/escuro/21-patrimonio.png) | ![As crises e os custos (escuro)](docs/screenshots/escuro/22-carteira-crises-custos.png) |
+| **De onde veio o crescimento** | **O valor de cada ação** |
+| ![De onde veio o crescimento (escuro)](docs/screenshots/escuro/23-patrimonio-crescimento.png) | ![O valor de cada ação (escuro)](docs/screenshots/escuro/24-carteira-valor-acoes.png) |
+| **Alerta da carteira** | **Gerir índices** |
 | ![Alerta da carteira (escuro)](docs/screenshots/escuro/25-carteira-alerta.png) | ![Gerir índices (escuro)](docs/screenshots/escuro/26-carteira-indices.png) |
 | **Notícias** | **Notícias do Radar** |
 | ![Notícias (escuro)](docs/screenshots/escuro/27-noticias.png) | ![Notícias do Radar (escuro)](docs/screenshots/escuro/28-noticias-radar.png) |
 | **E se tivesse investido no índice?** | **Raio-X dos ETF** |
 | ![E se tivesse investido no índice? (escuro)](docs/screenshots/escuro/29-desempenho-indice.png) | ![Raio-X dos ETF (escuro)](docs/screenshots/escuro/30-carteira-raio-x.png) |
+| **Dados de mercado** | **Simulador de venda** |
+| ![Dados de mercado (escuro)](docs/screenshots/escuro/31-definicoes-dados-mercado.png) | ![Simulador de venda (escuro)](docs/screenshots/escuro/32-fiscal-simulador.png) |
+| **Vender e recomprar** | **Relatório anual** |
+| ![Vender e recomprar (escuro)](docs/screenshots/escuro/33-fiscal-vender-recomprar.png) | ![Relatório anual (escuro)](docs/screenshots/escuro/34-relatorio-anual.png) |
 
 O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro ou Automático.
 
@@ -212,9 +218,9 @@ O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro o
 
 | Página | O que mostra |
 | --- | --- |
-| **Visão Geral** | **Cartão Carteira**: valor das posições, património líquido total e disponível, a **variação diária** (último dia de mercado, em % e €), o retorno total e a variação do período escolhido na barra de períodos (por omissão, o **ano corrente**), em % e €; com a opção «de 5 em 5 minutos» (Definições), estes valores e a pílula do topo atualizam-se sozinhos durante o horário das bolsas, com «atualizado às HH:MM»; por baixo, os resultados (não realizado, dividendos, realizado, comissões) e a conta (custo base, depositado, caixa, valor total, juros). A **barra de períodos** (1M a Máx, abre em YTD), entre o cartão e o gráfico, muda os dois. **Gráfico de evolução** (retorno ou valor, a toda a largura) com comparação com o S&P 500, o MSCI World, o FTSE All-World e o STOXX Europe 600 e **as minhas posições** (as 5 com maior ganho ou perda e as restantes somadas; na legenda, por selecionar). **Perfil de investidor**: Investor Score e Portfolio Score (0-100, últimos 3 anos) com seis perfis (Passive Index, Concentrated Picker, Diversified Active, Income Focus, Growth/Tech, Active Trader), o perfil sugerido pela carteira e a fórmula de cada métrica no «?»; um perfil por corretora e outro para todas as corretoras, com um aviso quando o perfil escolhido não é o que a carteira sugere. Principais movers do dia (até 8), com o nome, o preço e um gráfico do último ano, verde acima do teu preço médio de aquisição (tracejado) e vermelho abaixo. Próximos eventos dos próximos 90 dias (resultados, com o intervalo quando ainda é estimado, ex-dividendo e pagamentos). **Peso vs retorno** (mapa e bolhas) e **alocação** por setor, geografia, classe e corretora. |
+| **Visão Geral** | **Cartão Carteira**: valor das posições, património líquido total e disponível, a **variação diária** (último dia de mercado, em % e €), o retorno total e a variação do período escolhido na barra de períodos (por omissão, o **ano corrente**), em % e €; com a opção «de 5 em 5 minutos» (Definições), estes valores e a pílula do topo atualizam-se sozinhos durante o horário das bolsas, com «atualizado às HH:MM»; ao fundo do cartão, um gráfico com a evolução do **valor total da carteira** (posições + caixa) no período escolhido — o dinheiro a caminho entre corretoras conta, por isso uma passagem da XTB para a Trading 212 (ou outra) não faz descer o gráfico; por baixo, os resultados (não realizado, dividendos, realizado, comissões) e a conta (custo base, depositado, caixa, valor total, juros). A **barra de períodos** (1M a Máx, abre em YTD), entre o cartão e o gráfico, muda os dois. **Gráfico de evolução** (retorno ou valor, a toda a largura) com comparação com o S&P 500, o MSCI World, o FTSE All-World e o STOXX Europe 600 e **as minhas posições** (as 5 com maior ganho ou perda e as restantes somadas; na legenda, por selecionar). **Perfil de investidor**: Investor Score e Portfolio Score (0-100, últimos 3 anos) com seis perfis (Passive Index, Concentrated Picker, Diversified Active, Income Focus, Growth/Tech, Active Trader), o perfil sugerido pela carteira e a fórmula de cada métrica no «?»; um perfil por corretora e outro para todas as corretoras, com um aviso quando o perfil escolhido não é o que a carteira sugere. Principais movers do dia (até 8), com o nome, o preço e um gráfico do último ano, verde acima do teu preço médio de aquisição (tracejado) e vermelho abaixo. Próximos eventos dos próximos 90 dias (resultados, com o intervalo quando ainda é estimado, ex-dividendo e pagamentos). **Peso vs retorno** (mapa e bolhas) e **alocação** por setor, geografia, classe e corretora. |
 | **Carteira** | Posições abertas/fechadas, carteira vs mercado no dia (até 5 índices à escolha: MSCI World, FTSE All-World, S&P 500, Dow Jones, Nasdaq 100, Russell 2000, Bitcoin, FTSE 100, CAC 40, DAX, STOXX Europe 600, Euro STOXX 50, AEX e Euronext 100) com alertas da variação do dia de toda a carteira ou de uma corretora (1, 2, 3 ou 5%, a subir, a descer ou os dois; no máximo um aviso por dia e por sentido, sem contar depósitos e levantamentos), filtros por setor, pesquisa, tabela ordenável (preço, 1D, preço médio, investido, valor, não realizado, dividendos, efeito cambial, comissões, ROI, peso) e alocação por ativo, setor e moeda. **Raio-X dos ETF**: a exposição real por empresa, país e setor, somando as posições dentro dos ETF (pela composição publicada pelo emitente, carregada em CSV/XLSX ou descarregada do site dele) às ações diretas, e a sobreposição entre ETF. «As crises»: quanto cairia a carteira de hoje se 2008, 2011, 2020 ou 2022 se repetissem (beta de cada posição face ao S&P 500) e quanto tempo levava a recuperar. «Os custos»: comissões, custo dos ETF (TER, indicado por ti) e retenções na fonte acima dos 15% da convenção, por ano e daqui a 20 anos. «O valor de cada ação»: por ordem de popularidade, DCF, Número de Graham, fórmula de crescimento de Graham (com o rendimento das obrigações AAA configurável) e modelo de Gordon, e em «Mais métodos» Owner Earnings (Buffett), Earnings Power Value (Greenwald), Bazin e o PEG de Peter Lynch, sempre em intervalo e com a fórmula e os números no «?», comparados com o preço, e o crescimento que o preço de hoje já assume; dados fundamentais do Yahoo (uma vez por semana, na atualização de cotações; se o pedido principal falhar, a partir das demonstrações financeiras, também da cotação principal pelo ISIN, convertidos para a moeda da cotação), que podes corrigir. |
-| **Desempenho** | Retorno total e IRR, TWR e CAGR comparados com os mesmos índices da Visão Geral (S&P 500, MSCI World, FTSE All-World e STOXX Europe 600; vários ao mesmo tempo, nos gráficos e ao lado dos valores; a escolha mantém-se ao mudar de período); **«E se tivesse investido no índice?»**: o mesmo dinheiro, nos mesmos dias, em cada índice (valor hoje, ganho, IRR e diferença para a carteira, com gráfico); melhor/pior ano e mês, sequência atual; TWR anual e acumulado; drawdown; mapa de retornos mensais; mérito vs mercado (captura em alta/baixa, beta, % de meses acima do mercado); risco (Sharpe, Sortino, Calmar, volatilidade, max drawdown); alfa de Jensen e distribuição mensal ordenada. |
+| **Desempenho** | O botão **«Imprimir / PDF»** abre o relatório anual (ver Fiscal). Retorno total e IRR, TWR e CAGR comparados com os mesmos índices da Visão Geral (S&P 500, MSCI World, FTSE All-World e STOXX Europe 600; vários ao mesmo tempo, nos gráficos e ao lado dos valores; a escolha mantém-se ao mudar de período); **«E se tivesse investido no índice?»**: o mesmo dinheiro, nos mesmos dias, em cada índice (valor hoje, ganho, IRR e diferença para a carteira, com gráfico); melhor/pior ano e mês, sequência atual; TWR anual e acumulado; drawdown; mapa de retornos mensais; mérito vs mercado (captura em alta/baixa, beta, % de meses acima do mercado); risco (Sharpe, Sortino, Calmar, volatilidade, max drawdown); alfa de Jensen e distribuição mensal ordenada. |
 | **Dividendos** | Recebido líquido/bruto e retenção na fonte, maior pagador, meses com dividendos, rendimento anualizado, crescimento anual. **Projeção** do ano e dos próximos 12 meses com os dividendos recebidos e, para posições recentes, os dividendos por ação do Yahoo, com a origem de cada valor. Dividendos por ano, decomposição do crescimento, **mapa mensal com a linha do próximo ano**, **datas ex-dividendo** (recebido, a receber, sem direito por ter comprado depois, previsto), yield on cost e histórico. |
 | **Património** | A carteira das corretoras mais os outros ativos e dívidas que indicas à mão (contas à ordem, depósitos a prazo, certificados, PPR, imóveis, outros, créditos), separados por camadas de liquidez (imediata, curto prazo, ilíquido) e nunca somados num único total: património líquido total e património líquido disponível (só imediata e curto prazo); meses de reserva (liquidez imediata ÷ despesas mensais do Planeamento); imóveis pelo valor líquido de dívida (crédito ligado ao imóvel) com desconto opcional de 5% ou 10% para os custos de venda; casa de habitação própria fora do FIRE; alocação por camada e categoria com e sem a casa própria; evolução mensal por camada; «De onde veio o crescimento», ano a ano (poupança investida, valorização do mercado, outros ativos financeiros, imóveis e amortização da dívida), com o ganho sem a poupança e a % de cada parte sobre a sua base (o mercado pelo TWR das corretoras); «Atualizar valores», um formulário mensal com todos os ativos e dívidas, com lembrete (também na Visão Geral) quando um valor passa um mês sem atualizar; aviso nos valores com mais de 90 dias; cada ativo pode somar-se à carteira no Planeamento (FIRE). Na Visão Geral, o património líquido total e o disponível aparecem por baixo do valor da carteira. |
 | **Planeamento** | Independência financeira (FIRE): o número FIRE «para sempre» (regra dos 4%), «para sempre, com a pensão» e «até aos N anos, com a pensão», já depois do IRS dos levantamentos; a parte já feita; a idade e o ano a que corresponde cada capital necessário (com uma nota quando «investir até aos» adia a data FIRE: o capital pedido desce só porque faltam menos anos até à pensão); a data em três cenários (3%, 5% e 7% reais ao ano), a investir até à data FIRE (ou até uma idade) e a levantar daí em diante; o gráfico da vida inteira com os números FIRE a tracejado e quando cada cenário chega a cada um (tabela e pontos no gráfico); nota quando a pensão cobre as despesas; os outros ativos marcados em Património somam-se à carteira; até quando dura o dinheiro em cada cenário; acompanhamento mês a mês. |
@@ -323,6 +329,7 @@ portfolio_investimentos/
 │                  #   notas do perfil de investidor, crises, custos e valor de cada ação
 ├── services/      # base de dados, importação, mercado (yfinance ou acesso direto ao Yahoo), património,
 │                  #   cartões da Visão Geral, alertas da carteira, ordem dos cartões, cópias de segurança,
+│                  #   simulador de venda, relatório anual, Raio-X dos ETF, notícias,
 │                  #   demonstração
 ├── templates/     # páginas Jinja + Bootstrap 5.3
 ├── static/        # CSS/JS da app e bibliotecas (Bootstrap, Bootstrap Icons, Chart.js), sem CDN

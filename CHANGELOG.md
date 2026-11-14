@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-14
 
+- **Capturas de ecrã e README atualizados**  
+  Capturas novas de todas as páginas (claro e escuro) e quatro novas nos dois temas: Dados de mercado (Definições), simulador de venda, vender e recomprar (Fiscal) e relatório anual. As galerias do modo claro e do modo escuro passam a ter a mesma grelha (17 linhas de 2 imagens, títulos curtos): a linha com uma só imagem e um título longo alargava uma coluna e as capturas do modo claro saíam com tamanhos diferentes das do escuro. No README: o gráfico de fundo do cartão Carteira (valor total do período), o botão «Imprimir / PDF» em Desempenho e os novos serviços na estrutura.
 - **Relatório anual para imprimir ou guardar em PDF (#62)**  
   Página nova /relatorio?ano=AAAA (da corretora selecionada ou de todas), aberta com «Imprimir / PDF» em Fiscal e em Desempenho, e com o seu próprio botão «Imprimir / PDF» (o PDF é o do browser, sem dependências novas). Secções: resumo (valor no início e no fim, depósitos líquidos, ganho, TWR e IRR do ano, MSCI World e os outros índices em euros, gráfico do valor total e do dinheiro investido e dos dividendos por mês), dividendos por ativo e por país com a retenção na fonte, mais-valias FIFO por ativo com o saldo, juros e imposto estimado, património no início e no fim do ano (se usado) e as posições a 31/12 (calculadas só com as transações até essa data). Na impressão: sem a barra lateral, o topo nem as faixas, em A4, cada secção inteira numa página se couber, tabelas sem cortes e os gráficos em imagem (canvas.toDataURL). Por omissão abre o último ano completo.
 - **Fiscal: simulador de venda (#61)**  
