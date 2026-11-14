@@ -175,9 +175,9 @@
     // widget Carteira: o gráfico de fundo, a variação e o rendimento seguem o período do gráfico
     const drawHero = () => {
       if (!perf) return;
-      // o retorno acumulado em € (como o gráfico «Retorno total»): vender num dia e comprar no seguinte, depósitos,
-      // levantamentos e transferências entre corretoras não fazem picos, ao contrário do valor só das posições
-      const spark = perf.gain || [], h = perf.summary || {};
+      // a evolução do valor total da carteira (posições + caixa, como o gráfico «Valor total»): vender num dia e
+      // comprar no seguinte não faz picos, ao contrário do valor só das posições
+      const spark = perf.value || [], h = perf.summary || {};
       const c = document.getElementById("heroSpark");
       const accent = pm.css("--pm-up");
       pm.chart("heroSpark", {
