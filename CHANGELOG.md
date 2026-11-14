@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-14
 
+- **Visão Geral: o gráfico de fundo do cartão Carteira sem picos falsos**  
+  O gráfico de fundo desenhava o valor só das posições, por isso vender num dia e voltar a comprar no seguinte (ex.: trocar um ETF monetário por outro) fazia uma queda de um dia do tamanho da venda, enquanto o dinheiro estava em caixa. Passa a desenhar o retorno acumulado em €, como o gráfico «Retorno total»: sem picos de compras, vendas, depósitos, levantamentos ou transferências entre corretoras.
 - **Capturas de ecrã e README atualizados**  
   Capturas novas de todas as páginas (claro e escuro), com o cartão Carteira novo da Visão Geral, e uma captura nova da secção Dados de mercado das Definições com os preços de 5 em 5 minutos. No README: os títulos que faltavam na galeria (Notícias, «E se tivesse investido no índice?», Raio-X dos ETF), a atualização automática no cartão Carteira e a paginação das Transações.
 - **Transações: a paginação ocupa a largura da tabela**  
