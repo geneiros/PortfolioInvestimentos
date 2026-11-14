@@ -220,6 +220,36 @@ TX_ORDER = {"DEPOSIT": 0, "INTEREST": 1, "DIVIDEND": 1, "BUY": 2, "TRANSFER_IN":
 IN_TYPES, OUT_TYPES = ("BUY", "TRANSFER_IN", "CONVERT_IN"), ("SELL", "TRANSFER_OUT", "CONVERT_OUT")
 
 
+def simulate_sale(lots, qty, price_local, fx, fees_local=0.0):
+    """Simula uma venda pelo FIFO, sem mexer nos lotes: o mesmo cálculo das vendas reais (`_apply`/`_take_lots`).
+
+    O valor de realização é (quantidade × preço − comissões) ao câmbio `fx` (moeda do ativo por EUR), repartido pelos
+    lotes na proporção das quantidades. Devolve as linhas {acquired (None se anterior ao histórico), qty, cost_eur,
+    proceeds_eur, gain_eur}; se `qty` for maior do que os lotes, vende só o que existe."""
+    held = sum(lot.qty for lot in lots)
+    qty = min(qty, held)
+    if qty <= 1e-9:
+        return []
+    proceeds = (qty * price_local - (fees_local or 0.0)) / fx
+    rows, remaining = [], qty
+    for lot in lots:
+        if remaining <= 1e-9:
+            break
+        take = min(lot.qty, remaining)
+        cost = lot.cost_eur * take / lot.qty
+        share = proceeds * take / qty
+        rows.append({"acquired": None if lot.opening else lot.date, "qty": take, "cost_eur": cost,
+                     "proceeds_eur": share, "gain_eur": share - cost})
+        remaining -= take
+    return rows
+
+
+def tax_delta(balance, gain, rate=TAX_RATE):
+    """Imposto sobre o saldo de mais-valias do ano antes e depois de juntar `gain` (as perdas só abatem até zero)."""
+    before, after = max(balance, 0.0) * rate, max(balance + gain, 0.0) * rate
+    return {"before": before, "after": after, "delta": after - before}
+
+
 TRANSIT_DAYS = 7  # dias, no máximo, entre a saída de uma corretora e a chegada à outra
 
 

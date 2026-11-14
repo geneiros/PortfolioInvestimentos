@@ -2947,18 +2947,28 @@ def test_page_progress_bar_desktop_only(client):
     assert "progress: false" not in js  # os pedidos à API não usam a barra
 
 
+class _QuickHist:
+    """O mínimo de um DataFrame do yfinance que a atualização lê (o CI corre sem o pandas, que vem com o yfinance)."""
+
+    def __init__(self, close):
+        from datetime import datetime
+        self._rows = [(datetime.combine(date.today(), datetime.min.time()), {"Close": close})]
+        self.empty = False
+
+    def iterrows(self):
+        return iter(self._rows)
+
+
 class _QuickYf:
     calls = []
 
     class Ticker:
         def __init__(self, symbol):
-            import pandas as pd
             _QuickYf.calls.append(symbol)
             self.symbol = symbol
             cur = "USD" if symbol in ("ADBE", "EURUSD=X") else "EUR"
             self.history_metadata = {"currency": cur}
-            self._df = pd.DataFrame({"Close": [1.1 if symbol.endswith("=X") else 230.0]},
-                                    index=pd.DatetimeIndex([pd.Timestamp(date.today())]))
+            self._df = _QuickHist(1.1 if symbol.endswith("=X") else 230.0)
 
         def history(self, **kw):
             return self._df
@@ -3032,3 +3042,68 @@ def test_transactions_pagination_window(app, client):
     assert links == {str(i) for i in range(1, 26)} and 'data-gap="l"' in html  # o script mostra as que cabem
     assert "Página 12 de 25" in html
     assert "Página 25 de 25" in client.get("/transacoes?pagina=999").get_data(as_text=True)
+
+
+def test_sale_simulator(app, client):
+    from portfolio_investimentos.services import data, sale_sim
+    token = csrf(client)
+    post(client, "load_demo", token)
+    assert 'id="saleSim"' in client.get("/fiscal").get_data(as_text=True)
+    with app.app_context():
+        rows = sale_sim.positions()
+        assert rows and all(":" in r["key"] for r in rows)
+        key, held = rows[0]["key"], rows[0]["qty"]
+        bid, _, ticker = key.partition(":")
+        pos = data.load_portfolio(bid).positions[ticker]
+        expected_cost = pos.invested_eur
+    r = post(client, "simulate_sale", token, asset=key, qty="tudo").get_json()["message"]
+    assert r["qty"] == pytest.approx(held) and sum(ln["qty"] for ln in r["lots"]) == pytest.approx(held)
+    assert r["cost"] == pytest.approx(expected_cost, rel=1e-6)
+    assert r["tax_after"] == pytest.approx(max(r["balance_before"] + r["gain"], 0) * 0.28)
+    assert r["balance_after"] == pytest.approx(r["balance_before"] + r["gain"])
+    assert all(h["loss"] < 0 and h["key"] != key for h in r["harvest"])
+    half = post(client, "simulate_sale", token, asset=key, qty=str(held / 2).replace(".", ","), price="10").get_json()["message"]
+    assert half["qty"] == pytest.approx(held / 2) and half["price"] == 10
+    # o simulador não grava nada: a carteira continua igual
+    with app.app_context():
+        assert data.load_portfolio(bid).positions[ticker].qty == pytest.approx(held)
+    bad = post(client, "simulate_sale", token, asset=key, qty=str(held * 10))
+    assert bad.status_code == 400 and "Só tens" in bad.get_json()["error"]
+    assert post(client, "simulate_sale", token, asset="999:NADA").status_code == 400
+    csv = client.get(f"/fiscal/simulacao.csv?ativo={key}&qtd=tudo")
+    text = csv.get_data(as_text=True)
+    assert csv.status_code == 200 and text.startswith("﻿Simulação de venda")
+    assert "Data aquisição;Quantidade;Valor aquisição;Valor realização;Mais/menos-valia" in text
+    assert "Imposto estimado (28%)" in text
+    assert client.get("/fiscal/simulacao.csv?ativo=999:NADA").status_code == 400
+
+
+def test_sale_simulator_harvest_and_rebuy(app, client):
+    from portfolio_investimentos.services import sale_sim
+    token = csrf(client)
+    post(client, "load_demo", token)
+    with app.app_context():
+        losses = sale_sim._open_losses()
+        assert losses
+        keys = [r["key"] for r in losses]
+        balance = 1000.0
+        plan = sale_sim.harvest_plan(keys, balance, fee_per_order=2.0, fx_pct=0.5, rebuy=True)
+        total = sum(r["loss"] for r in losses)
+        # a comissão da venda e o câmbio entram no valor de realização (a menos-valia aumenta)
+        assert plan["loss"] == pytest.approx(total - 2.0 * len(losses)
+                                             - sum(r["value"] * 0.005 for r in losses if r["currency"] != "EUR"))
+        assert plan["saving"] == pytest.approx((max(balance, 0) - max(balance + plan["loss"], 0)) * 0.28)
+        assert plan["costs"] == pytest.approx(sum(2 * (2.0 + (r["value"] * 0.005 if r["currency"] != "EUR" else 0))
+                                                  for r in losses))
+        assert plan["net"] == pytest.approx(plan["saving"] - plan["costs"])
+        for row in plan["rows"]:  # recompra: o custo passa a ser o de hoje e a diferença fica para uma venda futura
+            assert row["new_cost"] < row["cost"]
+            assert row["deferred"] == pytest.approx((row["cost"] - row["new_cost"]) * 0.28)
+        sold = sale_sim.harvest_plan(keys[:1], 0.0, rebuy=False)
+        assert sold["saving"] == 0 and sold["deferred"] == 0 and sold["rows"][0]["new_cost"] is None
+        assert sold["unused_loss"] == pytest.approx(sold["loss"])  # saldo a zero: a perda não abate nada este ano
+        with pytest.raises(sale_sim.SimulationError):
+            sale_sim.harvest_plan([], balance)
+    r = post(client, "simulate_harvest", token, keys=",".join(keys), fee="1,5", rebuy="1").get_json()["message"]
+    assert r["rebuy"] and len(r["rows"]) == len(keys) and r["fee_per_order"] == 1.5
+    assert post(client, "simulate_harvest", token, keys="").status_code == 400
