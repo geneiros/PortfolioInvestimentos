@@ -3107,3 +3107,32 @@ def test_sale_simulator_harvest_and_rebuy(app, client):
     r = post(client, "simulate_harvest", token, keys=",".join(keys), fee="1,5", rebuy="1").get_json()["message"]
     assert r["rebuy"] and len(r["rows"]) == len(keys) and r["fee_per_order"] == 1.5
     assert post(client, "simulate_harvest", token, keys="").status_code == 400
+
+
+def test_annual_report(app, client):
+    from portfolio_investimentos.services import data, report
+    assert "Sem dados para o relatório" in client.get("/relatorio").get_data(as_text=True)
+    token = csrf(client)
+    post(client, "load_demo", token)
+    assert 'href="/relatorio?ano=' in client.get("/fiscal").get_data(as_text=True)
+    assert 'href="/relatorio"' in client.get("/desempenho").get_data(as_text=True)
+    with app.app_context():
+        p = data.load_portfolio(None)
+        years = report.years(p)
+        year = report.default_year(p)
+        assert year in years and year < date.today().year
+        r = report.build(None, year)
+        assert r["summary"]["end"].year == year
+        assert r["summary"]["gain"] == pytest.approx(r["summary"]["value_end"] - r["summary"]["value_start"]
+                                                     - r["summary"]["deposits"])
+        # posições a 31/12: só as transações até lá, avaliadas a essa data
+        at_end = data.portfolio_at(None, date(year, 12, 31))
+        assert r["holdings"] == pytest.approx(sum(x.value_eur for x in at_end.open_positions if not x.asset.is_benchmark))
+        assert r["holdings"] + at_end.cash == pytest.approx(r["summary"]["value_end"], rel=1e-6)
+        assert sum(c["gross"] for c in r["dividends_by_country"]) == pytest.approx(r["dividends_total"]["gross"])
+        assert len(r["chart"]["dates"]) == len(r["chart"]["value"]) > 0 and len(r["monthly_div"]) == 12
+    html = client.get(f"/relatorio?ano={year}").get_data(as_text=True)
+    for section in ("1 · Resumo", "2 · Dividendos", "3 · Mais-valias (FIFO) e juros", f"Posições a 31/12/{year}",
+                    "Imprimir / PDF", "@media print", 'id="repValue"'):
+        assert section in html, section
+    assert client.get("/relatorio?ano=1900").status_code == 200  # ano sem dados: o ano por omissão

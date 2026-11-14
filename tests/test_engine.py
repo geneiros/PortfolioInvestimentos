@@ -754,3 +754,27 @@ def test_simulate_sale_fifo_without_touching_lots():
     assert tax_delta(1000.0, 500.0) == pytest.approx({"before": 280.0, "after": 420.0, "delta": 140.0})
     assert tax_delta(-300.0, 200.0) == pytest.approx({"before": 0.0, "after": 0.0, "delta": 0.0})  # perdas não dão reembolso
     assert tax_delta(500.0, -800.0)["delta"] == pytest.approx(-140.0)  # só abate até zero
+
+
+def test_year_summary_and_dividends_in():
+    from portfolio_investimentos.engine.portfolio import Instrument, Portfolio, PriceBook, Tx
+    a = Instrument("AAA")
+    prices = {"AAA": [(date(2024, 12, 31), 10.0), (date(2025, 6, 30), 11.0), (date(2025, 12, 31), 12.0)]}
+    txs = [Tx(date(2024, 12, 31), "DEPOSIT", amount=1000.0), Tx(date(2024, 12, 31), "BUY", a, 100, 10.0),
+           Tx(date(2025, 6, 30), "DEPOSIT", amount=1100.0), Tx(date(2025, 6, 30), "BUY", a, 100, 11.0),
+           Tx(date(2025, 9, 1), "DIVIDEND", a, amount=50.0, tax=7.5)]
+    p = Portfolio(txs, PriceBook(prices, {}), [])
+    y = p.year_summary(2025)
+    assert y["start"] == date(2024, 12, 31) and y["end"] == date(2025, 12, 31) and not y["partial"]
+    assert y["value_start"] == pytest.approx(1000.0)
+    assert y["value_end"] == pytest.approx(200 * 12 + 50 - 7.5)
+    assert y["deposits"] == pytest.approx(1100.0)
+    assert y["gain"] == pytest.approx(y["value_end"] - 1000.0 - 1100.0)
+    assert y["twr"] == pytest.approx((1100 / 1000) * ((2400 + 42.5) / 2200) - 1, rel=1e-6)
+    assert y["irr"] is not None and y["irr"] > 0
+    first = p.year_summary(2024)  # a carteira começou a 31/12/2024: parte do zero
+    assert first["start"] is None and first["value_start"] == 0.0 and first["deposits"] == pytest.approx(1000.0)
+    assert p.year_summary(2023) is None
+    d = p.dividends_in(2025)
+    assert len(d) == 1 and d[0]["n"] == 1 and d[0]["gross"] == pytest.approx(50.0) and d[0]["net"] == pytest.approx(42.5)
+    assert p.dividends_in(2024) == []

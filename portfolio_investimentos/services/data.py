@@ -220,6 +220,19 @@ def load_portfolio(broker=None):
 
 
 def _compute_portfolio(broker):
+    txs, book, benches = _portfolio_inputs(broker)
+    return Portfolio(txs, book, benches)
+
+
+def portfolio_at(broker, end):
+    """A carteira como estava no fim do dia `end` (só as transações até lá, avaliada a essa data): as posições a
+    31/12 do relatório anual. Não fica em cache (é só para o relatório)."""
+    txs, book, benches = _portfolio_inputs(broker)
+    return Portfolio([t for t in txs if t.date <= end], book, benches, as_of=end)
+
+
+def _portfolio_inputs(broker):
+    """Transações (já como `Tx`), cotações e câmbios, e índices de referência da carteira de `broker`."""
     rows = transactions(broker)
     benches = [i.ticker for i in Instrument.query.filter_by(kind="index").order_by(Instrument.ticker).all()]
     order = {"^GSPC": 0, "^NDX": 1, "URTH": 2}
@@ -234,7 +247,7 @@ def _compute_portfolio(broker):
     currencies = {r.currency for r in rows} | {i.currency for i in insts.values()} | {"USD"}
     fx = _fx(currencies)
     book = PriceBook(_with_trade_prices(_prices(list(insts)), insts, PriceBook(fx=fx)), fx)
-    return Portfolio(txs, book, [insts[b] for b in benches if b in insts])
+    return txs, book, [insts[b] for b in benches if b in insts]
 
 
 def brokers():

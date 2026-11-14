@@ -950,6 +950,57 @@ class Portfolio:
             out[year] = y
         return out
 
+    def year_summary(self, year):
+        """Resumo de um ano para o relatório anual: valor no início (31/12 do ano anterior) e no fim (31/12, ou o
+        último dia com dados), depósitos líquidos, ganho, TWR, IRR do ano e o retorno de cada índice no mesmo
+        intervalo (em euros). None se a carteira não tiver dados nesse ano."""
+        s = self.series
+        if not s.dates:
+            return None
+        first, last = date(year, 1, 1), date(year, 12, 31)
+        k1 = bisect_right(s.dates, last) - 1
+        if k1 < 0 or s.dates[k1] < first:
+            return None
+        k0 = bisect_right(s.dates, first - timedelta(days=1)) - 1
+        started = k0 < 0  # a carteira começou neste ano: parte do zero
+        k0 = max(k0, 0)
+        v0 = 0.0 if started else s.value[k0]
+        nd0 = 0.0 if started else s.net_deposits[k0]
+        v1, nd1 = s.value[k1], s.net_deposits[k1]
+        deposits = nd1 - nd0
+        gain = (v1 - v0) - deposits
+        base = 1.0 if started else s.twr[k0]
+        twr = s.twr[k1] / base - 1 if base else None
+        d0 = s.dates[k0]
+        flows = [] if started or v0 <= EPS else [(d0, -v0)]
+        lo = k0 if started else k0 + 1
+        flows += [(s.dates[i], -s.flows[i]) for i in range(lo, k1 + 1) if abs(s.flows[i]) > EPS]
+        flows.append((s.dates[k1], v1))
+        irr = xirr(flows) if len(flows) > 1 else None
+        if irr is not None and (s.dates[k1] - d0).days < 365:
+            irr = (1 + irr) ** ((s.dates[k1] - d0).days / 365.0) - 1  # período curto: não anualizar
+        benches = []
+        for b in self.benchmarks:
+            c0, c1 = self._bench_closes(b, [d0, s.dates[k1]])
+            benches.append({"ticker": b.ticker, "name": b.name or b.ticker,
+                            "ret": c1 / c0 - 1 if c0 and c1 else None})
+        return {"year": year, "start": None if started else d0, "end": s.dates[k1], "value_start": v0,
+                "value_end": v1, "deposits": deposits, "gain": gain, "twr": twr, "irr": irr, "benchmarks": benches,
+                "partial": s.dates[k1] < last}
+
+    def dividends_in(self, year):
+        """Dividendos recebidos no ano, por ativo: [{asset, n, gross, tax, net}], do maior para o menor."""
+        out = {}
+        for d in self.dividends:
+            if d.date.year != year:
+                continue
+            r = out.setdefault(d.asset.ticker, {"asset": d.asset, "n": 0, "gross": 0.0, "tax": 0.0, "net": 0.0})
+            r["n"] += 1
+            r["gross"] += d.gross_eur
+            r["tax"] += d.tax_eur
+            r["net"] += d.net_eur
+        return sorted(out.values(), key=lambda r: -r["gross"])
+
     # ----------------------------------------------------------- desempenho
     PERIODS = {"1M": 30, "3M": 91, "6M": 182, "YTD": None, "1A": 365, "3A": 1095, "5A": 1826, "MAX": None}
 
