@@ -2947,18 +2947,28 @@ def test_page_progress_bar_desktop_only(client):
     assert "progress: false" not in js  # os pedidos à API não usam a barra
 
 
+class _QuickHist:
+    """O mínimo de um DataFrame do yfinance que a atualização lê (o CI corre sem o pandas, que vem com o yfinance)."""
+
+    def __init__(self, close):
+        from datetime import datetime
+        self._rows = [(datetime.combine(date.today(), datetime.min.time()), {"Close": close})]
+        self.empty = False
+
+    def iterrows(self):
+        return iter(self._rows)
+
+
 class _QuickYf:
     calls = []
 
     class Ticker:
         def __init__(self, symbol):
-            import pandas as pd
             _QuickYf.calls.append(symbol)
             self.symbol = symbol
             cur = "USD" if symbol in ("ADBE", "EURUSD=X") else "EUR"
             self.history_metadata = {"currency": cur}
-            self._df = pd.DataFrame({"Close": [1.1 if symbol.endswith("=X") else 230.0]},
-                                    index=pd.DatetimeIndex([pd.Timestamp(date.today())]))
+            self._df = _QuickHist(1.1 if symbol.endswith("=X") else 230.0)
 
         def history(self, **kw):
             return self._df
