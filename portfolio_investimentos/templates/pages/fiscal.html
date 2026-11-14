@@ -9,6 +9,7 @@
   <ul class="nav nav-pills ms-auto">
     {% for yr in years %}<li class="nav-item"><a class="nav-link {{ 'active' if yr == year }}" href="?ano={{ yr }}">{{ yr }}</a></li>{% endfor %}
   </ul>
+  <a class="btn btn-pm btn-sm" href="/relatorio?ano={{ year }}" title="Relatório anual de {{ year }}: desempenho, dividendos, mais-valias, juros, património e posições, para imprimir ou guardar em PDF"><i class="bi bi-printer"></i> Imprimir / PDF</a>
 </div>
 <div class="alert alert-secondary small"><i class="bi bi-info-circle"></i>
   Estimativa para Portugal com a taxa autónoma de 28% (mais-valias, Anexo G/J) e taxa liberatória de 28% (dividendos e juros, com crédito pela retenção estrangeira até ao limite português).

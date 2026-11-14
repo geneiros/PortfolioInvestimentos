@@ -151,7 +151,7 @@ As capturas usam os dados de demonstração (empresas e preços fictícios).
 | ![Retornos mensais](docs/screenshots/09-desempenho-mensal.png) | ![Mérito](docs/screenshots/10-desempenho-merito.png) |
 | **Risco e análise avançada** | **Dividendos** |
 | ![Risco](docs/screenshots/11-desempenho-risco.png) | ![Dividendos](docs/screenshots/12-dividendos.png) |
-| **Mapa de rendimento e datas ex-dividendo** | **Fiscal** |
+| **Mapa de rendimento e datas ex-dividendo** | **Fiscal** **Relatório anual** («Imprimir / PDF», também em Desempenho): um ano numa só página, pronta a imprimir ou a guardar em PDF no browser para guardar ou enviar ao contabilista: resumo (valor no início e no fim, depósitos, ganho, TWR e IRR do ano, comparação com o MSCI World e os outros índices em euros, gráfico do valor e dos dividendos por mês), dividendos por ativo e por país com a retenção na fonte, mais-valias FIFO por ativo, juros e imposto estimado, património no início e no fim do ano (se usas a página Património) e as posições a 31/12. |
 | ![Mapa de dividendos](docs/screenshots/13-dividendos-mapa.png) | ![Fiscal](docs/screenshots/14-fiscal.png) |
 | **Planeamento (FIRE)** | **Evolução e projeção** |
 | ![Planeamento](docs/screenshots/15-planeamento.png) | ![Projeção](docs/screenshots/16-planeamento-projecao.png) |

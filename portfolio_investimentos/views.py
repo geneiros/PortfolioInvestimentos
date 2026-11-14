@@ -10,7 +10,7 @@ from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory
                      Instrument, Price, Setting, Transaction, WatchItem, db)
 from . import auth
 from .services import context as ctx
-from .services import backups, data, insights, market, networth, portfolio_alerts, sale_sim, widgets
+from .services import backups, data, insights, market, networth, portfolio_alerts, report, sale_sim, widgets
 from .services import news as news_svc
 from .services.importer import BROKERS, INSTRUCTIONS
 from .services.market import check_alerts, refresh_state, upcoming_events, yfinance_available
@@ -462,6 +462,20 @@ def fiscal_csv():
                              repr(round(sl.gain_eur, 2))]))
     return Response("\ufeff" + "\n".join(out), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename=mais-valias-{year}.csv"})
+
+
+@bp.route("/relatorio")
+def relatorio():
+    """Relatório anual numa só página, para imprimir ou guardar em PDF (o PDF é o do browser)."""
+    c = ctx.build("fiscal", "Relatório anual")
+    p = c["p"]
+    years = report.years(p)
+    sel = _int(request.args.get("ano"))
+    year = sel if sel in years else report.default_year(p)
+    r = report.build(c["broker"], year) if years else None
+    c.update(years=years, year=year, r=r, chart_data=ctx.js_json(r["chart"] | {"monthly_div": r["monthly_div"]}) if r else "null",
+             generated=date.today())
+    return render_template("pages/relatorio.html", **c)
 
 
 @bp.route("/fiscal/simulacao.csv")

@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help, empty %}
+<style>
+  .pm-report h2 { font-size: 1.05rem; font-weight: 700; margin: 0 0 .75rem; }
+  .pm-report .pm-report-sec { margin-bottom: 1.25rem; }
+  .pm-report table { font-size: .875rem; }
+  .pm-report .pm-report-chart img, .pm-report .pm-report-chart canvas { width: 100%; height: 220px; }
+  @media print {
+    @page { size: A4; margin: 12mm 10mm; }
+    /* só o relatório: sem a barra lateral, o topo, as faixas (demonstração, avisos) e os botões */
+    .pm-sidebar, .pm-main > :not(.pm-content), .pm-content > :not(.pm-report), .pm-report-tools, #pmProgress, .pm-report .help { display: none !important; }
+    .pm-content { padding: 0 !important; }
+    body, .pm-card { background: #fff !important; color: #000 !important; }
+    .pm-card { border: 1px solid #ccc !important; box-shadow: none !important; padding: 10px 12px !important; height: auto !important; }
+    /* cada secção numa página, se couber; o resumo (com os gráficos) pode partir-se entre o texto e os gráficos */
+    .pm-report-sec:not(#repSummary) { break-inside: avoid-page; }
+    .pm-report-chart, .pm-report tr { break-inside: avoid; }
+    .pm-report-chart img { height: 180px !important; }
+    .pm-table-wrap { overflow: visible !important; max-height: none !important; border: 0 !important; }
+    .pm-report table, .pm-report .pm-table { width: 100% !important; min-width: 0 !important; font-size: 8.5pt; }
+    .pm-report th, .pm-report td { white-space: normal !important; padding: 3px 5px !important; }
+    .pm-report td .sub { display: block; font-size: 7.5pt; }
+    .pm-report .pm-mid { font-size: 13pt; }
+    a { color: inherit !important; text-decoration: none !important; }
+  }
+</style>
+{% if not r %}
+  {{ empty("Sem dados para o relatório", "O relatório anual junta o desempenho, os dividendos, as mais-valias e as posições de um ano. Importa as tuas transações primeiro.", "/importar", "Importar extrato") }}
+{% else %}
+{% set sm = r.summary %}
+<div class="pm-report">
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3 pm-report-tools">
+  <h5 class="m-0 fw-bold">Relatório anual</h5>
+  <ul class="nav nav-pills ms-auto">
+    {% for yr in years %}<li class="nav-item"><a class="nav-link {{ 'active' if yr == year }}" href="?ano={{ yr }}">{{ yr }}</a></li>{% endfor %}
+  </ul>
+  <button class="btn btn-primary btn-sm" type="button" id="reportPrint"><i class="bi bi-printer"></i> Imprimir / PDF</button>
+</div>
+
+<div class="pm-card pm-report-sec">
+  <div class="d-flex flex-wrap align-items-baseline gap-2">
+    <h2 class="m-0">Relatório de {{ year }}{% if r.partial %} <span class="fw-normal text-secondary fs-6">(até {{ sm.end|ddmmyyyy }})</span>{% endif %}</h2>
+    <span class="ms-auto small text-secondary">{{ broker_doc.broker_name if broker_doc else "Todas as corretoras" }} · gerado a {{ generated|ddmmyyyy }} · Portfolio Investimentos</span>
+  </div>
+  <div class="small text-secondary mt-1">Valores em euros, ao câmbio de cada dia. Mais-valias pelo método FIFO; imposto estimado a 28% (Portugal). Não substitui o aconselhamento de um contabilista.</div>
+</div>
+
+<div class="pm-card pm-report-sec" id="repSummary">
+  <h2>1 · Resumo</h2>
+  <div class="row g-3">
+    <div class="col-6 col-lg-3"><div class="pm-label">Valor no início</div><div class="pm-mid money">{{ sm.value_start|money(2) }}</div>
+      <div class="small text-secondary">{{ ("31/12/" ~ (year - 1)) if sm.start else "a carteira começou em " ~ year }}</div></div>
+    <div class="col-6 col-lg-3"><div class="pm-label">Valor no fim</div><div class="pm-mid money">{{ sm.value_end|money(2) }}</div>
+      <div class="small text-secondary">{{ sm.end|ddmmyyyy }}</div></div>
+    <div class="col-6 col-lg-3"><div class="pm-label">Depósitos líquidos {{ help("Depósitos menos levantamentos no ano.") }}</div><div class="pm-mid money">{{ sm.deposits|money(2, sign=True) }}</div></div>
+    <div class="col-6 col-lg-3"><div class="pm-label">Ganho {{ help("Valor no fim − valor no início − depósitos líquidos: o que a carteira ganhou ou perdeu no ano, com dividendos, juros e câmbio.") }}</div><div class="pm-mid money {{ sm.gain|tone }}">{{ sm.gain|money(2, sign=True) }}</div></div>
+    <div class="col-6 col-lg-3"><div class="pm-label">TWR do ano {{ help("Rendimento ponderado pelo tempo: os depósitos e levantamentos não o distorcem. É o que se compara com os índices.") }}</div><div class="pm-mid {{ sm.twr|tone }}">{{ sm.twr|pct(2) }}</div></div>
+    <div class="col-6 col-lg-3"><div class="pm-label">IRR do ano {{ help("Rendimento ponderado pelo dinheiro: conta quando entrou e saiu cada depósito.") }}</div><div class="pm-mid {{ (sm.irr or 0)|tone }}">{{ sm.irr|pct(2) if sm.irr is not none else "—" }}</div></div>
+    <div class="col-6 col-lg-3"><div class="pm-label">MSCI World (em €)</div>
+      <div class="pm-mid {{ ((r.msci.ret if r.msci else none) or 0)|tone }}">{{ r.msci.ret|pct(2) if r.msci and r.msci.ret is not none else "—" }}</div>
+      {% if r.msci and r.msci.ret is not none and sm.twr is not none %}<div class="small text-secondary">carteira {{ (sm.twr - r.msci.ret)|pct(2) }} face ao índice</div>{% endif %}</div>
+    <div class="col-6 col-lg-3"><div class="pm-label">Dividendos líquidos</div><div class="pm-mid money text-up">{{ r.dividends_total.net|money(2) }}</div>
+      <div class="small text-secondary">juros <span class="money">{{ r.interest|money(2) }}</span></div></div>
+  </div>
+  {% set others = sm.benchmarks|rejectattr("ticker", "equalto", "URTH")|selectattr("ret")|list %}
+  {% if others %}<div class="small text-secondary mt-2">Outros índices (em €): {% for b in others %}{{ b.name }} {{ b.ret|pct(2) }}{{ " · " if not loop.last }}{% endfor %}</div>{% endif %}
+  <div class="row g-3 mt-1">
+    <div class="col-lg-7 pm-report-chart"><div class="pm-label mb-1">Valor total e dinheiro investido</div><canvas id="repValue"></canvas></div>
+    <div class="col-lg-5 pm-report-chart"><div class="pm-label mb-1">Dividendos líquidos por mês</div><canvas id="repDiv"></canvas></div>
+  </div>
+</div>
+
+<div class="pm-card pm-report-sec" id="repDividends">
+  <h2>2 · Dividendos</h2>
+  {% if r.dividends %}
+  <div class="row g-3">
+    <div class="col-lg-7"><div class="pm-label mb-1">Por ativo</div>
+      <div class="pm-table-wrap"><table class="table pm-table"><thead><tr><th>Ativo</th><th class="text-end">Pagamentos</th><th class="text-end">Bruto</th><th class="text-end">Retido na fonte</th><th class="text-end">Líquido</th></tr></thead>
+      <tbody>{% for d in r.dividends %}<tr><td><b>{{ d.asset.ticker }}</b> <span class="sub">{{ d.asset.name }}</span></td><td class="text-end">{{ d.n }}</td>
+        <td class="text-end money">{{ d.gross|money(2) }}</td><td class="text-end money">{{ d.tax|money(2) }}</td><td class="text-end money">{{ d.net|money(2) }}</td></tr>{% endfor %}
+        <tr class="fw-semibold"><td>Total</td><td></td><td class="text-end money">{{ r.dividends_total.gross|money(2) }}</td><td class="text-end money">{{ r.dividends_total.tax|money(2) }}</td><td class="text-end money">{{ r.dividends_total.net|money(2) }}</td></tr></tbody></table></div></div>
+    <div class="col-lg-5"><div class="pm-label mb-1">Por país {{ help("País pelo ISIN, pela bolsa do símbolo ou pela moeda.") }}</div>
+      <div class="pm-table-wrap"><table class="table pm-table"><thead><tr><th>País</th><th class="text-end">Bruto</th><th class="text-end">Retido</th><th class="text-end">% retida</th></tr></thead>
+      <tbody>{% for c in r.dividends_by_country %}<tr><td>{{ c.country }}</td><td class="text-end money">{{ c.gross|money(2) }}</td><td class="text-end money">{{ c.tax|money(2) }}</td>
+        <td class="text-end">{{ (c.tax / c.gross)|pct(1, sign=False) if c.gross else "—" }}</td></tr>{% endfor %}</tbody></table></div></div>
+  </div>
+  {% else %}<p class="text-secondary mb-0">Sem dividendos em {{ year }}.</p>{% endif %}
+</div>
+
+<div class="pm-card pm-report-sec" id="repGains">
+  <h2>3 · Mais-valias (FIFO) e juros</h2>
+  {% if r.sales %}
+  <div class="pm-table-wrap"><table class="table pm-table"><thead><tr><th>Ativo</th><th class="text-end">Linhas</th><th class="text-end">Quantidade</th><th class="text-end">Valor realização</th><th class="text-end">Valor aquisição</th><th class="text-end">Mais/menos-valia</th></tr></thead>
+  <tbody>{% for g in r.sales %}<tr><td><b>{{ g.asset.ticker }}</b> <span class="sub">{{ g.asset.name }}</span></td><td class="text-end">{{ g.lots }}</td><td class="text-end">{{ g.qty|number(4) }}</td>
+    <td class="text-end money">{{ g.proceeds|money(2) }}</td><td class="text-end money">{{ g.cost|money(2) }}</td><td class="text-end money {{ g.gain|tone }}">{{ g.gain|money(2, sign=True) }}</td></tr>{% endfor %}</tbody></table></div>
+  {% else %}<p class="text-secondary">Sem vendas em {{ year }}.</p>{% endif %}
+  {% set fy = r.fiscal %}
+  <div class="row g-3 mt-1">
+    <div class="col-6 col-lg-3"><div class="pm-label">Saldo de mais-valias</div><div class="pm-mid money {{ (fy.balance if fy else 0)|tone }}">{{ (fy.balance if fy else 0)|money(2, sign=True) }}</div>
+      {% if fy %}<div class="small text-secondary">ganhos <span class="money">{{ fy.gains|money(2) }}</span> · perdas <span class="money">{{ fy.losses|money(2) }}</span></div>{% endif %}</div>
+    <div class="col-6 col-lg-3"><div class="pm-label">Juros</div><div class="pm-mid money">{{ r.interest|money(2) }}</div></div>
+    <div class="col-12 col-lg-6"><div class="pm-label">Imposto estimado (28%)</div>
+      <div class="pm-mid money text-down">{{ ((fy.tax_gains + fy.tax_dividends + fy.tax_interest) if fy else 0)|money(2) }}</div>
+      {% if fy %}<div class="small text-secondary">mais-valias <span class="money">{{ fy.tax_gains|money(2) }}</span> · dividendos (a pagar além da retenção) <span class="money">{{ fy.tax_dividends|money(2) }}</span> · juros <span class="money">{{ fy.tax_interest|money(2) }}</span></div>{% endif %}</div>
+  </div>
+  <div class="small text-secondary mt-2">O detalhe de cada lote FIFO está em Fiscal → «Exportar CSV (todas as linhas)».</div>
+</div>
+
+{% if r.networth %}{% set nw = r.networth %}
+<div class="pm-card pm-report-sec" id="repNetworth">
+  <h2>4 · Património</h2>
+  <div class="row g-3">
+    <div class="col-6 col-lg-3"><div class="pm-label">Início ({{ nw.start.month if nw.start else "—" }})</div><div class="pm-mid money">{{ nw.start.total|money(2) if nw.start else "—" }}</div>
+      {% if nw.start %}<div class="small text-secondary">disponível <span class="money">{{ nw.start.available|money(2) }}</span></div>{% endif %}</div>
+    <div class="col-6 col-lg-3"><div class="pm-label">Fim ({{ nw.end.month }})</div><div class="pm-mid money">{{ nw.end.total|money(2) }}</div>
+      <div class="small text-secondary">disponível <span class="money">{{ nw.end.available|money(2) }}</span></div></div>
+    <div class="col-6 col-lg-3"><div class="pm-label">Variação</div><div class="pm-mid money {{ nw.change|tone }}">{{ nw.change|money(2, sign=True) }}</div></div>
+  </div>
+  <div class="small text-secondary mt-2">Património líquido de todas as corretoras e dos outros ativos e dívidas (página Património), no fim de cada mês.</div>
+</div>
+{% endif %}
+
+<div class="pm-card pm-report-sec" id="repPositions">
+  <h2>{{ 5 if r.networth else 4 }} · Posições a {{ r.end|ddmmyyyy }}</h2>
+  {% if r.positions %}
+  <div class="pm-table-wrap"><table class="table pm-table"><thead><tr><th>Ativo</th><th class="text-end">Quantidade</th><th class="text-end">Preço</th><th class="text-end">Custo</th><th class="text-end">Valor</th><th class="text-end">Não realizado</th><th class="text-end">Peso</th></tr></thead>
+  <tbody>{% for pos in r.positions %}{% set un = pos.value_eur - pos.invested_eur %}<tr><td><b>{{ pos.asset.ticker }}</b> <span class="sub">{{ pos.asset.name }}</span></td>
+    <td class="text-end">{{ pos.qty|number(4) }}</td><td class="text-end">{{ pos.price|number(2) if pos.price else "—" }} {{ pos.asset.currency }}</td>
+    <td class="text-end money">{{ pos.invested_eur|money(2) }}</td><td class="text-end money">{{ pos.value_eur|money(2) }}</td>
+    <td class="text-end money {{ un|tone }}">{{ un|money(2, sign=True) }}</td><td class="text-end">{{ (pos.value_eur / r.holdings)|pct(1, sign=False) if r.holdings else "—" }}</td></tr>{% endfor %}
+    <tr class="fw-semibold"><td>Total das posições</td><td></td><td></td><td class="text-end money">{{ r.positions|sum(attribute="invested_eur")|money(2) }}</td><td class="text-end money">{{ r.holdings|money(2) }}</td><td></td><td></td></tr>
+    {% if r.cash|abs > 0.5 %}<tr><td>Caixa</td><td></td><td></td><td></td><td class="text-end money">{{ r.cash|money(2) }}</td><td></td><td></td></tr>{% endif %}</tbody></table></div>
+  {% else %}<p class="text-secondary mb-0">Sem posições abertas a {{ r.end|ddmmyyyy }}.</p>{% endif %}
+</div>
+</div>
+{% endif %}
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const data = {{ chart_data|safe }};
+  const btn = document.getElementById("reportPrint");
+  if (btn) btn.addEventListener("click", () => window.print());
+  if (!data || !window.Chart) return;
+  // os gráficos passam a imagens (canvas.toDataURL) para saírem no PDF tal como no ecrã
+  const toImage = (chart, id) => {
+    const canvas = document.getElementById(id), img = new Image();
+    img.src = chart.toBase64Image("image/png", 1);
+    img.alt = canvas.previousElementSibling ? canvas.previousElementSibling.textContent : "";
+    img.style.width = "100%"; img.style.height = canvas.style.height || "220px"; img.style.objectFit = "contain";
+    chart.destroy();
+    canvas.replaceWith(img);
+  };
+  const accent = pm.css("--pm-accent") || "#3b82f6", up = pm.css("--pm-up") || "#16a34a", muted = "#94a3b8";
+  const base = { responsive: true, maintainAspectRatio: false, animation: false, devicePixelRatio: 2,
+    plugins: { legend: { display: true, labels: { boxWidth: 10 } }, tooltip: { enabled: false } } };
+  const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  if (data.dates.length) {
+    const labels = data.dates.map((d) => { const [y, m, day] = d.split("-"); return `${day}/${m}`; });
+    const c1 = new Chart(document.getElementById("repValue"), {
+      type: "line",
+      data: { labels, datasets: [
+        { label: "Valor total", data: data.value, borderColor: accent, borderWidth: 2, pointRadius: 0, tension: .2 },
+        { label: "Dinheiro investido", data: data.deposits, borderColor: muted, borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0, stepped: true },
+      ] },
+      options: { ...base, scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { ticks: { callback: (v) => pm.money(v) } } } },
+    });
+    toImage(c1, "repValue");
+  }
+  const c2 = new Chart(document.getElementById("repDiv"), {
+    type: "bar",
+    data: { labels: months, datasets: [{ label: "Dividendos líquidos", data: data.monthly_div, backgroundColor: up }] },
+    options: { ...base, plugins: { ...base.plugins, legend: { display: false } }, scales: { y: { ticks: { callback: (v) => pm.money(v) } } } },
+  });
+  toImage(c2, "repDiv");
+});
+</script>
+{% endblock %}
