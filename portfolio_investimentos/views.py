@@ -555,10 +555,11 @@ def transacoes():
     if c["broker"]:
         q = q.filter_by(broker=int(c["broker"]))
     total = q.count()
-    page = max(_int(request.args.get("pagina"), 1), 1)
+    pages = max((total + page_size - 1) // page_size, 1)
+    page = min(max(_int(request.args.get("pagina"), 1), 1), pages)
     rows = (q.order_by(Transaction.date.desc(), Transaction.id.desc())
             .offset((page - 1) * page_size).limit(page_size).all())
-    c.update(total=total, page=page, pages=max((total + page_size - 1) // page_size, 1), rows=rows,
+    c.update(total=total, page=page, pages=pages, rows=rows,
              broker_names={b.id: b.broker_name for b in c["brokers"]}, labels=LABELS, tipo=typ,
              today=date.today().isoformat())
     return render_template("pages/transacoes.html", **c)

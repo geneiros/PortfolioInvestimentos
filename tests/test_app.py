@@ -3020,3 +3020,15 @@ def test_quick_quotes_local_loop(app, monkeypatch):
         Setting.set("quick_quotes", "1")
     main._quick_quotes_loop(app, every=0, rounds=2)
     assert seen == [1, 1]
+
+
+def test_transactions_pagination_window(app, client):
+    with app.app_context():
+        db.session.add_all([Transaction(date=date(2020, 1, 1) + timedelta(days=i), type="DEPOSIT", amount=1.0,
+                                        currency="EUR") for i in range(2500)])
+        db.session.commit()
+    html = client.get("/transacoes?pagina=12").get_data(as_text=True)
+    links = set(re.findall(r'href="\?pagina=(\d+)"', html))
+    assert {"1", "11", "12", "13", "25"} <= links and "5" not in links and "…" in html
+    assert "Página 12 de 25" in html
+    assert "Página 25 de 25" in client.get("/transacoes?pagina=999").get_data(as_text=True)
