@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-14
 
+- **Capturas de ecrã e README atualizados**  
+  Capturas novas de todas as páginas (claro e escuro), com o cartão Carteira novo da Visão Geral, e uma captura nova da secção Dados de mercado das Definições com os preços de 5 em 5 minutos. No README: os títulos que faltavam na galeria (Notícias, «E se tivesse investido no índice?», Raio-X dos ETF), a atualização automática no cartão Carteira e a paginação das Transações.
 - **Transações: a paginação ocupa a largura da tabela**  
   Os números das páginas enchem a linha até à largura da tabela (menos «Página X de N»), à volta da página atual, sempre com a primeira e a última e «…» onde faltam páginas. São mais números no computador e menos no telemóvel, e ajustam-se ao redimensionar a janela.
 - **Transações: a paginação já não sai do ecrã**  
