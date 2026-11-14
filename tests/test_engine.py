@@ -735,3 +735,22 @@ def test_bridge_transfers_keep_total_value_in_transit():
     assert min(raw.value) == 0.0                                    # sem a junção, cai a zero dois dias
     s = Portfolio(bridge_transfers(txs), PriceBook({}, {}), []).series
     assert min(s.value) == pytest.approx(10000.0) and s.value[-1] == pytest.approx(10000.0)
+
+
+def test_simulate_sale_fifo_without_touching_lots():
+    from portfolio_investimentos.engine.portfolio import Lot, simulate_sale, tax_delta
+    lots = [Lot(date(2024, 1, 10), 10, 1010.0, 1000.0, 1.01),          # €100 por ação
+            Lot(date(2025, 3, 5), 10, 1515.0, 1500.0, 1.01, opening=False)]  # €150 por ação
+    rows = simulate_sale(lots, 15, 220.0, 1.1, fees_local=22.0)  # (15 × 220 − 22) / 1,1 = €2 980
+    assert [(r["acquired"], r["qty"]) for r in rows] == [(date(2024, 1, 10), 10), (date(2025, 3, 5), 5)]
+    assert [round(r["cost_eur"], 2) for r in rows] == [1000.0, 750.0]
+    assert round(sum(r["proceeds_eur"] for r in rows), 2) == 2980.0
+    assert round(sum(r["gain_eur"] for r in rows), 2) == 1230.0
+    assert [lot.qty for lot in lots] == [10, 10] and lots[0].cost_eur == 1000.0  # os lotes ficam iguais
+    assert sum(r["qty"] for r in simulate_sale(lots, 99, 1.0, 1.0)) == 20     # não vende mais do que existe
+    assert simulate_sale(lots[:1], 0, 1.0, 1.0) == []
+    opening = simulate_sale([Lot(date(2020, 1, 1), 1, 5.0, 5.0, 1.0, opening=True)], 1, 6.0, 1.0)
+    assert opening[0]["acquired"] is None
+    assert tax_delta(1000.0, 500.0) == pytest.approx({"before": 280.0, "after": 420.0, "delta": 140.0})
+    assert tax_delta(-300.0, 200.0) == pytest.approx({"before": 0.0, "after": 0.0, "delta": 0.0})  # perdas não dão reembolso
+    assert tax_delta(500.0, -800.0)["delta"] == pytest.approx(-140.0)  # só abate até zero

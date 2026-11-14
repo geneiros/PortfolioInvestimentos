@@ -15,7 +15,7 @@ from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory
 from . import auth
 from .engine.formatting import parse_number
 from .engine.portfolio import ASSET_TYPES
-from .services import backups, data, importer, market
+from .services import backups, data, importer, market, sale_sim
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -655,6 +655,26 @@ def quick_quotes_now(force=False):
     if not insts:
         return {"updated": 0, "fx": 0, "at": Setting.get("quick_quotes_at"), "skipped": "empty"}
     return market.quick_quotes(insts, regions=_regions(p_all), force=force)
+
+
+def _sim_args(asset, qty, price, fees):
+    """Argumentos do simulador de venda: quantidade vazia ou «tudo» = toda a posição; preço vazio = o último."""
+    q = None if str(qty or "").strip().lower() in ("", "tudo", "all") else _float(qty)
+    px = None if not str(price or "").strip() else _float(price)
+    return asset, q, px, _float(fees)
+
+
+def simulate_sale_result(asset, qty=None, price=None, fees=None):
+    try:
+        return sale_sim.simulate(*_sim_args(asset, qty, price, fees))
+    except sale_sim.SimulationError as exc:
+        raise ApiError(str(exc)) from exc
+
+
+@action
+def simulate_sale(asset="", qty="", price="", fees=""):
+    """Simulador de venda (Fiscal): lotes FIFO, mais-valia, imposto do ano antes e depois e perdas por realizar."""
+    return simulate_sale_result(asset, qty, price, fees)
 
 
 @action

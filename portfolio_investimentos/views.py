@@ -10,7 +10,7 @@ from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory
                      Instrument, Price, Setting, Transaction, WatchItem, db)
 from . import auth
 from .services import context as ctx
-from .services import backups, data, insights, market, networth, portfolio_alerts, widgets
+from .services import backups, data, insights, market, networth, portfolio_alerts, sale_sim, widgets
 from .services import news as news_svc
 from .services.importer import BROKERS, INSTRUCTIONS
 from .services.market import check_alerts, refresh_state, upcoming_events, yfinance_available
@@ -426,7 +426,8 @@ def fiscal():
         g.proceeds += sl.proceeds_eur
         g.cost += sl.cost_eur
     c.update(years=years, year=year, y=y, groups=sorted(groups.values(), key=lambda g: g.asset.ticker),
-             n_lots=len(y["sales"]) if y else 0)
+             n_lots=len(y["sales"]) if y else 0, sim_positions=sale_sim.positions() if c["p"].transactions else [],
+             this_year=date.today().year)
     return render_template("pages/fiscal.html", **c)
 
 
@@ -461,6 +462,34 @@ def fiscal_csv():
                              repr(round(sl.gain_eur, 2))]))
     return Response("\ufeff" + "\n".join(out), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename=mais-valias-{year}.csv"})
+
+
+@bp.route("/fiscal/simulacao.csv")
+def fiscal_simulation_csv():
+    """A simulação de venda em CSV: lotes FIFO, totais, imposto antes e depois e perdas por realizar."""
+    from .api import ApiError, simulate_sale_result
+    a = request.args
+    try:
+        r = simulate_sale_result(a.get("ativo", ""), a.get("qtd"), a.get("preco"), a.get("comissoes"))
+    except ApiError as exc:
+        return Response(str(exc), status=400, mimetype="text/plain")
+    n = lambda v: repr(round(v, 2))  # noqa: E731
+    q = lambda s: '"' + str(s).replace('"', '""') + '"'  # noqa: E731
+    out = [f"Simulação de venda (não é uma venda real);{q(r['ticker'])};{q(r['broker'])};"
+           f"quantidade {r['qty']!r};preço {r['price']!r} {r['currency']};comissões {r['fees']!r}",
+           "Data aquisição;Quantidade;Valor aquisição;Valor realização;Mais/menos-valia"]
+    for ln in r["lots"]:
+        out.append(";".join([ln["acquired"] or "anterior ao histórico", repr(ln["qty"]), n(ln["cost_eur"]),
+                             n(ln["proceeds_eur"]), n(ln["gain_eur"])]))
+    out += [f"Total;{r['qty']!r};{n(r['cost'])};{n(r['proceeds'])};{n(r['gain'])}", "",
+            f"Saldo de mais-valias {r['year']};antes;{n(r['balance_before'])};depois;{n(r['balance_after'])}",
+            f"Imposto estimado ({round(r['rate'] * 100)}%);antes;{n(r['tax_before'])};depois;{n(r['tax_after'])};"
+            f"diferença;{n(r['tax_delta'])}", "", "Perdas por realizar;Corretora;Menos-valia;Poupança no imposto;Acumulado"]
+    for h in r["harvest"]:
+        out.append(";".join([q(h["ticker"]), q(h["broker"]), n(h["loss"]), n(h["saving"]), n(h["cumulative"])]))
+    name = "".join(ch for ch in r["ticker"] if ch.isalnum() or ch in "-._") or "ativo"
+    return Response("\ufeff" + "\n".join(out), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename=simulacao-venda-{name}.csv"})
 
 
 @bp.route("/radar")

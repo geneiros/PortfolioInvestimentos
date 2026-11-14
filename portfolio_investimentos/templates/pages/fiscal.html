@@ -64,10 +64,95 @@
   </div></div>
 </div>
 {% endif %}
+
+{% if sim_positions %}
+<div class="pm-card mt-3" id="saleSim">
+  <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+    <div class="pm-label m-0">Simular uma venda {{ help("Antes de vender: os lotes que saem pelo FIFO (o mesmo método do relatório acima), a mais ou menos-valia, o imposto estimado das mais-valias de " ~ this_year ~ " antes e depois da venda (com as vendas de todas as corretoras) e as posições com menos-valia que a compensariam se fossem vendidas no mesmo ano.") }}</div>
+  </div>
+  <form class="row g-2 align-items-end" id="simForm">
+    <div class="col-12 col-md-4"><label class="form-label small text-secondary mb-1" for="simAsset">Posição</label>
+      <select class="form-select form-select-sm" id="simAsset" name="asset">
+        {% for r in sim_positions %}<option value="{{ r.key }}" data-qty="{{ r.qty }}" data-price="{{ r.price or '' }}" data-cur="{{ r.currency }}">{{ r.ticker }} · {{ r.name }} · {{ r.broker }} ({{ r.qty|number(4) }})</option>{% endfor %}
+      </select></div>
+    <div class="col-6 col-md-2"><label class="form-label small text-secondary mb-1" for="simQty">Quantidade</label>
+      <div class="input-group input-group-sm"><input class="form-control" id="simQty" name="qty" inputmode="decimal" placeholder="tudo">
+        <button class="btn btn-outline-secondary" type="button" id="simAll">Tudo</button></div></div>
+    <div class="col-6 col-md-2"><label class="form-label small text-secondary mb-1" for="simPrice">Preço (<span id="simCur">EUR</span>)</label>
+      <input class="form-control form-control-sm" id="simPrice" name="price" inputmode="decimal" placeholder="último"></div>
+    <div class="col-6 col-md-2"><label class="form-label small text-secondary mb-1" for="simFees">Comissões</label>
+      <input class="form-control form-control-sm" id="simFees" name="fees" inputmode="decimal" placeholder="0"></div>
+    <div class="col-6 col-md-2 d-flex gap-2"><button class="btn btn-primary btn-sm flex-fill" type="submit"><i class="bi bi-calculator"></i> Simular</button></div>
+  </form>
+  <div id="simOut" class="mt-3 d-none">
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-lg-3"><div class="pm-label">Valor de realização</div><div class="pm-mid money" id="simProceeds"></div></div>
+      <div class="col-6 col-lg-3"><div class="pm-label">Custo de aquisição</div><div class="pm-mid money" id="simCost"></div></div>
+      <div class="col-6 col-lg-3"><div class="pm-label">Mais/menos-valia</div><div class="pm-mid money" id="simGain"></div></div>
+      <div class="col-6 col-lg-3"><div class="pm-label">Imposto de <span id="simYear"></span> (28%)</div>
+        <div class="pm-mid money" id="simTax"></div><div class="small text-secondary" id="simTaxDetail"></div></div>
+    </div>
+    <div class="d-flex align-items-center mb-2"><div class="pm-label m-0">Lotes que saem (FIFO)</div>
+      <a class="btn btn-pm btn-sm ms-auto" id="simCsv" href="#"><i class="bi bi-download"></i> Exportar CSV</a></div>
+    <div class="pm-table-wrap mb-3"><table class="table pm-table"><thead><tr><th>Aquisição</th><th class="text-end">Quantidade</th>
+      <th class="text-end">Valor aquisição</th><th class="text-end">Valor realização</th><th class="text-end">Mais/menos-valia</th></tr></thead>
+      <tbody id="simLots"></tbody></table></div>
+    <div class="pm-label mb-1">Perdas por realizar {{ help("Posições abertas (de todas as corretoras) com menos-valia latente ao último preço. «Poupança» é quanto o imposto das mais-valias do ano desceria se vendesses só essa posição, depois da venda simulada; «Acumulado», vendendo também as de cima. As perdas só abatem até o saldo do ano chegar a zero.") }}</div>
+    <div id="simHarvest"></div>
+  </div>
+  <div class="small text-secondary mt-3"><i class="bi bi-info-circle"></i>
+    É só uma simulação: nada é vendido nem recomprado. O imposto é uma estimativa a 28% sobre o saldo das mais e menos-valias de {{ this_year }} de todas as corretoras; a opção pelo englobamento, o reporte de perdas de anos anteriores e as regras de cada caso são decisão tua (confirma com um contabilista). Os lotes «anteriores ao histórico» têm o custo estimado.</div>
+</div>
+{% endif %}
 {% endautoescape %}{% endblock %}
 
 {% block scripts %}
 <script>
+// simulador de venda
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("simForm");
+  if (!form) return;
+  const $ = (id) => document.getElementById(id);
+  const sel = $("simAsset");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const num = (v, d = 4) => new Intl.NumberFormat("pt-PT", { maximumFractionDigits: d }).format(v);
+  const td = (v, cls = "") => `<td class="text-end ${cls}">${v}</td>`;
+  const sync = () => {
+    const o = sel.selectedOptions[0];
+    $("simCur").textContent = o.dataset.cur;
+    $("simPrice").placeholder = o.dataset.price ? "último: " + num(+o.dataset.price, 4) : "indica o preço";
+  };
+  sel.addEventListener("change", sync); sync();
+  $("simAll").addEventListener("click", () => { $("simQty").value = ""; $("simQty").placeholder = "tudo"; });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const args = { asset: sel.value, qty: $("simQty").value, price: $("simPrice").value, fees: $("simFees").value };
+    let r;
+    try { r = await pm.call("simulate_sale", args); } catch (err) { return; }
+    const set = (id, v, tone) => { const el = $(id); el.textContent = v; el.classList.remove("text-up", "text-down", "text-secondary"); if (tone !== undefined) el.classList.add(pm.tone(tone)); };
+    set("simProceeds", pm.money(r.proceeds, 2)); set("simCost", pm.money(r.cost, 2));
+    set("simGain", pm.money(r.gain, 2, true), r.gain);
+    $("simYear").textContent = r.year;
+    set("simTax", pm.money(r.tax_after, 2));
+    $("simTaxDetail").textContent = `antes ${pm.money(r.tax_before, 2)} · ${r.tax_delta >= 0 ? "+" : "−"}${pm.money(Math.abs(r.tax_delta), 2)} com esta venda`
+      + ` · saldo ${pm.money(r.balance_before, 2, true)} → ${pm.money(r.balance_after, 2, true)}`;
+    $("simLots").innerHTML = r.lots.map((l) => `<tr><td>${l.acquired ? esc(l.acquired.split("-").reverse().join("/")) : '<span class="text-secondary">anterior ao histórico</span>'}</td>`
+      + td(num(l.qty)) + td(pm.money(l.cost_eur, 2), "money") + td(pm.money(l.proceeds_eur, 2), "money")
+      + td(pm.money(l.gain_eur, 2, true), "money " + pm.tone(l.gain_eur)) + "</tr>").join("")
+      + `<tr class="fw-semibold"><td>Total · ${esc(r.ticker)} · ${esc(r.broker)}</td>` + td(num(r.qty)) + td(pm.money(r.cost, 2), "money")
+      + td(pm.money(r.proceeds, 2), "money") + td(pm.money(r.gain, 2, true), "money " + pm.tone(r.gain)) + "</tr>";
+    $("simHarvest").innerHTML = r.harvest.length
+      ? '<div class="pm-table-wrap"><table class="table pm-table"><thead><tr><th>Ativo</th><th>Corretora</th><th class="text-end">Menos-valia</th><th class="text-end">Poupança no imposto</th><th class="text-end">Acumulado</th></tr></thead><tbody>'
+        + r.harvest.map((h) => `<tr><td><b>${esc(h.ticker)}</b> <span class="sub">${esc(h.name)}</span></td><td>${esc(h.broker)}</td>`
+          + td(pm.money(h.loss, 2, true), "money text-down") + td(pm.money(h.saving, 2), "money") + td(pm.money(h.cumulative, 2), "money") + "</tr>").join("")
+        + "</tbody></table></div>"
+        + (r.balance_after <= 0 ? '<p class="small text-secondary mb-0">Com esta venda, o saldo do ano já não é positivo: realizar mais perdas não baixa o imposto deste ano.</p>' : "")
+      : '<p class="small text-secondary mb-0">Nenhuma posição aberta com menos-valia latente.</p>';
+    $("simCsv").href = "/fiscal/simulacao.csv?" + new URLSearchParams({ ativo: args.asset, qtd: args.qty, preco: args.price, comissoes: args.fees });
+    $("simOut").classList.remove("d-none");
+  });
+});
+
 document.addEventListener("DOMContentLoaded", () => {
   const modalEl = document.getElementById("lotsModal");
   if (!modalEl) return;

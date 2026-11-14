@@ -3032,3 +3032,37 @@ def test_transactions_pagination_window(app, client):
     assert links == {str(i) for i in range(1, 26)} and 'data-gap="l"' in html  # o script mostra as que cabem
     assert "Página 12 de 25" in html
     assert "Página 25 de 25" in client.get("/transacoes?pagina=999").get_data(as_text=True)
+
+
+def test_sale_simulator(app, client):
+    from portfolio_investimentos.services import data, sale_sim
+    token = csrf(client)
+    post(client, "load_demo", token)
+    assert 'id="saleSim"' in client.get("/fiscal").get_data(as_text=True)
+    with app.app_context():
+        rows = sale_sim.positions()
+        assert rows and all(":" in r["key"] for r in rows)
+        key, held = rows[0]["key"], rows[0]["qty"]
+        bid, _, ticker = key.partition(":")
+        pos = data.load_portfolio(bid).positions[ticker]
+        expected_cost = pos.invested_eur
+    r = post(client, "simulate_sale", token, asset=key, qty="tudo").get_json()["message"]
+    assert r["qty"] == pytest.approx(held) and sum(ln["qty"] for ln in r["lots"]) == pytest.approx(held)
+    assert r["cost"] == pytest.approx(expected_cost, rel=1e-6)
+    assert r["tax_after"] == pytest.approx(max(r["balance_before"] + r["gain"], 0) * 0.28)
+    assert r["balance_after"] == pytest.approx(r["balance_before"] + r["gain"])
+    assert all(h["loss"] < 0 and h["key"] != key for h in r["harvest"])
+    half = post(client, "simulate_sale", token, asset=key, qty=str(held / 2).replace(".", ","), price="10").get_json()["message"]
+    assert half["qty"] == pytest.approx(held / 2) and half["price"] == 10
+    # o simulador não grava nada: a carteira continua igual
+    with app.app_context():
+        assert data.load_portfolio(bid).positions[ticker].qty == pytest.approx(held)
+    bad = post(client, "simulate_sale", token, asset=key, qty=str(held * 10))
+    assert bad.status_code == 400 and "Só tens" in bad.get_json()["error"]
+    assert post(client, "simulate_sale", token, asset="999:NADA").status_code == 400
+    csv = client.get(f"/fiscal/simulacao.csv?ativo={key}&qtd=tudo")
+    text = csv.get_data(as_text=True)
+    assert csv.status_code == 200 and text.startswith("﻿Simulação de venda")
+    assert "Data aquisição;Quantidade;Valor aquisição;Valor realização;Mais/menos-valia" in text
+    assert "Imposto estimado (28%)" in text
+    assert client.get("/fiscal/simulacao.csv?ativo=999:NADA").status_code == 400
