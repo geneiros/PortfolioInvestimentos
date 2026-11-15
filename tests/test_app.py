@@ -3163,3 +3163,25 @@ def test_harvest_card_without_simulating_a_sale(app, client):
     assert all(r["key"] != sale_key for r in with_sale["rows"])
     h2 = post(client, "simulate_harvest", token, keys=keys, asset=sale_key, qty="tudo").get_json()["message"]
     assert h2["balance_before"] == pytest.approx(sale["balance_after"])
+
+
+def test_etf_holdings_invesco_full_name_xlsx():
+    """Ficheiro da Invesco: linhas de texto antes, «Full name | ISIN | Weight» e pesos em fração, sem país."""
+    import openpyxl
+    from portfolio_investimentos.services import xray
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Implied constituents"
+    for row in ([], ["Invesco FTSE All-World UCITS ETF Acc"], ["Data as of 12/11/2026"], [],
+                ["Full name", "ISIN", "Weight"],
+                ["APPLE INC USD0.00001", "US0378331005", 0.0488],
+                ["TAIWAN SEMICONDUCTOR MANUFAC TWD10", "TW0002330008", 0.0166],
+                ["OUTRAS", "", 0.9346]):
+        ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    rows = xray.parse_holdings(buf.getvalue(), "Top_10_exposures-holdings.xlsx")
+    assert [(r["name"][:5], r["isin"]) for r in rows] == [("APPLE", "US0378331005"), ("TAIWA", "TW0002330008"),
+                                                          ("OUTRA", None)]
+    assert rows[0]["weight"] == pytest.approx(0.0488) and sum(r["weight"] for r in rows) == pytest.approx(1.0)
+    assert rows[0]["country"] == "EUA" and rows[1]["country"] == "Taiwan"  # país pelo ISIN

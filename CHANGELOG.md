@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-15
 
+- **Raio-X: ficheiros de posições da Invesco**  
+  A coluna do nome «Full name» (ficheiro «Implied constituents» da Invesco, ex.: FTSE All-World, FWIA) e a do ISIN «ISIN code» passam a ser reconhecidas; antes, o ficheiro era recusado com «não encontrei as colunas do nome e do peso». Sem coluna de país, o país vem do ISIN.
 - **Fiscal: «Vender e recomprar» num cartão próprio**  
   A simulação de vender e recomprar as posições com menos-valia passa para um cartão separado, já preenchido ao abrir a página: parte do saldo de mais-valias do ano (de todas as corretoras), sem ser preciso simular primeiro a venda de uma ação. Depois de simular uma venda no cartão de cima, aparece a opção «Contar com a venda simulada acima», que recalcula as perdas por realizar e a simulação a partir do saldo depois dessa venda. O simulador de venda fica só com a venda (lotes FIFO, imposto antes e depois e CSV). Capturas 31 a 33 atualizadas.
 

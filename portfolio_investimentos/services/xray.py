@@ -54,13 +54,14 @@ SECTOR_PT = {
 
 _COLS = {
     "name": ("name", "nome", "holding", "holding name", "security name", "issuer", "emitente", "descrição",
-             "description", "security", "constituent", "company"),
+             "description", "security", "constituent", "company", "full name", "fund holding name",
+             "holding description", "nome completo"),
     "weight": ("weight (%)", "weight", "peso (%)", "peso", "% of funds", "% of fund", "% of net assets",
                "% net assets", "market value weight", "% weight", "weighting", "% do fundo", "ponderação",
                "% of market value", "weight %"),
     "country": ("location", "country", "país", "pais", "country of risk", "domicile", "localização"),
     "sector": ("sector", "setor", "sector (gics)", "gics sector", "industry"),
-    "isin": ("isin", "código isin"),
+    "isin": ("isin", "código isin", "isin code", "isin-code"),
     "ticker": ("ticker", "symbol", "código", "issuer ticker"),
 }
 
