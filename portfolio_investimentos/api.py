@@ -678,6 +678,17 @@ def simulate_sale(asset="", qty="", price="", fees=""):
 
 
 @action
+def harvest_list(asset="", qty="", price="", fees=""):
+    """Posições com menos-valia e quanto cada uma baixaria o imposto, a partir do saldo do ano depois da venda
+    simulada no formulário de cima (sem ela, a partir do saldo do ano)."""
+    if not asset:
+        balance = sale_sim.year_balance()
+        return {"balance": balance, "rows": sale_sim.harvest(balance)}
+    sale = simulate_sale_result(asset, qty, price, fees)
+    return {"balance": sale["balance_after"], "rows": sale_sim.harvest(sale["balance_after"], skip=asset)}
+
+
+@action
 def simulate_harvest(keys="", fee="", fx_pct="", rebuy="1", asset="", qty="", price="", fees=""):
     """Vender (e voltar a comprar) as posições com menos-valia escolhidas: poupança no imposto do ano, custos e
     imposto adiado. O saldo de partida inclui a venda simulada no formulário de cima, se houver."""

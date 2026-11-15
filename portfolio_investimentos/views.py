@@ -427,6 +427,8 @@ def fiscal():
         g.cost += sl.cost_eur
     c.update(years=years, year=year, y=y, groups=sorted(groups.values(), key=lambda g: g.asset.ticker),
              n_lots=len(y["sales"]) if y else 0, sim_positions=sale_sim.positions() if c["p"].transactions else [],
+             year_balance=sale_sim.year_balance() if c["p"].transactions else 0.0,
+             harvest_rows=sale_sim.harvest(sale_sim.year_balance()) if c["p"].transactions else [],
              this_year=date.today().year)
     return render_template("pages/fiscal.html", **c)
 

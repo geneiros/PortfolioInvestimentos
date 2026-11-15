@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-15
+
+- **Fiscal: «Vender e recomprar» num cartão próprio**  
+  A simulação de vender e recomprar as posições com menos-valia passa para um cartão separado, já preenchido ao abrir a página: parte do saldo de mais-valias do ano (de todas as corretoras), sem ser preciso simular primeiro a venda de uma ação. Depois de simular uma venda no cartão de cima, aparece a opção «Contar com a venda simulada acima», que recalcula as perdas por realizar e a simulação a partir do saldo depois dessa venda. O simulador de venda fica só com a venda (lotes FIFO, imposto antes e depois e CSV). Capturas 31 a 33 atualizadas.
+
 ## 2026-11-14
 
 - **Capturas de ecrã e README atualizados**  

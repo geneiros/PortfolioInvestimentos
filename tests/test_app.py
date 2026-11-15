@@ -3136,3 +3136,30 @@ def test_annual_report(app, client):
                     "Imprimir / PDF", "@media print", 'id="repValue"'):
         assert section in html, section
     assert client.get("/relatorio?ano=1900").status_code == 200  # ano sem dados: o ano por omissão
+
+
+def test_harvest_card_without_simulating_a_sale(app, client):
+    from portfolio_investimentos.services import sale_sim
+    token = csrf(client)
+    post(client, "load_demo", token)
+    html = client.get("/fiscal").get_data(as_text=True)
+    assert 'id="harvestCard"' in html and "Vender e recomprar posições com menos-valia" in html
+    assert "Perdas por realizar" not in html  # já não está dentro do simulador de venda
+    with app.app_context():
+        balance = sale_sim.year_balance()
+        losses = sale_sim._open_losses()
+        assert losses and all(r["ticker"] in html for r in losses)  # a tabela vem já preenchida
+        sale_key = sale_sim.positions()[0]["key"]
+        sale = sale_sim.simulate(sale_key)
+    keys = ",".join(r["key"] for r in losses)
+    # sem venda simulada: parte do saldo do ano
+    h = post(client, "simulate_harvest", token, keys=keys).get_json()["message"]
+    assert h["balance_before"] == pytest.approx(balance)
+    base = post(client, "harvest_list", token).get_json()["message"]
+    assert base["balance"] == pytest.approx(balance) and len(base["rows"]) == len(losses)
+    # com a venda simulada acima: parte do saldo depois dela e não inclui a posição vendida
+    with_sale = post(client, "harvest_list", token, asset=sale_key, qty="tudo").get_json()["message"]
+    assert with_sale["balance"] == pytest.approx(sale["balance_after"])
+    assert all(r["key"] != sale_key for r in with_sale["rows"])
+    h2 = post(client, "simulate_harvest", token, keys=keys, asset=sale_key, qty="tudo").get_json()["message"]
+    assert h2["balance_before"] == pytest.approx(sale["balance_after"])
