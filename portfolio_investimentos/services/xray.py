@@ -328,7 +328,7 @@ def xray(p, top=TOP):
                 overlap.append({"a": a, "b": b, "share": share, "common": len(common)})
     overlap.sort(key=lambda x: -x["share"])
     companies_total = sum(c["value"] for c in comps)
-    pies = {"companies": _pie([(c["name"], c["value"]) for c in comps], 10, "Outras empresas", companies_total),
+    pies = {"companies": _pie([(c["name"], c["value"]) for c in comps], 9, "Outras empresas", companies_total),
             "countries": _pie(sorted(by_country.items(), key=lambda kv: -kv[1]), 9, "Outros"),
             "sectors": _pie(sorted(by_sector.items(), key=lambda kv: -kv[1]), 9, "Outros")}
     return {"companies": top_rows, "countries": ranked(by_country), "sectors": ranked(by_sector),

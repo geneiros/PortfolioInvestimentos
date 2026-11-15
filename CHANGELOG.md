@@ -5,7 +5,7 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 ## 2026-11-15
 
 - **Carteira: gráficos circulares no Raio-X dos ETF**  
-  Três gráficos circulares por cima das barras: a exposição real por empresa (as 10 maiores e «Outras empresas»), por país e por setor (os 9 maiores e «Outros»). A legenda encurta os nomes longos e a dica mostra o nome inteiro, o valor e a %. «Outros» fica sempre a cinzento. Captura do Raio-X atualizada.
+  Três gráficos por cima das barras, no mesmo estilo dos gráficos «Alocação» (anel, legenda à direita): a exposição real por empresa (as 9 maiores e «Outras empresas»), por país e por setor (os 9 maiores e «Outros»). A legenda encurta os nomes longos e a dica mostra o nome inteiro, o valor e a %. «Outros» fica sempre a cinzento. Captura do Raio-X atualizada.
 - **Raio-X: ficheiros de posições da Invesco**  
   A coluna do nome «Full name» (ficheiro «Implied constituents» da Invesco, ex.: FTSE All-World, FWIA) e a do ISIN «ISIN code» passam a ser reconhecidas; antes, o ficheiro era recusado com «não encontrei as colunas do nome e do peso». Sem coluna de país, o país vem do ISIN.
 - **Fiscal: «Vender e recomprar» num cartão próprio**  
