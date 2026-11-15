@@ -188,6 +188,11 @@
       <span class="small text-secondary ms-auto">{{ xray.count }} empresas · cobre {{ xray.coverage|pct(0, sign=False) }} da carteira</span>
     </div>
     {% if xray.missing %}<div class="alert alert-info small py-2 mb-2">Falta a composição de {{ xray.missing|join(', ') }}: carrega-a em «Composição dos ETF», em baixo. Até lá, {{ 'esse ETF conta' if xray.missing|length == 1 else 'esses ETF contam' }} como «ETF sem composição».</div>{% endif %}
+    <div class="row g-3 mb-3" id="xrayPies">
+      {% for key, label in (("companies", "Por empresa"), ("countries", "Por país"), ("sectors", "Por setor")) %}
+      <div class="col-md-4"><div class="pm-label mb-2">{{ label }}</div><div style="height: 340px"><canvas id="xray-pie-{{ key }}" aria-label="Exposição {{ label|lower }}"></canvas></div></div>
+      {% endfor %}
+    </div>
     <div class="row g-4">
       <div class="col-xl-5"><div class="pm-label mb-2">Por empresa</div>
         {% set top = xray.companies[0].pct if xray.companies else 1 %}
@@ -473,6 +478,26 @@
       document.querySelectorAll(".pm-chip.filter").forEach((x) => x.classList.toggle("active", x === b)); apply();
     }));
     document.getElementById("posSearch").addEventListener("input", apply);
+    // Raio-X dos ETF: exposição real por empresa, país e setor
+    const pies = {{ js_json(xray.pies if xray else {})|safe }};
+    Object.entries(pies).forEach(([key, rows]) => {
+      if (!rows.length || !document.getElementById("xray-pie-" + key)) return;
+      // cinzento só para «Outros»; as outras fatias com cores distintas (sem o cinzento da paleta)
+      const pieColors = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#06b6d4", "#ef4444", "#84cc16", "#ec4899", "#14b8a6", "#f97316"];
+      const rest = (n) => n === "Outros" || n === "Outras empresas";
+      const colors = rows.map((r, i) => rest(r[0]) ? "#94a3b8" : pieColors[i % pieColors.length]);
+      const short = (n) => n.length > 22 ? n.slice(0, 21) + "…" : n;  // a legenda não corta; o nome inteiro fica na dica
+      pm.chart("xray-pie-" + key, {
+        type: "pie",
+        data: { labels: rows.map((r) => short(r[0])), datasets: [{ data: rows.map((r) => r[1]), backgroundColor: colors, borderWidth: 1, borderColor: pm.css("--bs-body-bg") || "#fff" }] },
+        options: { maintainAspectRatio: false, plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } },
+          tooltip: { callbacks: { label: (it) => {
+            const total = it.dataset.data.reduce((a, b) => a + b, 0);
+            return `${rows[it.dataIndex][0]}: ${pm.money(it.parsed)} (${pm.pct(it.parsed / total, 1, false)})`;
+          } } } } },
+      });
+    });
     Object.entries(alloc).forEach(([key, rows]) => {
       pm.chart("alloc-" + key, {
         type: "doughnut",

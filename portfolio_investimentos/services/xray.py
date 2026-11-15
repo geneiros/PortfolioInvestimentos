@@ -327,6 +327,28 @@ def xray(p, top=TOP):
             if share > 0.001:
                 overlap.append({"a": a, "b": b, "share": share, "common": len(common)})
     overlap.sort(key=lambda x: -x["share"])
+    companies_total = sum(c["value"] for c in comps)
+    pies = {"companies": _pie([(c["name"], c["value"]) for c in comps], 10, "Outras empresas", companies_total),
+            "countries": _pie(sorted(by_country.items(), key=lambda kv: -kv[1]), 9, "Outros"),
+            "sectors": _pie(sorted(by_sector.items(), key=lambda kv: -kv[1]), 9, "Outros")}
     return {"companies": top_rows, "countries": ranked(by_country), "sectors": ranked(by_sector),
             "overlap": overlap, "coverage": covered / total if total else 0.0, "missing": missing,
-            "total": total, "count": len(companies)}
+            "total": total, "count": len(companies), "companies_total": companies_total, "pies": pies}
+
+
+def _pie(items, n, rest_label, total=None):
+    """[[nome, valor]] para um gráfico circular: os `n` maiores e o resto numa fatia `rest_label` (por último).
+
+    Fatias com menos de 0,5% do total juntam-se ao resto, tal como um «Outros» que já exista nos dados."""
+    total = sum(v for _, v in items) if total is None else total
+    if total <= 0:
+        return []
+    out, rest = [], 0.0
+    for name, value in items:
+        if name == rest_label or len(out) >= n or value < total * 0.005:
+            rest += value
+        elif value > 0:
+            out.append([name, round(value, 2)])
+    if rest > 0.005:
+        out.append([rest_label, round(rest, 2)])
+    return out

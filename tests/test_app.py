@@ -2927,8 +2927,17 @@ def test_etf_xray_holdings_exposure_and_overlap(app, client):
         ov = x["overlap"][0]
         assert {ov["a"], ov["b"]} == {"DEMO-WRLD", "DEMO-CASH"} and ov["share"] == pytest.approx(0.4 + 0.2)
         assert EtfHolding.query.filter_by(etf="DEMO-WRLD").count() == 3
+        # gráficos circulares: no máximo 10 (+ «Outras empresas») e 9 (+ «Outros») fatias, que somam tudo
+        pies = x["pies"]
+        assert set(pies) == {"companies", "countries", "sectors"}
+        assert sum(v for _, v in pies["companies"]) == pytest.approx(x["companies_total"], abs=0.05)
+        assert sum(v for _, v in pies["countries"]) == pytest.approx(x["total"], abs=0.05)
+        assert sum(v for _, v in pies["sectors"]) == pytest.approx(x["total"], abs=0.05)
+        assert len(pies["companies"]) <= 11 and len(pies["countries"]) <= 10 and len(pies["sectors"]) <= 10
+        assert [n for n, _ in pies["countries"]].count("Outros") <= 1
     html = client.get("/carteira").get_data(as_text=True)
     assert "Falta a composição" not in html and "Sobreposição entre ETF" in html
+    assert all(f'id="xray-pie-{k}"' in html for k in ("companies", "countries", "sectors"))
     # descarregar só de emitentes; o endereço fica guardado para atualizar
     assert post(client, "fetch_etf_holdings", token, ticker="DEMO-WRLD", url="https://exemplo.com/a.csv").status_code == 400
     with app.app_context():
