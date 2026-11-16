@@ -121,7 +121,10 @@ def create_app(config=None):
     def _offline():
         from datetime import datetime
         from .models import Setting
-        return {"offline_enabled": Setting.get("offline_enabled") == "1",
+        from flask import request
+        theme = request.cookies.get("pm_theme")
+        return {"theme_pref": theme if theme in ("light", "dark", "purple") else None,
+                "offline_enabled": Setting.get("offline_enabled") == "1",
                 "quick_quotes": Setting.get("quick_quotes") == "1",
                 "generated_at": datetime.now().isoformat(timespec="minutes")}
 

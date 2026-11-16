@@ -1,0 +1,40 @@
+{#- Tema e cor da barra do sistema (Android, aplicação instalada).
+    A escolha vem do cookie pm_theme, para o HTML já trazer a cor certa (o Chrome da aplicação instalada pode não
+    acompanhar uma meta mudada por JavaScript); no Automático, duas metas com «media», a forma padrão. O script
+    acerta o resto com o localStorage (escolha feita antes de existir o cookie). -#}
+{%- set theme_colors = {"light": "#ffffff", "dark": "#212529", "purple": "#272236"} %}
+{%- if theme_pref in theme_colors %}
+  <meta name="theme-color" content="{{ theme_colors[theme_pref] }}" id="themeColor">
+{%- else %}
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#212529" media="(prefers-color-scheme: dark)">
+{%- endif %}
+  <script>
+    (function () {
+      const COLORS = { light: "#ffffff", dark: "#212529", purple: "#272236" };
+      // uma só meta com a cor do tema escolhido; no Automático, as duas com «media» (segue o sistema)
+      window.pmThemeColor = function (pref, dark) {
+        document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.remove());
+        const add = (color, media) => {
+          const m = document.createElement("meta");
+          m.name = "theme-color"; m.content = color;
+          if (media) m.media = media; else m.id = "themeColor";
+          document.head.appendChild(m);
+        };
+        if (pref === "auto") { add(COLORS.light, "(prefers-color-scheme: light)"); add(COLORS.dark, "(prefers-color-scheme: dark)"); }
+        else add(pref === "purple" ? COLORS.purple : dark ? COLORS.dark : COLORS.light);
+      };
+      window.pmThemeCookie = function (pref) {
+        document.cookie = "pm_theme=" + pref + "; path=/; max-age=31536000; SameSite=Lax";
+      };
+      const server = "{{ theme_pref or 'auto' }}";
+      let pref = server;
+      try { pref = localStorage.getItem("pm-theme") || server; } catch (e) {}
+      if (!(pref in COLORS) && pref !== "auto") pref = "auto";
+      // «purple» é um tema escuro com cores próprias (classe pm-purple, ver pm.css)
+      const dark = pref === "dark" || pref === "purple" || (pref === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+      document.documentElement.classList.toggle("pm-purple", pref === "purple");
+      if (pref !== server) { window.pmThemeColor(pref, dark); window.pmThemeCookie(pref); }  // a próxima página já vem certa
+    })();
+  </script>

@@ -3202,3 +3202,21 @@ def test_purple_theme_option(client):
     assert 'pref === "purple"' in html  # o tema aplica-se antes de a página aparecer
     css = client.get("/static/css/pm.css").get_data(as_text=True)
     assert "html.pm-purple" in css and "#272236" in css and "#312b44" in css
+
+
+def test_theme_color_from_cookie(client):
+    """A cor da barra do sistema vem já no HTML, pelo cookie do tema (o Chrome da aplicação instalada pode não
+    acompanhar uma meta mudada por JavaScript); sem escolha, as duas metas com «media»."""
+    def metas(html):
+        return re.findall(r'<meta name="theme-color"[^>]*>', html)
+    html = client.get("/").get_data(as_text=True)
+    assert len(metas(html)) == 2 and all("prefers-color-scheme" in m for m in metas(html))
+    assert '<html lang="pt" data-bs-theme="light">' in html
+    for theme, color, bs in (("light", "#ffffff", "light"), ("dark", "#212529", "dark"), ("purple", "#272236", "dark")):
+        client.set_cookie("pm_theme", theme)
+        html = client.get("/").get_data(as_text=True)
+        assert metas(html) == [f'<meta name="theme-color" content="{color}" id="themeColor">'], theme
+        assert f'data-bs-theme="{bs}"' in html and (('class="pm-purple"' in html) == (theme == "purple"))
+    client.set_cookie("pm_theme", "rosa")  # valor inválido: Automático
+    assert len(metas(client.get("/").get_data(as_text=True))) == 2
+    assert "pwaInfo" in client.get("/definicoes").get_data(as_text=True)

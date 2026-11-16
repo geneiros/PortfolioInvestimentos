@@ -378,9 +378,10 @@
     const dark = pref === "dark" || pref === "purple" || (pref === "auto" && prefersDark.matches);
     document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
     document.documentElement.classList.toggle("pm-purple", pref === "purple");
-    // a barra do sistema acompanha o fundo da página (o do tema escolhido)
-    const meta = document.getElementById("themeColor");
-    if (meta) meta.setAttribute("content", pref === "purple" ? "#272236" : dark ? "#212529" : "#ffffff");
+    // a barra do sistema acompanha o fundo da página (o do tema escolhido); o cookie faz o servidor trazer já a
+    // cor certa nas páginas seguintes (ver _theme_head.html)
+    if (window.pmThemeColor) window.pmThemeColor(pref, dark);
+    if (window.pmThemeCookie) window.pmThemeCookie(pref);
     document.querySelectorAll("[data-pm-theme]").forEach((b) => b.classList.toggle("active", b.dataset.pmTheme === pref));
     document.dispatchEvent(new CustomEvent("pm:theme"));
   };

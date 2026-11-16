@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-16
 
+- **Barra do sistema (Android, aplicação instalada) com a cor do tema**  
+  Na aplicação instalada, a barra de estado ficava sempre escura: o Chrome usava a cor do manifesto (#212529) e não acompanhava a cor que o JavaScript punha na página. Agora a escolha do tema também fica num cookie e o servidor já manda o HTML com a cor certa (#ffffff no Claro, #212529 no Escuro, #272236 no Purple) e com o tema aplicado, sem piscar; no Automático, duas cores com «media» (segue o sistema). O manifesto passa a ter o branco do tema por omissão e perde o campo «user_preferences», que não é standard. Em Definições → Disponível offline, uma linha mostra se a aplicação está aberta como aplicação instalada e a cor pedida para a barra.
 - **Tema novo «Purple»**  
   Na lista do botão Tema (fundo da barra lateral): um tema escuro com o fundo da página #272236 e o do menu lateral #312B44, mais os campos, menus e bordas nos mesmos tons de roxo. Usa a base do modo escuro, por isso os gráficos e os componentes já se adaptam; a barra do sistema (aplicação instalada) fica da cor do fundo.
 

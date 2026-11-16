@@ -142,6 +142,7 @@
       {% endif %}
       <p class="small text-body-secondary mt-2 mb-0"><i class="bi bi-info-circle"></i> Quem tiver acesso a este dispositivo vê os valores guardados,
         mesmo com palavra-passe. A cópia mostra a corretora selecionada no momento em que foi guardada, e é apagada ao desligar ou ao sair (Sair).</p>
+      <p class="small text-body-secondary mt-2 mb-0" id="pwaInfo"></p>
     </div>
 
     <div class="pm-card mb-3">
@@ -320,6 +321,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (wanted) box.value = wanted;
     apply();
   }
+  // diagnóstico da aplicação instalada: modo de abertura e cor pedida para a barra do sistema
+  const info = document.getElementById("pwaInfo");
+  const showInfo = () => {
+    if (!info) return;
+    const standalone = matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches || navigator.standalone === true;
+    const metas = [...document.querySelectorAll('meta[name="theme-color"]')].filter((m) => !m.media || matchMedia(m.media).matches);
+    info.innerHTML = '<i class="bi bi-phone"></i> Aberta como ' + (standalone ? "<b>aplicação instalada</b>" : "<b>página no browser</b>")
+      + " · cor pedida para a barra do sistema: <b>" + (metas[0] ? metas[0].content : "—") + "</b>";
+  };
+  showInfo(); document.addEventListener("pm:theme", showInfo);
   const out = document.getElementById("offlineSaved"), btn = document.getElementById("offlineSave");
   if (!out) return;
   const show = () => { const t = pm.offline.lastSaved(); out.textContent = t ? new Date(t).toLocaleString("pt-PT") : "ainda não"; };
