@@ -3220,3 +3220,16 @@ def test_theme_color_from_cookie(client):
     client.set_cookie("pm_theme", "rosa")  # valor inválido: Automático
     assert len(metas(client.get("/").get_data(as_text=True))) == 2
     assert "pwaInfo" in client.get("/definicoes").get_data(as_text=True)
+
+
+def test_manifest_follows_theme(client):
+    """Há browsers que pintam a barra da aplicação instalada só com a cor do manifesto: ele acompanha o tema."""
+    import json
+    for tema, color in (("purple", "#272236"), ("dark", "#212529"), ("light", "#ffffff"), ("auto", "#ffffff")):
+        r = client.get(f"/manifest.webmanifest?tema={tema}")
+        m = json.loads(r.get_data(as_text=True))
+        assert r.status_code == 200 and r.mimetype == "application/manifest+json"
+        assert m["theme_color"] == m["background_color"] == color and m["id"] == "/" and m["display"] == "standalone"
+    client.set_cookie("pm_theme", "purple")
+    assert json.loads(client.get("/manifest.webmanifest").get_data(as_text=True))["theme_color"] == "#272236"
+    assert 'href="/manifest.webmanifest?tema=purple"' in client.get("/").get_data(as_text=True)

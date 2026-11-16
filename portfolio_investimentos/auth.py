@@ -24,7 +24,7 @@ bp = Blueprint("auth", __name__)
 LOCAL = {"127.0.0.1", "::1"}
 MIN_LENGTH = 8
 MAX_FAILS, LOCK_SECONDS = 5, 300
-OPEN_ENDPOINTS = {"auth.login", "static", "pages.service_worker", "pages.ping"}
+OPEN_ENDPOINTS = {"auth.login", "static", "pages.service_worker", "pages.ping", "pages.manifest"}
 
 
 def env_password():

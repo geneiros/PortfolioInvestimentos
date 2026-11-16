@@ -786,6 +786,26 @@ def _saved_expenses():
     return v if v > 0 else None
 
 
+THEME_COLORS = {"light": "#ffffff", "dark": "#212529", "purple": "#272236"}
+
+
+@bp.route("/manifest.webmanifest")
+def manifest():
+    """O manifesto da aplicação instalada com a cor do tema escolhido (?tema=, ou o cookie pm_theme).
+
+    Alguns browsers pintam a barra do sistema da aplicação instalada só com a cor do manifesto e ignoram a meta
+    theme-color da página; por isso o manifesto acompanha o tema. No Automático fica a cor do tema claro."""
+    import json
+    theme = request.args.get("tema") or request.cookies.get("pm_theme")
+    color = THEME_COLORS.get(theme, THEME_COLORS["light"])
+    with current_app.open_resource("static/manifest.webmanifest") as f:
+        data = json.load(f)
+    data["theme_color"] = data["background_color"] = color
+    resp = current_app.response_class(json.dumps(data, ensure_ascii=False), mimetype="application/manifest+json")
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 @bp.route("/sw.js")
 def service_worker():
     # servido na raiz para o service worker controlar todas as páginas da aplicação

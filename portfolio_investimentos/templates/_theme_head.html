@@ -26,6 +26,9 @@
       };
       window.pmThemeCookie = function (pref) {
         document.cookie = "pm_theme=" + pref + "; path=/; max-age=31536000; SameSite=Lax";
+        // o manifesto também acompanha o tema (há browsers que só usam a cor dele na aplicação instalada)
+        const link = document.getElementById("pmManifest");
+        if (link) link.href = "/manifest.webmanifest?tema=" + pref;
       };
       const server = "{{ theme_pref or 'auto' }}";
       let pref = server;

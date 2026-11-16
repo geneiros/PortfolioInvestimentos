@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-16
 
+- **O manifesto da aplicação instalada acompanha o tema**  
+  Há browsers que pintam a barra do sistema da aplicação instalada só com a cor do manifesto e ignoram a que a página pede (no telemóvel do utilizador, a barra ficava branca com o Purple escolhido). O manifesto passa a ser servido pela aplicação (/manifest.webmanifest?tema=…) com a cor do tema escolhido (#ffffff, #212529 ou #272236; no Automático, a do claro), e a página aponta para o do tema atual (também ao trocar de tema).
 - **Barra do sistema (Android, aplicação instalada) com a cor do tema**  
   Na aplicação instalada, a barra de estado ficava sempre escura: o Chrome usava a cor do manifesto (#212529) e não acompanhava a cor que o JavaScript punha na página. Agora a escolha do tema também fica num cookie e o servidor já manda o HTML com a cor certa (#ffffff no Claro, #212529 no Escuro, #272236 no Purple) e com o tema aplicado, sem piscar; no Automático, duas cores com «media» (segue o sistema). O manifesto passa a ter o branco do tema por omissão e perde o campo «user_preferences», que não é standard. Em Definições → Disponível offline, uma linha mostra se a aplicação está aberta como aplicação instalada e a cor pedida para a barra.
 - **Tema novo «Purple»**  
