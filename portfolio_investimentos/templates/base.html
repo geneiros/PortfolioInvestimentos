@@ -10,10 +10,12 @@
     (function () {
       let pref = "auto";
       try { pref = localStorage.getItem("pm-theme") || "auto"; } catch (e) {}
-      const dark = pref === "dark" || (pref === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      // «purple» é um tema escuro com cores próprias (classe pm-purple, ver pm.css)
+      const dark = pref === "dark" || pref === "purple" || (pref === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+      document.documentElement.classList.toggle("pm-purple", pref === "purple");
       // barra do sistema (Android, aplicação instalada) da cor do fundo da aplicação
-      document.getElementById("themeColor").setAttribute("content", dark ? "#212529" : "#ffffff");
+      document.getElementById("themeColor").setAttribute("content", pref === "purple" ? "#272236" : dark ? "#212529" : "#ffffff");
       // esconder valores já antes de a página aparecer (sem mostrar os valores por instantes)
       try { if (localStorage.getItem("pm-private") === "1") document.documentElement.classList.add("pm-private"); } catch (e) {}
     })();
@@ -63,6 +65,7 @@
         <ul class="dropdown-menu">
           <li><button class="dropdown-item" data-pm-theme="light"><i class="bi bi-sun me-2"></i>Claro</button></li>
           <li><button class="dropdown-item" data-pm-theme="dark"><i class="bi bi-moon-stars me-2"></i>Escuro</button></li>
+          <li><button class="dropdown-item" data-pm-theme="purple"><i class="bi bi-palette me-2"></i>Purple</button></li>
           <li><button class="dropdown-item" data-pm-theme="auto"><i class="bi bi-circle-half me-2"></i>Automático</button></li>
         </ul>
       </div>

@@ -370,15 +370,17 @@
   };
   pm.store = store;
 
-  // modos de cor nativos do Bootstrap: light | dark | auto
+  // modos de cor nativos do Bootstrap: light | dark | auto, e o tema purple (escuro com cores próprias)
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)");
   pm.applyTheme = () => {
     const pref = store.get("pm-theme") || "auto";
-    const dark = pref === "dark" || (pref === "auto" && prefersDark.matches);
+    // «purple»: tema escuro com cores próprias (classe pm-purple, ver pm.css)
+    const dark = pref === "dark" || pref === "purple" || (pref === "auto" && prefersDark.matches);
     document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+    document.documentElement.classList.toggle("pm-purple", pref === "purple");
     // a barra do sistema acompanha o fundo da página (o do tema escolhido)
     const meta = document.getElementById("themeColor");
-    if (meta) meta.setAttribute("content", dark ? "#212529" : "#ffffff");
+    if (meta) meta.setAttribute("content", pref === "purple" ? "#272236" : dark ? "#212529" : "#ffffff");
     document.querySelectorAll("[data-pm-theme]").forEach((b) => b.classList.toggle("active", b.dataset.pmTheme === pref));
     document.dispatchEvent(new CustomEvent("pm:theme"));
   };

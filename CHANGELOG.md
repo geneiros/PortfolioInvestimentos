@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-16
+
+- **Tema novo «Purple»**  
+  Na lista do botão Tema (fundo da barra lateral): um tema escuro com o fundo da página #272236 e o do menu lateral #312B44, mais os campos, menus e bordas nos mesmos tons de roxo. Usa a base do modo escuro, por isso os gráficos e os componentes já se adaptam; a barra do sistema (aplicação instalada) fica da cor do fundo.
+
 ## 2026-11-15
 
 - **Carteira: gráficos circulares no Raio-X dos ETF**  

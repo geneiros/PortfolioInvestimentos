@@ -19,6 +19,23 @@
   --pm-down: var(--bs-danger-text-emphasis);
 }
 
+/* Tema «Purple»: o modo escuro do Bootstrap com fundos roxos (página #272236, menu lateral #312B44) */
+html.pm-purple[data-bs-theme="dark"] {
+  --bs-body-bg: #272236;
+  --bs-body-bg-rgb: 39, 34, 54;
+  --bs-tertiary-bg: #312b44;
+  --bs-tertiary-bg-rgb: 49, 43, 68;
+  --bs-secondary-bg: #3a3350;
+  --bs-secondary-bg-rgb: 58, 51, 80;
+  --bs-border-color: #463d5f;
+  --bs-border-color-translucent: rgba(255, 255, 255, .12);
+  --bs-emphasis-color-rgb: 255, 255, 255;
+  color-scheme: dark;
+}
+html.pm-purple[data-bs-theme="dark"] .table { --bs-table-bg: transparent; }
+html.pm-purple[data-bs-theme="dark"] .dropdown-menu { --bs-dropdown-bg: #312b44; --bs-dropdown-link-hover-bg: #3a3350; }
+html.pm-purple[data-bs-theme="dark"] .modal { --bs-modal-bg: #272236; }
+
 .text-up { color: var(--pm-up) !important; }
 .text-down { color: var(--pm-down) !important; }
 .tabular { font-variant-numeric: tabular-nums; }

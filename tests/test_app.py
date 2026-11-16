@@ -3194,3 +3194,11 @@ def test_etf_holdings_invesco_full_name_xlsx():
                                                           ("OUTRA", None)]
     assert rows[0]["weight"] == pytest.approx(0.0488) and sum(r["weight"] for r in rows) == pytest.approx(1.0)
     assert rows[0]["country"] == "EUA" and rows[1]["country"] == "Taiwan"  # país pelo ISIN
+
+
+def test_purple_theme_option(client):
+    html = client.get("/").get_data(as_text=True)
+    assert 'data-pm-theme="purple"' in html and ">Purple</button>" in html
+    assert 'pref === "purple"' in html  # o tema aplica-se antes de a página aparecer
+    css = client.get("/static/css/pm.css").get_data(as_text=True)
+    assert "html.pm-purple" in css and "#272236" in css and "#312b44" in css

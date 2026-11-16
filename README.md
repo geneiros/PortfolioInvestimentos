@@ -212,7 +212,7 @@ As capturas usam os dados de demonstração (empresas e preços fictícios).
 | **Vender e recomprar** | **Relatório anual** |
 | ![Vender e recomprar (escuro)](docs/screenshots/escuro/33-fiscal-vender-recomprar.png) | ![Relatório anual (escuro)](docs/screenshots/escuro/34-relatorio-anual.png) |
 
-O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro ou Automático.
+O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro, Purple (escuro, em tons de roxo) ou Automático.
 
 ## Funcionalidades
 

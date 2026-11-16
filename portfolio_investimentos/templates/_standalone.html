@@ -9,9 +9,11 @@
     (function () {
       let pref = "auto";
       try { pref = localStorage.getItem("pm-theme") || "auto"; } catch (e) {}
-      const dark = pref === "dark" || (pref === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      // «purple» é um tema escuro com cores próprias (classe pm-purple, ver pm.css)
+      const dark = pref === "dark" || pref === "purple" || (pref === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
-      document.getElementById("themeColor").setAttribute("content", dark ? "#212529" : "#ffffff");
+      document.documentElement.classList.toggle("pm-purple", pref === "purple");
+      document.getElementById("themeColor").setAttribute("content", pref === "purple" ? "#272236" : dark ? "#212529" : "#ffffff");
     })();
   </script>
   <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
