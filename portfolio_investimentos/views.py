@@ -550,6 +550,9 @@ def noticias():
     Google Notícias, Yahoo Finance e Marketaux."""
     from .services import news
     c = ctx.build("noticias", "Notícias")
+    if not news.selected():  # todas as fontes desligadas em Definições: nada a pedir
+        c.update(news_off=True)
+        return render_template("pages/noticias.html", **c)
     p = c["p"]
     insts = [pos.asset for pos in p.open_positions]
     tickers = [a.ticker for a in insts]

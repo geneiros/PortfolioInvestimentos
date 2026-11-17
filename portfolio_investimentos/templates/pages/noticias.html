@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block content %}{% autoescape true %}
 {% from "macros.html" import help, logo, empty %}
-{% if not has_data %}
+{% if news_off %}
+  {{ empty("Notícias desligadas", "Não tens nenhuma fonte de notícias escolhida. Liga pelo menos uma em Definições → Notícias para voltares a ver as notícias dos teus ativos (e o menu Notícias).", "/definicoes#newsSettings", "Escolher fontes") }}
+{% elif not has_data %}
   {{ empty("Ainda não tens posições", "Importa o extrato da tua corretora para veres as notícias dos teus ativos.", "/importar", "Importar extrato") }}
 {% else %}
 {% macro news_list(rows, show_ticker=true) -%}

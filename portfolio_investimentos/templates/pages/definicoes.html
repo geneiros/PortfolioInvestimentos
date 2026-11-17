@@ -91,7 +91,10 @@
           {% endif %}
         </form>
         <form class="mt-2" data-pm-method="set_news_sources" data-pm-success="Guardado." id="newsSources">
-          <div class="text-body-secondary mb-1">Fontes de notícias</div>
+          <div class="d-flex flex-wrap align-items-baseline gap-2 mb-1"><span class="text-body-secondary">Fontes de notícias</span>
+            <button class="btn btn-link btn-sm p-0" type="button" data-news-all="1">Todas</button>
+            <button class="btn btn-link btn-sm p-0" type="button" data-news-all="0">Nenhuma</button>
+            <span class="text-body-secondary ms-auto">Sem nenhuma fonte, o menu Notícias fica escondido.</span></div>
           <div class="table-responsive"><table class="table pm-table mb-2"><thead><tr><th>Fonte</th><th class="text-end">Notícias</th><th class="text-nowrap">Mais recente</th><th class="text-nowrap">Última atualização {{ help("O que cada fonte devolveu da última vez que se pediram notícias: quantos ativos se pediram, quantas notícias vieram (e quantas eram novas) e quantos pedidos falharam. Uma fonte com 0 notícias e sem erros respondeu, mas não tem notícias desses ativos.") }}</th></tr></thead><tbody>
           {% for key, name in news_providers.items() %}{% set st = news_stats.get(key, {}) %}
             <tr data-source="{{ key }}"><td><label class="d-flex gap-2 align-items-center"><input type="hidden" name="source_{{ key }}" value="0"><input class="form-check-input mt-0" type="checkbox" name="source_{{ key }}" value="1" {{ 'checked' if key in news_sources }}> {{ name }}
@@ -321,6 +324,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (wanted) box.value = wanted;
     apply();
   }
+  // fontes de notícias: marcar ou desmarcar todas (só no formulário; guarda-se com «Guardar»)
+  document.querySelectorAll("[data-news-all]").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll('#newsSources input[type=checkbox][name^="source_"]').forEach((c) => { c.checked = b.dataset.newsAll === "1"; });
+  }));
   // diagnóstico da aplicação instalada: modo de abertura e cor pedida para a barra do sistema
   const info = document.getElementById("pwaInfo");
   const showInfo = () => {

@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-17
+
+- **Notícias: desligar todas as fontes**  
+  Em Definições → Notícias já se podem desmarcar todas as fontes (com os atalhos «Todas» e «Nenhuma»). Sem nenhuma fonte, o item Notícias desaparece do menu lateral e a página /notícias mostra «Notícias desligadas», sem fazer pedidos, com o botão para escolher fontes. Ligar uma fonte repõe o menu.
+
 ## 2026-11-16
 
 - **O manifesto da aplicação instalada acompanha o tema**  

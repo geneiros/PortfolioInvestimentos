@@ -47,12 +47,18 @@ def _regions(p):
     return found or {"EU"}
 
 
+def _nav():
+    """O menu lateral; sem nenhuma fonte de notícias escolhida (Definições), sem o item Notícias."""
+    from .news import selected
+    return NAV if selected() else [item for item in NAV if item[0] != "noticias"]
+
+
 def build(active, title, **extra):
     broker = data.selected_broker()
     brokers = data.brokers()
     p = data.load_portfolio(broker)
     ctx = dict(
-        active=active, title=title, nav=NAV, nav_bottom=NAV_BOTTOM, feedback_url=FEEDBACK_URL,
+        active=active, title=title, nav=_nav(), nav_bottom=NAV_BOTTOM, feedback_url=FEEDBACK_URL,
         brokers=brokers, broker=broker, broker_doc=next((b for b in brokers if b.name == broker), None),
         total_positions=sum(b.positions for b in brokers), p=p, day_change=p.day_change(),
         market=market_status(regions=_regions(p)), eurusd=p.book.latest_fx("USD"),

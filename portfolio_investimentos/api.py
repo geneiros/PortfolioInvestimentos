@@ -803,10 +803,11 @@ def set_news_sources(**values):
     """Fontes de notícias ligadas (campos source_<fonte>=1)."""
     from .services import news
     chosen = [p for p in news.PROVIDERS if str(values.get(f"source_{p}", "")) in ("1", "on", "true")]
-    if not chosen:
-        raise ApiError("Escolhe pelo menos uma fonte de notícias.")
+    # sem nenhuma fonte fica "" (diferente de «sem valor», que é todas): o menu Notícias deixa de aparecer
     Setting.set("news_sources", ",".join(chosen))
     Setting.set("news_fetched", None)
+    if not chosen:
+        return "Notícias desligadas: o menu Notícias fica escondido até ligares uma fonte."
     return "Fontes de notícias guardadas."
 
 

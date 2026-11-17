@@ -2454,7 +2454,11 @@ def test_news_settings_and_reset(app, client):
     assert post(client, "set_news_sources", token, source_yahoo="1", source_finnhub="0", source_marketaux="1").status_code == 200
     with app.app_context():
         assert Setting.get("news_sources") == "yahoo,marketaux"
-    assert post(client, "set_news_sources", token).status_code == 400
+    # sem nenhuma fonte: aceita e desliga as notícias (o menu deixa de aparecer)
+    assert post(client, "set_news_sources", token).status_code == 200
+    with app.app_context():
+        assert Setting.get("news_sources") == ""
+    assert post(client, "set_news_sources", token, source_yahoo="1", source_marketaux="1").status_code == 200
     assert post(client, "set_finnhub_key", token, key="").status_code == 200
     with app.app_context():
         assert Setting.get("finnhub_key") is None
@@ -2561,7 +2565,7 @@ def test_old_provider_news_removed(app, client):
         Setting.set("news_sources", "antiga")
         db.session.commit()
     html = client.get("/noticias").get_data(as_text=True)
-    assert "Sem fontes de notícias ligadas" in html
+    assert "Notícias desligadas" in html  # nenhuma fonte válida escolhida
 
 
 def test_yahoo_rss_source(app):
@@ -3233,3 +3237,27 @@ def test_manifest_follows_theme(client):
     client.set_cookie("pm_theme", "purple")
     assert json.loads(client.get("/manifest.webmanifest").get_data(as_text=True))["theme_color"] == "#272236"
     assert 'href="/manifest.webmanifest?tema=purple"' in client.get("/").get_data(as_text=True)
+
+
+def test_news_all_sources_off_hides_menu(app, client, monkeypatch):
+    from portfolio_investimentos.models import Setting
+    from portfolio_investimentos.services import news
+    token = csrf(client)
+    post(client, "load_demo", token)
+    assert 'href="/noticias"' in client.get("/").get_data(as_text=True)
+    off = {f"source_{p}": "0" for p in news.PROVIDERS}
+    r = post(client, "set_news_sources", token, **off)
+    assert r.status_code == 200 and "Notícias desligadas" in r.get_json()["message"]
+    with app.app_context():
+        assert Setting.get("news_sources") == "" and news.selected() == [] and news.enabled() == []
+    assert 'href="/noticias"' not in client.get("/").get_data(as_text=True)
+    assert 'href="/noticias"' not in client.get("/definicoes").get_data(as_text=True)
+    # a página não pede notícias a ninguém
+    monkeypatch.setattr(news, "refresh", lambda *a, **k: (_ for _ in ()).throw(AssertionError("não devia pedir")))
+    html = client.get("/noticias").get_data(as_text=True)
+    assert "Notícias desligadas" in html and "/definicoes#newsSettings" in html
+    monkeypatch.undo()
+    assert post(client, "refresh_news", token).status_code == 200  # «Atualizar todas as fontes» sem fontes: sem erro
+    # ligar uma fonte repõe o menu
+    post(client, "set_news_sources", token, **{**off, "source_google": "1"})
+    assert 'href="/noticias"' in client.get("/").get_data(as_text=True)
