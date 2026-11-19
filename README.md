@@ -351,6 +351,8 @@ python -m pytest tests
 python -m portfolio_investimentos
 ```
 
+**Extensões (plugins):** pacotes instalados à parte podem acrescentar páginas, itens no menu, secções nas Definições, blocos no Fiscal e na Carteira, ações da API e tarefas periódicas, sem mexer neste código. Ver [docs/plugins.md](docs/plugins.md).
+
 ## Próximos passos
 
 - Parsers para DEGIRO, IBKR, Revolut e eToro.

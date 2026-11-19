@@ -83,6 +83,9 @@ def main():
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
 
     threading.Thread(target=_quick_quotes_loop, args=(app,), daemon=True, name="cotacoes-rapidas").start()
+    for fn, every in getattr(app.extensions.get("pm_plugins"), "tasks", []):  # tarefas periódicas dos plugins
+        threading.Thread(target=_plugin_task_loop, args=(app, fn, every), daemon=True,
+                         name=f"plugin-{getattr(fn, '__name__', 'tarefa')}").start()
 
     try:
         from waitress import serve
@@ -93,6 +96,21 @@ def main():
 
 DEFAULT_PORT = 5000
 QUICK_EVERY = 300  # segundos
+
+
+def _plugin_task_loop(app, fn, every, rounds=None):
+    """Tarefa periódica de um plugin, no contexto da aplicação; um erro fica no log e a tarefa continua."""
+    import logging
+    import time
+    n = 0
+    while rounds is None or n < rounds:
+        n += 1
+        time.sleep(every)
+        try:
+            with app.app_context():
+                fn(app)
+        except Exception as exc:  # nunca deixa a thread morrer
+            logging.getLogger(__name__).info("tarefa do plugin %s falhou: %s", getattr(fn, "__name__", fn), exc)
 
 
 def _quick_quotes_loop(app, every=QUICK_EVERY, rounds=None):

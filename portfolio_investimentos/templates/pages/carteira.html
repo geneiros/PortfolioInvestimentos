@@ -399,6 +399,7 @@
 </div>
 </div>
 {% endif %}
+{% for t in plugin_slot("carteira", "bottom") %}{% include t %}{% endfor %}{# extensões (plugins.py) #}
 {% endautoescape %}{% endblock %}
 
 {% block scripts %}
