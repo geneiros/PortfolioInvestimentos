@@ -200,6 +200,7 @@
       </form>
       <p class="small text-body-secondary mt-2 mb-0">Para restaurar uma cópia, fecha a aplicação e substitui o ficheiro acima pelo ficheiro da cópia.</p>
     </div>
+    {% for t in plugin_settings %}{% include t %}{% endfor %}{# secções das extensões (plugins.py) #}
   </div>
 
   <div class="col-xl-7"><div class="pm-card">

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}{% autoescape true %}
 {% from "macros.html" import help, empty %}
+{% for t in plugin_slot("fiscal", "top") %}{% include t %}{% endfor %}{# extensões (plugins.py) #}
 {% if not y %}
   {{ empty("Sem movimentos com relevância fiscal", "Vendas, dividendos e juros aparecem aqui agrupados por ano.", "/importar", "Importar extrato") }}
 {% else %}
@@ -126,6 +127,7 @@
     É só uma simulação. Vender e voltar a comprar logo a seguir não está confirmado como aceite em todos os casos: antes de o fazeres só para abater imposto, confirma com um contabilista ou nas Finanças se a menos-valia é aceite (há situações em que não é). Tem em conta também o spread e o risco de o preço mudar entre a venda e a recompra.</div>
 </div>
 {% endif %}
+{% for t in plugin_slot("fiscal", "bottom") %}{% include t %}{% endfor %}
 {% endautoescape %}{% endblock %}
 
 {% block scripts %}

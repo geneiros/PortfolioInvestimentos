@@ -47,10 +47,16 @@ def _regions(p):
     return found or {"EU"}
 
 
-def _nav():
-    """O menu lateral; sem nenhuma fonte de notícias escolhida (Definições), sem o item Notícias."""
+def _nav(bottom=False):
+    """O menu lateral (com os itens dos plugins); sem nenhuma fonte de notícias escolhida (Definições), sem o item
+    Notícias. `bottom=True`: o grupo de baixo (Importar, Transações, Definições)."""
+    from .. import plugins
     from .news import selected
-    return NAV if selected() else [item for item in NAV if item[0] != "noticias"]
+    reg = plugins.registry()
+    if bottom:
+        return reg.nav_items(NAV_BOTTOM, bottom=True) if reg else NAV_BOTTOM
+    items = NAV if selected() else [item for item in NAV if item[0] != "noticias"]
+    return reg.nav_items(items) if reg else items
 
 
 def build(active, title, **extra):
@@ -58,7 +64,7 @@ def build(active, title, **extra):
     brokers = data.brokers()
     p = data.load_portfolio(broker)
     ctx = dict(
-        active=active, title=title, nav=_nav(), nav_bottom=NAV_BOTTOM, feedback_url=FEEDBACK_URL,
+        active=active, title=title, nav=_nav(), nav_bottom=_nav(bottom=True), feedback_url=FEEDBACK_URL,
         brokers=brokers, broker=broker, broker_doc=next((b for b in brokers if b.name == broker), None),
         total_positions=sum(b.positions for b in brokers), p=p, day_change=p.day_change(),
         market=market_status(regions=_regions(p)), eurusd=p.book.latest_fx("USD"),

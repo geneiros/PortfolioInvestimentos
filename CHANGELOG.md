@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-19
+
+- **Extensões (plugins)**  
+  Pacotes Python instalados à parte (entry point «portfolio_investimentos.plugins», ou a variável PORTFOLIO_PLUGINS para desenvolver) podem acrescentar páginas, itens no menu, secções nas Definições, blocos em pontos fixos do Fiscal e da Carteira, ações da API, tarefas periódicas, variáveis para os templates e tabelas próprias, sem mexer no núcleo. Um plugin com erro não impede o arranque. Sem plugins, nada muda. Documentação em docs/plugins.md e um plugin de exemplo nos testes.
+
 ## 2026-11-17
 
 - **Notícias: desligar todas as fontes**  
