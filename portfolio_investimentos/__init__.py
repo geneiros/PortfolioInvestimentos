@@ -7,7 +7,7 @@ from pathlib import Path
 
 from flask import Flask, session
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 
 def _adopt_legacy(old, new):
@@ -131,6 +131,15 @@ def create_app(config=None):
                 "offline_enabled": Setting.get("offline_enabled") == "1",
                 "quick_quotes": Setting.get("quick_quotes") == "1",
                 "generated_at": datetime.now().isoformat(timespec="minutes")}
+
+    @app.context_processor
+    def _updates():
+        # aviso de versão nova: só no executável único (o código da pasta atualiza-se com git pull)
+        from .services import updates
+        exe = updates.is_executable()
+        return {"app_version": __version__, "is_executable": exe,
+                "update_available": updates.available() if exe else None,
+                "update_notice": updates.notice_enabled()}
 
     @app.after_request
     def _mark_offline_pages(resp):

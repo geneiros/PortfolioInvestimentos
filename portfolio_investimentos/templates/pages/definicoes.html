@@ -70,6 +70,17 @@
         <span class="text-body-secondary w-100">Só o último preço e o câmbio do dia (um pedido curto ao Yahoo, com ~15 min de atraso em algumas bolsas); o histórico, os dividendos e os eventos continuam na atualização completa. No computador também atualiza com o browser fechado.</span>
       </div>
       <hr>
+      <div class="small d-flex flex-wrap gap-2 align-items-center" id="versionSettings">
+        <span class="text-body-secondary">Versão <b>{{ app_version }}</b>{% if not is_executable %} · a correr a partir do código (atualiza-se com <code>git pull</code>){% endif %}</span>
+        {% if is_executable %}
+          {% if update_notice %}<span class="badge text-bg-success">Aviso de versão nova ligado</span>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-pm-action="set_update_notice" data-args='{"enabled": "0"}'>Desligar</button>
+          {% else %}<button class="btn btn-sm btn-outline-secondary" type="button" data-pm-action="set_update_notice" data-args='{"enabled": "1"}'>Avisar quando houver uma versão nova</button>{% endif %}
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-pm-action="check_update" data-toast id="checkUpdate"><i class="bi bi-arrow-repeat"></i> Ver agora</button>
+          <span class="text-body-secondary w-100">O executável não se atualiza sozinho: com uma versão nova no GitHub, aparece uma faixa no topo com o link para a descarregar (uma verificação por dia, ao arrancar). Os teus dados ficam como estão.</span>
+        {% endif %}
+      </div>
+      <hr>
       <div id="newsSettings" class="small">
         <div class="text-body-secondary mb-1">Notícias {{ help("A página Notícias junta as notícias dos teus ativos e do mercado destas fontes. O Finnhub e o Marketaux precisam de uma chave (gratuitas em finnhub.io e marketaux.com; o Finnhub gratuito só tem empresas cotadas nos EUA e no Canadá). O Google Notícias (pelo nome do ativo) e o Yahoo Finance (pelo símbolo, de preferência o dos EUA) não precisam de chave.") }}</div>
         <form class="d-flex flex-wrap gap-2 align-items-center mb-2" data-pm-method="set_finnhub_key" data-pm-success="Guardado.">

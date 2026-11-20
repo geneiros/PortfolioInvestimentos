@@ -2,6 +2,13 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-20
+
+- **Versão 0.4.0**  
+  Executáveis novos (Windows, macOS e Linux) com tudo o que mudou desde a 0.3.0: importação da DEGIRO e da Interactive Brokers; Raio-X dos ETF com gráficos por empresa, país e setor; «E se tivesse investido no índice?»; simulador de venda com FIFO, imposto estimado, perdas por realizar e «vender e recomprar»; relatório anual para imprimir ou guardar em PDF; preços das posições abertas de 5 em 5 minutos (opcional); cartão Carteira com variação diária, retorno total e o período escolhido; dinheiro e ações a caminho entre corretoras contam no valor total; paginação das Transações; tema Purple; barra do sistema da aplicação instalada com a cor do tema; desligar todas as fontes de notícias; extensões (plugins).
+- **Aviso de versão nova (executável)**  
+  O executável não se atualiza sozinho. Passa a perguntar ao GitHub pela última release (no máximo uma vez por dia, uns segundos depois de arrancar; sem internet não faz nada) e, se houver uma versão mais recente, mostra uma faixa no topo com o botão «Descarregar» (para a página da release) e um × que a fecha até à versão seguinte. Em Definições → Dados de mercado: a versão atual, desligar o aviso e «Ver agora». Quem corre o código da pasta (scripts de arranque, PythonAnywhere) atualiza com git pull e não vê o aviso.
+
 ## 2026-11-19
 
 - **Extensões (plugins)**  

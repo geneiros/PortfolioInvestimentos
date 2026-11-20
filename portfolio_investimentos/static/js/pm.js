@@ -168,8 +168,11 @@
     e.preventDefault();
     if (el.dataset.confirm && !confirm(el.dataset.confirm)) return;
     if (el.dataset.pmAction === "logout") pm.offline.clear();  // ao sair, a cópia offline é apagada
-    await pm.call(el.dataset.pmAction, JSON.parse(el.dataset.args || "{}"));
-    if (el.dataset.reload !== "false") location.reload();
+    const msg = await pm.call(el.dataset.pmAction, JSON.parse(el.dataset.args || "{}"));
+    // data-toast: mostra a mensagem da ação antes de recarregar (ex.: «Ver agora» da versão nova)
+    const toast = el.hasAttribute("data-toast") && typeof msg === "string";
+    if (toast) pm.toast(msg);
+    if (el.dataset.reload !== "false") setTimeout(() => location.reload(), toast ? 1500 : 0);
   });
 
   // botão "Atualizar cotações agora": a atualização corre no servidor em segundo plano,

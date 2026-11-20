@@ -704,6 +704,32 @@ def simulate_harvest(keys="", fee="", fx_pct="", rebuy="1", asset="", qty="", pr
 
 
 @action
+def dismiss_update(tag=""):
+    """Fecha o aviso de versão nova até haver uma versão a seguir a esta."""
+    Setting.set("update_dismissed", (tag or "").strip()[:32] or None)
+
+
+@action
+def set_update_notice(enabled):
+    on = str(enabled).lower() in ("1", "true", "on", "sim")
+    Setting.set("update_notice", None if on else "0")
+    return "Vais ser avisado quando houver uma versão nova." if on else "Aviso de versão nova desligado."
+
+
+@action
+def check_update():
+    """«Ver agora» (Definições): pergunta já ao GitHub pela última release."""
+    from .services import updates
+    state = updates.check(force=True)
+    found = updates.available()
+    if found:
+        return f"Há uma versão nova: {found['tag']}."
+    if not state.get("tag"):
+        return "Não foi possível saber a última versão (sem ligação ao GitHub?)."
+    return f"Tens a versão mais recente ({state['tag']})."
+
+
+@action
 def quick_quotes():
     """Chamada pela página de 5 em 5 minutos (com a opção ligada): atualiza os preços de hoje das posições abertas,
     se as bolsas estiverem abertas, e devolve os valores do cartão Carteira e da variação do dia."""

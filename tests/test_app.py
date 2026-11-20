@@ -3261,3 +3261,50 @@ def test_news_all_sources_off_hides_menu(app, client, monkeypatch):
     # ligar uma fonte repõe o menu
     post(client, "set_news_sources", token, **{**off, "source_google": "1"})
     assert 'href="/noticias"' in client.get("/").get_data(as_text=True)
+
+
+def test_update_notice_only_in_executable(app, client, monkeypatch):
+    import sys
+    from datetime import datetime, timedelta
+    from portfolio_investimentos import __version__
+    from portfolio_investimentos.models import Setting
+    from portfolio_investimentos.services import updates
+    assert updates.version_tuple("v0.10.0") > updates.version_tuple("v0.9.2") > updates.version_tuple("0.9")
+    calls = []
+
+    def fake(url):
+        calls.append(url)
+        return {"tag_name": "v9.9.9", "html_url": "https://github.com/geneiros/PortfolioInvestimentos/releases/tag/v9.9.9"}
+    now = datetime(2026, 11, 20, 10, 0)
+    with app.app_context():
+        st = updates.check(now=now, fetch=fake)
+        assert st["tag"] == "v9.9.9" and len(calls) == 1
+        updates.check(now=now + timedelta(hours=5), fetch=fake)  # no mesmo dia: não volta a perguntar
+        assert len(calls) == 1
+        broken = updates.check(now=now + timedelta(days=2), fetch=lambda url: 1 / 0)  # sem rede: fica o estado anterior
+        assert broken["tag"] == "v9.9.9"
+        assert updates.available()["tag"] == "v9.9.9"
+    # fora do executável (código da pasta / PythonAnywhere): sem faixa
+    assert 'id="updateNotice"' not in client.get("/").get_data(as_text=True)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="updateNotice"' in html and "v9.9.9" in html and "releases/tag/v9.9.9" in html
+    assert f"tens a {__version__}" in html
+    assert 'id="checkUpdate"' in client.get("/definicoes").get_data(as_text=True)
+    token = csrf(client)
+    assert post(client, "dismiss_update", token, tag="v9.9.9").status_code == 200
+    assert 'id="updateNotice"' not in client.get("/").get_data(as_text=True)
+    with app.app_context():  # uma versão a seguir volta a avisar; o aviso pode desligar-se
+        Setting.set("update_check", '{"checked": "2026-11-20T10:00:00", "tag": "v10.0.0", "url": "https://evil.example/x"}')
+        assert updates.available() == {"tag": "v10.0.0", "url": updates.RELEASES_URL}  # só links do GitHub
+    assert post(client, "set_update_notice", token, enabled="0").status_code == 200
+    assert 'id="updateNotice"' not in client.get("/").get_data(as_text=True)
+    with app.app_context():
+        Setting.set("update_check", json_dumps({"tag": __version__}))
+        Setting.set("update_notice", None)
+        assert updates.available() is None  # a mesma versão: nada a avisar
+
+
+def json_dumps(obj):
+    import json
+    return json.dumps(obj)

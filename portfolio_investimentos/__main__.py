@@ -83,6 +83,8 @@ def main():
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
 
     threading.Thread(target=_quick_quotes_loop, args=(app,), daemon=True, name="cotacoes-rapidas").start()
+    if getattr(sys, "frozen", False):  # executável único: há uma versão nova no GitHub?
+        threading.Timer(10.0, _check_updates, args=(app,)).start()
     for fn, every in getattr(app.extensions.get("pm_plugins"), "tasks", []):  # tarefas periódicas dos plugins
         threading.Thread(target=_plugin_task_loop, args=(app, fn, every), daemon=True,
                          name=f"plugin-{getattr(fn, '__name__', 'tarefa')}").start()
@@ -96,6 +98,16 @@ def main():
 
 DEFAULT_PORT = 5000
 QUICK_EVERY = 300  # segundos
+
+
+def _check_updates(app):
+    """Pergunta ao GitHub pela última release (no máximo uma vez por dia); sem internet não faz nada."""
+    try:
+        with app.app_context():
+            from .services import updates
+            updates.check()
+    except Exception:  # nunca impede a aplicação de correr
+        pass
 
 
 def _plugin_task_loop(app, fn, every, rounds=None):
