@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **Executável do Windows sem terminal**  
+  O executável do Windows deixa de abrir a janela do terminal: aparecem só o ecrã de arranque e a janela própria, e as mensagens ficam em registo.log, na pasta dos dados. Lançado a partir de um cmd ou PowerShell, escreve nesse terminal. O terminal volta a aparecer quando a janela própria não abre (a aplicação abre no browser e fecha-se fechando o terminal), num erro de arranque ou com `--terminal`. No macOS e no Linux fica como estava.
 - **Versão 0.4.5**  
   Executáveis novos com o modo portátil: com o executável numa pen USB (Windows), os dados ficam na pasta PortfolioInvestimentos-dados ao lado dele; noutros discos e sistemas, com `--portatil`. Quem tem uma versão anterior vê a faixa «Há uma versão nova».
 - **Executável: modo portátil (pen USB)**  

@@ -31,6 +31,8 @@ def main():
     parser.add_argument("--portatil", action="store_true",
                         help=f"executável: guardar os dados na pasta {PORTABLE_NAME} ao lado do executável "
                              "(automático numa pen USB no Windows)")
+    parser.add_argument("--terminal", action="store_true",
+                        help="executável do Windows: mostrar o terminal com as mensagens da aplicação")
     parser.add_argument("--testar-janela", action="store_true",
                         help="dizer se a janela própria (pywebview) está disponível e sair")
     parser.add_argument("--testar-yahoo", action="store_true",
@@ -47,6 +49,10 @@ def main():
             portable_dir.cache_clear()
         else:
             print("--portatil só se aplica ao executável; a correr a partir do código, usa PORTFOLIO_DATA_DIR.")
+    from . import desktop
+    if args.terminal:
+        desktop.show_console()
+    desktop.log_to_file(data_dir() / "registo.log")  # executável do Windows sem terminal: as mensagens ficam aqui
     if args.testar_janela:
         ok = _webview_available()
         print("Janela própria (pywebview): " + ("disponível" if ok else "indisponível (abre no browser)"))
@@ -61,6 +67,7 @@ def main():
         if _window_app(args):
             return
         print("Não foi possível abrir a janela própria; a abrir no browser.")
+    desktop.show_console()  # sem a janela própria, o terminal é o que se fecha para terminar a aplicação
     from .migrations import MigrationError
     try:
         app = create_app()

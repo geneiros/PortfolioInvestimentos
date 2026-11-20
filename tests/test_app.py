@@ -3489,3 +3489,68 @@ def test_portatil_option_creates_folder(frozen_exe, monkeypatch):
         cli.main()
     assert (frozen_exe / pkg.PORTABLE_NAME).is_dir()
     assert pkg.data_dir() == frozen_exe / pkg.PORTABLE_NAME
+
+
+class _FakeKernel32:
+    def __init__(self, ok=True):
+        self.ok, self.calls = ok, []
+
+    def AttachConsole(self, pid):
+        self.calls.append("attach")
+        return self.ok
+
+    def AllocConsole(self):
+        self.calls.append("alloc")
+        return self.ok
+
+    def SetConsoleTitleW(self, title):
+        self.calls.append("title")
+
+
+def test_windowed_exe_console(monkeypatch, tmp_path):
+    import sys
+    from portfolio_investimentos import desktop
+    k = _FakeKernel32()
+    # fora do executável do Windows não faz nada
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(sys, "stdout", None)
+    assert not desktop.attach_parent_console(k) and not desktop.show_console(k) and k.calls == []
+    # executável do Windows, saída redirecionada (CI): não mexe
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "stdout", io.StringIO())
+    assert not desktop.attach_parent_console(k) and not desktop.show_console(k) and k.calls == []
+    assert not desktop.log_to_file(tmp_path / "registo.log")
+    # duplo clique (sem consola): as mensagens vão para o registo
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "stderr", None)
+    monkeypatch.setattr(desktop, "_bind_console", lambda stdin=False: k.calls.append(f"bind{stdin}"))
+    assert desktop.log_to_file(tmp_path / "registo.log")
+    print("olá do registo")
+    assert "olá do registo" in (tmp_path / "registo.log").read_text(encoding="utf-8")
+    # sem a janela própria: abre um terminal, que substitui o registo
+    assert desktop.show_console(k) and k.calls == ["alloc", "title", "bindTrue"] and desktop._log_file is None
+    # lançado a partir de um terminal
+    monkeypatch.setattr(sys, "stdout", None)
+    assert desktop.attach_parent_console(k) and k.calls[-2:] == ["attach", "bindFalse"]
+    monkeypatch.setattr(sys, "stdout", None)
+    assert not desktop.attach_parent_console(_FakeKernel32(ok=False))
+
+
+def test_browser_path_shows_terminal(frozen_exe, monkeypatch):
+    import sys
+    from portfolio_investimentos import __main__ as cli
+    from portfolio_investimentos import desktop
+    shown = []
+    monkeypatch.setattr(desktop, "show_console", lambda: shown.append(1))
+    monkeypatch.setattr(cli, "_webview_available", lambda: False)
+    monkeypatch.setattr(cli, "create_app", lambda: (_ for _ in ()).throw(RuntimeError("parar aqui")))
+    monkeypatch.setattr(sys, "argv", ["PortfolioInvestimentos.exe"])
+    with pytest.raises(RuntimeError):
+        cli.main()
+    assert shown == [1]
+    shown.clear()
+    monkeypatch.setattr(sys, "argv", ["PortfolioInvestimentos.exe", "--terminal", "--testar-janela"])
+    with pytest.raises(SystemExit):
+        cli.main()
+    assert shown == [1]

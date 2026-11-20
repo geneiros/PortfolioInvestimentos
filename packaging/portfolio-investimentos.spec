@@ -49,5 +49,6 @@ if sys.platform == "win32":
     sp = Splash(str(ROOT / "packaging" / "splash.png"), binaries=a.binaries, datas=a.datas, text_pos=None,
                 always_on_top=False)
     splash = [sp, sp.binaries]
-exe = EXE(pyz, a.scripts, *splash, a.binaries, a.datas, [], name="PortfolioInvestimentos", console=True, upx=False,
+exe = EXE(pyz, a.scripts, *splash, a.binaries, a.datas, [], name="PortfolioInvestimentos",
+          console=sys.platform != "win32",  # no Windows, sem a janela do terminal (ver desktop.show_console) upx=False,
           icon=icon if sys.platform != "linux" else None, strip=False)

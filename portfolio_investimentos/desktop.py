@@ -159,3 +159,75 @@ p.error{{color:#dc3545;font-size:1rem}}
 <script>window.pmSplash=function(t,e){{var m=document.getElementById("msg");m.textContent=t;
 if(e){{m.className="error";document.getElementById("track").className="track hidden";}}}};</script>
 </body></html>"""
+
+
+# ---------------------------------------------------------------------- terminal (executável do Windows)
+# No Windows o executável é gerado sem consola (sem a janela preta do terminal). Sem consola, sys.stdout é None:
+# - lançado a partir de um cmd/PowerShell, liga-se a esse terminal (para --help, --demo, --importar…);
+# - com duplo clique, as mensagens vão para registo.log na pasta dos dados;
+# - sem a janela própria (abre no browser), num erro ou com --terminal, abre-se um terminal como antes.
+# Com a saída redirecionada (CI, «> ficheiro») não se mexe em nada.
+_log_file = None
+
+
+def _windowed():
+    return sys.platform == "win32" and getattr(sys, "frozen", False)
+
+
+def _bind_console(stdin=False):
+    sys.stdout = open("CONOUT$", "w", encoding="utf-8", buffering=1)
+    sys.stderr = open("CONOUT$", "w", encoding="utf-8", buffering=1)
+    if stdin:
+        sys.stdin = open("CONIN$", encoding="utf-8")
+
+
+def _kernel32():
+    import ctypes
+    return ctypes.windll.kernel32
+
+
+def attach_parent_console(kernel32=None):
+    """Lançado a partir de um terminal: escreve nesse terminal. True se ligou."""
+    if not _windowed() or sys.stdout is not None:
+        return False
+    try:
+        k = kernel32 or _kernel32()
+        if not k.AttachConsole(-1):  # ATTACH_PARENT_PROCESS
+            return False
+        _bind_console()
+        return True
+    except Exception:
+        return False
+
+
+def log_to_file(path):
+    """Sem consola nem saída redirecionada: as mensagens vão para `path` (reescrito em cada arranque)."""
+    global _log_file
+    if sys.stdout is not None:
+        return False
+    try:
+        _log_file = open(path, "w", encoding="utf-8", buffering=1)
+    except OSError:
+        return False
+    sys.stdout = sys.stderr = _log_file
+    return True
+
+
+def show_console(kernel32=None):
+    """Abre um terminal novo e passa a escrever nele (como no executável com consola). Só no executável do
+    Windows e só se a saída não tiver outro destino (um terminal, um ficheiro ou o CI)."""
+    global _log_file
+    if not _windowed() or (sys.stdout is not None and sys.stdout is not _log_file):
+        return False
+    try:
+        k = kernel32 or _kernel32()
+        if not k.AllocConsole():
+            return False
+        k.SetConsoleTitleW(TITLE)
+        _bind_console(stdin=True)
+        if _log_file is not None:
+            _log_file.close()
+            _log_file = None
+        return True
+    except Exception:
+        return False

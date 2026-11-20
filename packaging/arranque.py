@@ -1,9 +1,18 @@
 """Arranque do executável único (PyInstaller): o mesmo que `python -m portfolio_investimentos`.
 
-Com duplo clique, a janela do terminal fecha-se logo que o programa termina: quando termina com erro (ex.: porta
+No Windows não há terminal (as mensagens ficam em registo.log), salvo nos erros. Com duplo clique, a janela do
+terminal fecha-se logo que o programa termina: quando termina com erro (ex.: porta
 ocupada, base de dados de uma versão mais recente), espera por Enter para se poder ler a mensagem.
 """
 import sys
+
+
+def _show_console():
+    try:  # executável do Windows sem terminal: abre um para se ver o erro
+        from portfolio_investimentos.desktop import show_console
+        show_console()
+    except Exception:
+        pass
 
 
 def _wait_before_closing():
@@ -20,11 +29,14 @@ def _wait_before_closing():
 
 
 def run():
+    from portfolio_investimentos.desktop import attach_parent_console
+    attach_parent_console()  # executável do Windows lançado a partir de um terminal: as mensagens vão para lá
     from portfolio_investimentos.__main__ import main
     try:
         main()
     except SystemExit as exc:
         if exc.code not in (None, 0):
+            _show_console()
             if not isinstance(exc.code, int):
                 print(exc.code)
             _wait_before_closing()
@@ -32,6 +44,7 @@ def run():
     except KeyboardInterrupt:
         pass
     except Exception:
+        _show_console()
         import traceback
         traceback.print_exc()
         _wait_before_closing()
