@@ -3308,3 +3308,32 @@ def test_update_notice_only_in_executable(app, client, monkeypatch):
 def json_dumps(obj):
     import json
     return json.dumps(obj)
+
+
+def test_native_window_with_browser_fallback(monkeypatch):
+    """Executável: abre numa janela própria (pywebview); sem ela, o chamador abre o browser."""
+    import sys
+    import types
+    from portfolio_investimentos import __main__ as main
+    monkeypatch.setitem(sys.modules, "webview", None)  # pywebview não instalado
+    assert main._webview_available() is False and main._run_window("http://127.0.0.1:1/", wait=0) is False
+    calls = {}
+    fake = types.ModuleType("webview")
+    fake.settings = {}
+    fake.create_window = lambda title, url, **kw: calls.update(title=title, url=url, **kw)
+    fake.start = lambda **kw: calls.update(started=kw)
+    monkeypatch.setitem(sys.modules, "webview", fake)
+    assert main._webview_available() is True
+    assert main._run_window("http://127.0.0.1:1/", wait=0) is True
+    assert calls["title"] == "Portfolio Investimentos" and calls["url"] == "http://127.0.0.1:1/"
+    assert calls["started"] == {"private_mode": False}  # o tema e as preferências ficam entre arranques
+    assert fake.settings == {"ALLOW_DOWNLOADS": True, "OPEN_EXTERNAL_LINKS_IN_BROWSER": True}
+
+    def broken(**kw):
+        raise RuntimeError("sem motor web")
+    fake.start = broken  # ex.: Linux sem GTK/Qt: volta ao browser
+    assert main._run_window("http://127.0.0.1:1/", wait=0) is False
+    monkeypatch.setattr(sys, "argv", ["portfolio_investimentos", "--testar-janela"])
+    with pytest.raises(SystemExit) as exc:
+        main.main()
+    assert exc.value.code == 0

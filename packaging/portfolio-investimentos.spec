@@ -17,7 +17,10 @@ binaries, hiddenimports = [], []
 hiddenimports += ["waitress"]
 # yfinance (cotações) e as dependências com código nativo ou ficheiros de dados; opcional: sem ele a aplicação
 # usa o acesso direto ao Yahoo
-for pkg in ("yfinance", "curl_cffi", "peewee", "frozendict", "multitasking"):
+# pywebview (janela própria: WebView2 no Windows, WebKit no macOS) e as suas dependências; opcional: sem ele o
+# executável abre a aplicação no browser
+for pkg in ("yfinance", "curl_cffi", "peewee", "frozendict", "multitasking",
+            "webview", "clr_loader", "pythonnet", "proxy_tools", "bottle"):
     try:
         d, b, h = collect_all(pkg)
     except Exception:
@@ -25,6 +28,11 @@ for pkg in ("yfinance", "curl_cffi", "peewee", "frozendict", "multitasking"):
     datas += d
     binaries += b
     hiddenimports += h
+try:  # o módulo «clr» do pythonnet (WebView2 no Windows) não é um pacote: entra à parte
+    import clr  # noqa: F401
+    hiddenimports += ["clr"]
+except Exception:
+    pass
 # os módulos da aplicação importados dentro de funções (ex.: serviços carregados a pedido)
 hiddenimports += [f"portfolio_investimentos.{p.relative_to(PKG).with_suffix('').as_posix().replace('/', '.')}"
                   for p in PKG.rglob("*.py") if p.name != "__main__.py"]

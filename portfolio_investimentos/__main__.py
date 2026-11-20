@@ -14,7 +14,11 @@ def main():
                         help="porta (por omissão 5000; se estiver ocupada, usa a primeira livre até 5020)")
     parser.add_argument("--host", default="127.0.0.1",
                         help="endereço (por omissão 127.0.0.1; 0.0.0.0 abre-a na rede local e exige palavra-passe)")
-    parser.add_argument("--no-browser", action="store_true", help="não abrir o browser automaticamente")
+    parser.add_argument("--no-browser", action="store_true", help="não abrir o browser (nem a janela) automaticamente")
+    parser.add_argument("--browser", action="store_true",
+                        help="abrir no browser em vez da janela própria (o executável abre numa janela própria)")
+    parser.add_argument("--janela", action="store_true",
+                        help="abrir numa janela própria (pywebview), também a correr a partir do código")
     parser.add_argument("--demo", action="store_true", help="carregar dados de demonstração e sair")
     parser.add_argument("--refresh", action="store_true", help="atualizar cotações (yfinance) e sair")
     parser.add_argument("--abertas", action="store_true",
@@ -23,10 +27,16 @@ def main():
                         help="importar extratos (XTB .xlsx, Trading 212, Trade Republic ou CSV genérico) e sair")
     parser.add_argument("--corretora", choices=["generic", "trading212", "traderepublic", "xtb"],
                         help="corretora dos extratos de --importar (por omissão, detetada pelo conteúdo)")
+    parser.add_argument("--testar-janela", action="store_true",
+                        help="dizer se a janela própria (pywebview) está disponível e sair")
     parser.add_argument("--testar-yahoo", action="store_true",
                         help="testar a ligação ao Yahoo Finance (cotações, câmbios e pesquisa) e sair")
     args = parser.parse_args()
 
+    if args.testar_janela:
+        ok = _webview_available()
+        print("Janela própria (pywebview): " + ("disponível" if ok else "indisponível (abre no browser)"))
+        raise SystemExit(0 if ok else 1)
     if args.testar_yahoo:
         raise SystemExit(_test_yahoo())
     from .migrations import MigrationError
@@ -78,9 +88,10 @@ def main():
         print(f"Aberta na rede em {args.host}:{args.port}. Os outros dispositivos só entram depois de definires "
               "uma palavra-passe (Definições → Segurança ou variável PORTFOLIO_PASSWORD).")
     print(f"Dados guardados em {data_dir()}")
-    print("Fecha esta janela (ou Ctrl+C) para terminar.")
-    if not args.no_browser:
-        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    # o executável abre numa janela própria (pywebview); sem ela (ex.: Linux sem GTK/Qt), no browser, como antes
+    window = not args.no_browser and not args.browser and (getattr(sys, "frozen", False) or args.janela)
+    window = window and _webview_available()
+    print("Fecha a janela da aplicação para terminar." if window else "Fecha esta janela (ou Ctrl+C) para terminar.")
 
     threading.Thread(target=_quick_quotes_loop, args=(app,), daemon=True, name="cotacoes-rapidas").start()
     if getattr(sys, "frozen", False):  # executável único: há uma versão nova no GitHub?
@@ -89,11 +100,65 @@ def main():
         threading.Thread(target=_plugin_task_loop, args=(app, fn, every), daemon=True,
                          name=f"plugin-{getattr(fn, '__name__', 'tarefa')}").start()
 
+    if window:
+        server = threading.Thread(target=_serve, args=(app, args.host, args.port), daemon=True, name="servidor")
+        server.start()
+        if _run_window(url):
+            return  # a janela fechou: termina (o servidor corre numa thread que acaba com o programa)
+        print("Não foi possível abrir a janela própria; a abrir no browser.")
+        webbrowser.open(url)
+        print("Fecha esta janela (ou Ctrl+C) para terminar.")
+        server.join()
+        return
+    if not args.no_browser:
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    _serve(app, args.host, args.port)
+
+
+def _serve(app, host, port):
     try:
         from waitress import serve
-        serve(app, host=args.host, port=args.port, threads=4)
+        serve(app, host=host, port=port, threads=4)
     except ImportError:
-        app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
+        app.run(host=host, port=port, debug=False, use_reloader=False)
+
+
+def _webview_available():
+    try:
+        import webview  # noqa: F401  (pywebview: janela nativa com o motor web do sistema)
+        return True
+    except Exception:
+        return False
+
+
+def _run_window(url, wait=30.0):
+    """Abre a aplicação numa janela nativa (pywebview: WebView2 no Windows, WebKit no macOS, GTK/Qt no Linux) e
+    espera que se feche. Devolve False se não for possível (o chamador abre então o browser)."""
+    import time
+    import urllib.request
+    try:
+        import webview
+    except Exception:
+        return False
+    deadline = time.monotonic() + wait
+    while time.monotonic() < deadline:  # espera que o servidor responda, para a janela não abrir em branco
+        try:
+            urllib.request.urlopen(url + "ping", timeout=1)
+            break
+        except Exception:
+            time.sleep(0.2)
+    settings = getattr(webview, "settings", None)
+    if isinstance(settings, dict):
+        settings["ALLOW_DOWNLOADS"] = True                 # exportações CSV, cópias de segurança
+        settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True  # notícias, GitHub, sites dos emitentes
+    try:
+        webview.create_window("Portfolio Investimentos", url, width=1400, height=900, min_size=(900, 600),
+                              text_select=True)
+        webview.start(private_mode=False)  # guarda o armazenamento local (tema, preferências) entre arranques
+        return True
+    except Exception as exc:  # sem motor web no sistema (ex.: Linux sem GTK/Qt, Windows sem WebView2)
+        print(f"Janela própria indisponível: {exc}")
+        return False
 
 
 DEFAULT_PORT = 5000
