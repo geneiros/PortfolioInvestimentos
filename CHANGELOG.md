@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **Versão 0.4.1**  
+  Executáveis novos com a barra de progresso só quando a aplicação é acedida online (no executável, que corre no próprio computador, deixa de aparecer). Quem tem a 0.4.0 vê a faixa «Há uma versão nova» com o link para descarregar.
 - **Barra de progresso só com a aplicação acedida online**  
   A barra fina no topo ao mudar de página (no computador) passa a aparecer só quando a aplicação é acedida online (ex.: PythonAnywhere). No próprio computador (executável, python -m portfolio_investimentos) ou na rede de casa (localhost, 127.x, 10.x, 192.168.x, 172.16–31.x, *.local) as páginas abrem logo e a barra só piscava, por isso deixa de aparecer. No telemóvel continua sem barra.
 - **Versão 0.4.0**  
