@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **Janela própria: maximizada e com a cor do tema**  
+  A janela própria do executável abre maximizada e a barra de título fica da cor do fundo do tema escolhido (Claro #ffffff, Escuro #212529, Purple #272236; no Automático, a do modo do sistema), e acompanha as trocas de tema. Windows 11: cor da barra e do texto (DWM); Windows 10: só barra clara ou escura; macOS: barra transparente sobre o fundo da janela com a aparência clara ou escura. A cor fica guardada para a janela já abrir com ela no arranque seguinte.
 - **Versão 0.4.2**  
   Executáveis novos: no Windows e no macOS a aplicação abre numa janela própria (pywebview), sem barra de endereço nem separadores; no Linux, no browser como antes. Quem tem a 0.4.0 ou a 0.4.1 vê a faixa «Há uma versão nova» com o link para descarregar.
 - **Executável: janela própria (pywebview)**  

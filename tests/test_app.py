@@ -3320,13 +3320,18 @@ def test_native_window_with_browser_fallback(monkeypatch):
     calls = {}
     fake = types.ModuleType("webview")
     fake.settings = {}
-    fake.create_window = lambda title, url, **kw: calls.update(title=title, url=url, **kw)
+    def create_window(title, url, **kw):
+        calls.update(title=title, url=url, **kw)
+        return types.SimpleNamespace()  # sem «events» (versões antigas do pywebview): continua a funcionar
+    fake.create_window = create_window
     fake.start = lambda **kw: calls.update(started=kw)
     monkeypatch.setitem(sys.modules, "webview", fake)
     assert main._webview_available() is True
     assert main._run_window("http://127.0.0.1:1/", wait=0) is True
     assert calls["title"] == "Portfolio Investimentos" and calls["url"] == "http://127.0.0.1:1/"
     assert calls["started"] == {"private_mode": False}  # o tema e as preferências ficam entre arranques
+    assert calls["maximized"] is True and calls["background_color"] == "#ffffff"
+    assert callable(calls["js_api"].set_theme)
     assert fake.settings == {"ALLOW_DOWNLOADS": True, "OPEN_EXTERNAL_LINKS_IN_BROWSER": True}
 
     def broken(**kw):
@@ -3337,3 +3342,17 @@ def test_native_window_with_browser_fallback(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         main.main()
     assert exc.value.code == 0
+
+
+def test_window_title_bar_follows_theme(app, monkeypatch):
+    """Janela própria: a página avisa a cor do tema (window.pywebview.api.set_theme); fica guardada para o arranque
+    seguinte e a barra de título é pintada (Windows/macOS; noutros sistemas não faz nada)."""
+    from portfolio_investimentos import desktop
+    applied = []
+    api = desktop.WindowApi(app, apply=lambda color, dark: applied.append((color, dark)) or True)
+    assert api.set_theme("#272236", True) is True and applied == [("#272236", True)]
+    assert desktop.saved_color(app) == ("#272236", True)
+    assert api.set_theme("red; drop", False) is False and len(applied) == 1  # só #rrggbb
+    assert desktop.saved_color(None) == ("#ffffff", False)
+    monkeypatch.setattr(desktop.sys, "platform", "linux")
+    assert desktop.title_bar("#212529", True) is False  # Linux: o executável abre no browser, nada a pintar

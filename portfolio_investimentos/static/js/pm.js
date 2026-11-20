@@ -389,9 +389,19 @@
     // cor certa nas páginas seguintes (ver _theme_head.html)
     if (window.pmThemeColor) window.pmThemeColor(pref, dark);
     if (window.pmThemeCookie) window.pmThemeCookie(pref);
+    pm.windowTheme();
     document.querySelectorAll("[data-pm-theme]").forEach((b) => b.classList.toggle("active", b.dataset.pmTheme === pref));
     document.dispatchEvent(new CustomEvent("pm:theme"));
   };
+  // janela própria do executável (pywebview): a barra de título fica da cor do fundo do tema
+  pm.windowTheme = () => {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || typeof api.set_theme !== "function") return;
+    const dark = document.documentElement.getAttribute("data-bs-theme") === "dark";
+    const purple = document.documentElement.classList.contains("pm-purple");
+    try { api.set_theme(purple ? "#272236" : dark ? "#212529" : "#ffffff", dark); } catch (e) { /* só cosmética */ }
+  };
+  window.addEventListener("pywebviewready", () => pm.windowTheme());  // a ponte chega depois da página
   pm.setTheme = (t) => { store.set("pm-theme", t); pm.applyTheme(); };
   prefersDark.addEventListener("change", () => { if ((store.get("pm-theme") || "auto") === "auto") pm.applyTheme(); });
 

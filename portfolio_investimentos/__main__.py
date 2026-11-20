@@ -103,7 +103,7 @@ def main():
     if window:
         server = threading.Thread(target=_serve, args=(app, args.host, args.port), daemon=True, name="servidor")
         server.start()
-        if _run_window(url):
+        if _run_window(url, app):
             return  # a janela fechou: termina (o servidor corre numa thread que acaba com o programa)
         print("Não foi possível abrir a janela própria; a abrir no browser.")
         webbrowser.open(url)
@@ -131,7 +131,7 @@ def _webview_available():
         return False
 
 
-def _run_window(url, wait=30.0):
+def _run_window(url, app=None, wait=30.0):
     """Abre a aplicação numa janela nativa (pywebview: WebView2 no Windows, WebKit no macOS, GTK/Qt no Linux) e
     espera que se feche. Devolve False se não for possível (o chamador abre então o browser)."""
     import time
@@ -151,9 +151,15 @@ def _run_window(url, wait=30.0):
     if isinstance(settings, dict):
         settings["ALLOW_DOWNLOADS"] = True                 # exportações CSV, cópias de segurança
         settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True  # notícias, GitHub, sites dos emitentes
+    from . import desktop
+    color, dark = desktop.saved_color(app)  # a cor do tema da última vez: não abre branca no tema escuro
     try:
-        webview.create_window("Portfolio Investimentos", url, width=1400, height=900, min_size=(900, 600),
-                              text_select=True)
+        window = webview.create_window(desktop.TITLE, url, width=1400, height=900, min_size=(900, 600),
+                                       text_select=True, maximized=True, background_color=color,
+                                       js_api=desktop.WindowApi(app))
+        events = getattr(window, "events", None)
+        if events is not None and hasattr(events, "shown"):  # a barra de título com a cor do tema, logo ao abrir
+            events.shown += lambda *a: desktop.title_bar(color, dark)
         webview.start(private_mode=False)  # guarda o armazenamento local (tema, preferências) entre arranques
         return True
     except Exception as exc:  # sem motor web no sistema (ex.: Linux sem GTK/Qt, Windows sem WebView2)
