@@ -128,7 +128,8 @@ def main():
 def _start_background(app):
     """Tarefas em segundo plano: cotações rápidas, aviso de versão nova (executável) e as dos plugins."""
     threading.Thread(target=_quick_quotes_loop, args=(app,), daemon=True, name="cotacoes-rapidas").start()
-    if getattr(sys, "frozen", False):  # executável único: há uma versão nova no GitHub?
+    from .services.updates import is_executable
+    if is_executable():  # executável único ou app Android: há uma versão nova no GitHub?
         threading.Timer(10.0, _check_updates, args=(app,)).start()
     for fn, every in getattr(app.extensions.get("pm_plugins"), "tasks", []):  # tarefas periódicas dos plugins
         threading.Thread(target=_plugin_task_loop, args=(app, fn, every), daemon=True,

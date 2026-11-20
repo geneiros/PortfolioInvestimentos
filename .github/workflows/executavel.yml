@@ -1,6 +1,6 @@
 name: Executável único (PyInstaller)
 
-# Gera o executável para Windows, macOS e Linux, para quem não quer instalar o Python, e confirma que arranca
+# Gera o executável para Windows, macOS e Linux (e a APK para Android), para quem não quer instalar o Python, e confirma que arranca
 # e serve as páginas. Numa etiqueta v* (ex.: v0.4.6), junta os executáveis a uma release do GitHub. Corrido à mão
 # com «etiqueta» preenchida, cria essa etiqueta (no commit escolhido) e a release, sem ser preciso enviar a etiqueta.
 on:
@@ -13,7 +13,7 @@ on:
   push:
     tags: ["v*"]
   pull_request:
-    paths: ["packaging/**", ".github/workflows/executavel.yml", "requirements.txt", "pyproject.toml"]
+    paths: ["packaging/**", "android/**", ".github/workflows/executavel.yml", "requirements.txt", "pyproject.toml"]
 
 permissions:
   contents: write
@@ -85,9 +85,77 @@ jobs:
           path: dist/${{ matrix.nome }}
           retention-days: 30
 
+  android:
+    # app Android (Python embutido com o Chaquopy): gera a APK e experimenta-a num emulador
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || startsWith(inputs.etiqueta, 'v') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+      - name: Código da aplicação para a app
+        run: |
+          mkdir -p android/app/src/main/python
+          cp -r portfolio_investimentos android/app/src/main/python/
+          find android/app/src/main/python -name __pycache__ -prune -exec rm -rf {} +
+      - name: Chave de assinatura (segredos do GitHub)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/chave.jks"
+            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/chave.jks" >> "$GITHUB_ENV"
+          elif [ "$RELEASE" = "true" ]; then
+            echo "::error::Falta o segredo ANDROID_KEYSTORE_B64 (ver android/README.md): sem a chave fixa, a APK não se atualiza por cima da anterior."
+            exit 1
+          else
+            echo "Sem chave: a APK de teste fica assinada com a chave de depuração."
+          fi
+      - name: Gerar a APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          DISABLE_SQLALCHEMY_CEXT: "1"
+        run: |
+          gradle assembleRelease --no-daemon --stacktrace
+          mkdir -p ../dist
+          cp app/build/outputs/apk/release/app-release.apk ../dist/PortfolioInvestimentos-android.apk
+          ls -la ../dist
+      - name: Ativar o KVM (emulador)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Experimentar no emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash android/testar-emulador.sh dist/PortfolioInvestimentos-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PortfolioInvestimentos-android.apk
+          path: dist/PortfolioInvestimentos-android.apk
+          retention-days: 30
+
   release:
     if: startsWith(github.ref, 'refs/tags/v') || startsWith(inputs.etiqueta, 'v')
-    needs: construir
+    needs: [construir, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

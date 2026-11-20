@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #ffffff; --fg: #212529; --muted: #6c757d; --bar: #e9ecef; --accent: #0d6efd; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #212529; --fg: #f8f9fa; --muted: #adb5bd; --bar: #343a40; } }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; display: flex;
+         align-items: center; justify-content: center; text-align: center; padding: 0 16px; }
+  img { width: 96px; height: 96px; border-radius: 22px; }
+  h1 { font-size: 1.25rem; font-weight: 600; margin: 16px 0 20px; }
+  .bar { width: 220px; height: 4px; background: var(--bar); border-radius: 2px; overflow: hidden; margin: 0 auto; }
+  .bar span { display: block; width: 40%; height: 100%; background: var(--accent); border-radius: 2px;
+              animation: andar 1.2s ease-in-out infinite; }
+  @keyframes andar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+  p { color: var(--muted); font-size: .9rem; margin-top: 14px; max-width: 28rem; }
+  .erro .bar { display: none; }
+  .erro p { color: #dc3545; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="caixa">
+  <img src="icon.png" alt="">
+  <h1>Portfolio Investimentos</h1>
+  <div class="bar"><span></span></div>
+  <p id="estado">A preparar a aplicação… (na primeira vez demora um pouco mais)</p>
+</div>
+<script>
+  window.pmSplash = function (text, error) {
+    document.getElementById("estado").textContent = text;
+    document.getElementById("caixa").classList.toggle("erro", !!error);
+  };
+</script>
+</body>
+</html>

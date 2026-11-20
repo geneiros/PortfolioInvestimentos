@@ -5,6 +5,7 @@ corre o código da pasta (scripts iniciar.*, PythonAnywhere) atualiza com «git 
 Um pedido ao GitHub no máximo uma vez por dia; sem internet não acontece nada.
 """
 import json
+import os
 import re
 import sys
 import urllib.request
@@ -19,7 +20,8 @@ EVERY = timedelta(days=1)
 
 
 def is_executable():
-    return bool(getattr(sys, "frozen", False))
+    """Executável único (PyInstaller) ou app Android: os que se atualizam descarregando a versão nova."""
+    return bool(getattr(sys, "frozen", False)) or os.environ.get("PORTFOLIO_ANDROID") == "1"
 
 
 def version_tuple(v):

@@ -395,11 +395,16 @@
   };
   // janela própria do executável (pywebview): a barra de título fica da cor do fundo do tema
   pm.windowTheme = () => {
-    const api = window.pywebview && window.pywebview.api;
-    if (!api || typeof api.set_theme !== "function") return;
     const dark = document.documentElement.getAttribute("data-bs-theme") === "dark";
     const purple = document.documentElement.classList.contains("pm-purple");
-    try { api.set_theme(purple ? "#272236" : dark ? "#212529" : "#ffffff", dark); } catch (e) { /* só cosmética */ }
+    const color = purple ? "#272236" : dark ? "#212529" : "#ffffff";
+    if (window.pmAndroid) {  // app Android: barras de estado e de navegação na cor do tema
+      try { window.pmAndroid.setTheme(color, dark); } catch (e) { /* só cosmética */ }
+      return;
+    }
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || typeof api.set_theme !== "function") return;
+    try { api.set_theme(color, dark); } catch (e) { /* só cosmética */ }
   };
   window.addEventListener("pywebviewready", () => pm.windowTheme());  // a ponte chega depois da página
   pm.setTheme = (t) => { store.set("pm-theme", t); pm.applyTheme(); };

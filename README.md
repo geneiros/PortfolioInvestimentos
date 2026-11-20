@@ -94,6 +94,22 @@ O script abre a aplicação no browser do telemóvel. No Chrome, **menu ⋮ → 
 - Se aparecer "Sem cotações do Yahoo Finance", vê o motivo em **Definições → Resultado por ativo**, ou testa a ligação no Termux com `bash iniciar-android.sh --testar-yahoo`.
 - Os dados do telemóvel e do computador são independentes. Se preferires uma só cópia, corre a aplicação no computador com `--host 0.0.0.0` e palavra-passe, e abre-a no telemóvel.
 
+### App Android
+
+Na release há também a **`PortfolioInvestimentos-android.apk`**. É a aplicação completa a correr no telemóvel, com
+os dados no telemóvel e sem Termux nem browser.
+
+- **Instalar:** descarrega a APK no telemóvel e abre-a. Na primeira vez, o Android pede para permitir instalar apps
+  desta origem (o browser ou o gestor de ficheiros). O Play Protect pode avisar que a app é desconhecida: escolhe
+  instalar mesmo assim.
+- **Atualizar:** instala a APK nova por cima. Os dados ficam. A app avisa quando há uma versão nova, como os
+  executáveis.
+- **Os dados ficam na área privada da app:** desinstalar apaga-os. Faz cópias de segurança em **Definições**; o
+  ficheiro guarda-se onde escolheres, por exemplo em Transferências.
+- As cotações a cada 5 minutos só correm com a app aberta (o Android suspende as apps em segundo plano). Sem o
+  yfinance, as cotações usam o acesso direto ao Yahoo Finance, como no Termux.
+- Para quem gera a APK: ver [android/README.md](android/README.md) (chave de assinatura nos segredos do GitHub).
+
 ### Onde ficam os dados
 
 | Sistema | Pasta |

@@ -1,0 +1,17 @@
+// App Android do Portfolio Investimentos (Python embutido com o Chaquopy). Ver android/README.md.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "PortfolioInvestimentos"
+include ":app"

@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **App Android**  
+  Uma APK (PortfolioInvestimentos-android.apk) com a aplicação completa a correr no telemóvel. O Python e a aplicação vão dentro da app (Chaquopy) e o servidor arranca no próprio telemóvel. A janela própria tem o ecrã de arranque, a escolha de ficheiros para importar extratos, os downloads (cópias de segurança, CSV) para a pasta escolhida e as barras do sistema na cor do tema. Os dados ficam na área privada da app e há o aviso de versão nova. O workflow gera a APK, assinada com a chave dos segredos do GitHub, experimenta-a num emulador e junta-a à release.
 - **Versão 0.4.6**  
   Executável do Windows sem a janela do terminal: só o ecrã de arranque e a janela própria; as mensagens ficam em registo.log (com `--terminal`, sem a janela própria ou num erro, o terminal aparece). Quem tem uma versão anterior vê a faixa «Há uma versão nova».
 - **Executável do Windows sem terminal**  

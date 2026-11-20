@@ -1,0 +1,5 @@
+.gradle/
+build/
+local.properties
+# copiado de ../portfolio_investimentos pelo workflow (ou à mão) antes de gerar a APK
+app/src/main/python/portfolio_investimentos/

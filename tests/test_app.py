@@ -3554,3 +3554,23 @@ def test_browser_path_shows_terminal(frozen_exe, monkeypatch):
     with pytest.raises(SystemExit):
         cli.main()
     assert shown == [1]
+
+
+def test_android_start(monkeypatch, tmp_path):
+    """Arranque da app Android: servidor numa porta livre, pronto a responder, e só uma vez por processo."""
+    import urllib.request
+    from portfolio_investimentos import __main__ as cli
+    from portfolio_investimentos import android
+    from portfolio_investimentos.services import updates
+    monkeypatch.setenv("PORTFOLIO_DATA_DIR", "x")  # o monkeypatch repõe as variáveis no fim
+    monkeypatch.setenv("PORTFOLIO_ANDROID", "0")
+    started = []
+    monkeypatch.setattr(cli, "_start_background", lambda app: started.append(app))
+    monkeypatch.setattr(android, "_state", {})
+    url = android.start(tmp_path / "dados")
+    assert url.startswith("http://127.0.0.1:") and len(started) == 1
+    with urllib.request.urlopen(url + "ping", timeout=5) as r:
+        assert r.status in (200, 204)
+    assert (tmp_path / "dados" / "portfolio.db").exists()
+    assert android.start(tmp_path / "outra") == url and len(started) == 1
+    assert updates.is_executable()  # a app Android também vê o aviso de versão nova

@@ -1,0 +1,74 @@
+plugins {
+    id "com.android.application"
+    id "com.chaquo.python"
+}
+
+// a versão da app é a do pacote Python (portfolio_investimentos/__init__.py): 0.4.6 → versionCode 406
+def pkgVersion = (file("../../portfolio_investimentos/__init__.py").text =~ /__version__ = "([^"]+)"/)[0][1]
+def parts = pkgVersion.tokenize(".").collect { it.replaceAll(/\D.*/, "").toInteger() }
+
+android {
+    namespace "io.github.geneiros.portfolioinvestimentos"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "io.github.geneiros.portfolioinvestimentos"
+        minSdk 24
+        targetSdk 34
+        versionCode parts[0] * 10000 + parts[1] * 100 + parts[2]
+        versionName pkgVersion
+        ndk {
+            abiFilters "arm64-v8a", "x86_64"  // telemóveis (arm64) e o emulador do teste (x86_64)
+        }
+    }
+
+    // a chave vem dos segredos do GitHub (ver android/README.md); sem ela, a chave de depuração (só para testes)
+    def keystore = System.getenv("ANDROID_KEYSTORE_FILE")
+    signingConfigs {
+        release {
+            if (keystore) {
+                storeFile file(keystore)
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keystore ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        version "3.12"
+        pip {
+            // sem dependências automáticas: só pacotes em Python puro (as extensões em C ficam de fora)
+            options "--no-deps"
+            install "Flask"
+            install "Werkzeug"
+            install "Jinja2"
+            install "MarkupSafe"
+            install "itsdangerous"
+            install "click"
+            install "blinker"
+            install "Flask-SQLAlchemy"
+            install "SQLAlchemy"
+            install "typing_extensions"
+            install "waitress"
+            install "openpyxl"
+            install "et_xmlfile"
+            install "tzdata"
+            install "certifi"
+        }
+        // templates, ficheiros estáticos, fusos horários e certificados têm de existir como ficheiros
+        extractPackages "portfolio_investimentos", "tzdata", "certifi"
+    }
+}
