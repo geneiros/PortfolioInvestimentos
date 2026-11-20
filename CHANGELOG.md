@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **Versão 0.4.5**  
+  Executáveis novos com o modo portátil: com o executável numa pen USB (Windows), os dados ficam na pasta PortfolioInvestimentos-dados ao lado dele; noutros discos e sistemas, com `--portatil`. Quem tem uma versão anterior vê a faixa «Há uma versão nova».
 - **Executável: modo portátil (pen USB)**  
   No Windows, com o executável numa pen USB, os dados (base de dados, chave, cópias de segurança, logótipos e o armazenamento da janela própria) ficam na pasta PortfolioInvestimentos-dados ao lado do executável, em vez de %APPDATA%. Noutros discos e sistemas, `--portatil` cria essa pasta e, enquanto existir, é usada. PORTFOLIO_DATA_DIR continua a mandar; numa pen protegida contra escrita, fica a pasta habitual. As Definições mostram «Modo portátil». Os dados que já existem no computador não são copiados sozinhos.
 - **Versão 0.4.4**  
