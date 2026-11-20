@@ -44,7 +44,7 @@ Se não queres instalar o Python, descarrega o executável do teu sistema na pá
 - Os dados ficam na mesma pasta que na instalação com Python (ver **Onde ficam os dados**), por isso podes passar de uma para a outra. Para atualizar, descarrega o executável novo e substitui o antigo: os dados não são afetados.
 - Não se atualiza sozinho: quando há uma versão nova no GitHub, aparece uma faixa no topo com o botão **Descarregar** (verifica uma vez por dia; desliga-se em **Definições → Dados de mercado**). Descarrega o executável novo e substitui o antigo; os dados ficam como estão.
 - Aceita as mesmas opções da linha de comandos, por exemplo `PortfolioInvestimentos-windows.exe --port 5001` ou `--no-browser`.
-- Para o gerares tu próprio: `pip install -r requirements.txt pyinstaller pillow` e `pyinstaller packaging/portfolio-investimentos.spec`; o executável fica em `dist/`. O workflow **Executável único (PyInstaller)** do GitHub gera os três e, numa etiqueta `v*` (ou corrido à mão em Actions com a versão em «etiqueta», ex.: `v0.4.1`), junta-os a uma release.
+- Para o gerares tu próprio: `pip install -r requirements.txt pyinstaller pillow` e `pyinstaller packaging/portfolio-investimentos.spec`; o executável fica em `dist/`. O workflow **Executável único (PyInstaller)** do GitHub gera os três e, numa etiqueta `v*` (ou corrido à mão em Actions com a versão em «etiqueta», ex.: `v0.4.2`), junta-os a uma release.
 
 ### Instalar como aplicação (PWA)
 

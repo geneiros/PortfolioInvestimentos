@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **Versão 0.4.2**  
+  Executáveis novos: no Windows e no macOS a aplicação abre numa janela própria (pywebview), sem barra de endereço nem separadores; no Linux, no browser como antes. Quem tem a 0.4.0 ou a 0.4.1 vê a faixa «Há uma versão nova» com o link para descarregar.
 - **Executável: janela própria (pywebview)**  
   No Windows e no macOS, o executável abre a aplicação numa janela própria, sem barra de endereço nem separadores, com o motor web do sistema (WebView2 no Windows, WebKit no macOS); fechar a janela termina a aplicação. As exportações descarregam-se e os links externos (notícias, GitHub) abrem no browser. No Linux, ou sem motor web, abre no browser como antes; --browser força o browser e --janela abre a janela também a correr a partir do código (pip install pywebview). --testar-janela diz se a janela está disponível; o workflow do executável confirma-o no Windows e no macOS.
 - **Versão 0.4.1**  
