@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **Versão 0.4.3**  
+  Executáveis novos: a janela própria abre com 85% do ecrã, centrada, e a barra de título acompanha a cor do tema (Windows 11 com a cor; Windows 10 só clara ou escura; macOS com a aparência e o fundo do tema). Quem tem uma versão anterior vê a faixa «Há uma versão nova».
 - **Janela própria: 85% do ecrã, centrada**  
   A janela própria do executável abre com 85% da largura e da altura do ecrã principal, centrada nele (sem informação do ecrã, 1400×900 centrada).
 - **Janela própria: deixa de abrir maximizada**  
