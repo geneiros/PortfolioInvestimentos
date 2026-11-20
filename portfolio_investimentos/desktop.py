@@ -93,36 +93,69 @@ def window_geometry(screens, fraction=0.85):
     return width, height, x, y
 
 
+def _color_file():
+    from . import data_dir
+    return data_dir() / "janela.txt"
+
+
 class WindowApi:
     """Ponte JavaScript → Python (window.pywebview.api) da janela própria: a página avisa quando muda de tema."""
 
-    def __init__(self, app=None, apply=None):
-        self._app = app
+    def __init__(self, apply=None, store=None):
         self._apply = apply or title_bar
+        self._store = store or _color_file
 
     def set_theme(self, color, dark=False):
         if not valid_color(color):
             return False
-        if self._app is not None:
-            try:
-                with self._app.app_context():
-                    from .models import Setting
-                    Setting.set("window_color", f"{color.lower()}|{1 if dark else 0}")
-            except Exception as exc:
-                log.info("não foi possível guardar a cor da janela: %s", exc)
+        try:  # num ficheiro da pasta de dados: a janela abre antes da base de dados (ecrã de arranque)
+            self._store().write_text(f"{color.lower()}|{1 if dark else 0}", encoding="utf-8")
+        except Exception as exc:
+            log.info("não foi possível guardar a cor da janela: %s", exc)
         return bool(self._apply(color, bool(dark)))
 
 
-def saved_color(app=None):
+def saved_color(store=None):
     """(cor, escuro) da última vez, para a janela já abrir com a cor do tema; sem nada guardado, a do tema claro."""
-    if app is not None:
-        try:
-            with app.app_context():
-                from .models import Setting
-                raw = Setting.get("window_color") or ""
-            color, _, dark = raw.partition("|")
-            if valid_color(color):
-                return color, dark == "1"
-        except Exception:
-            pass
+    try:
+        raw = (store or _color_file)().read_text(encoding="utf-8").strip()
+        color, _, dark = raw.partition("|")
+        if valid_color(color):
+            return color, dark == "1"
+    except Exception:
+        pass
     return DEFAULT_COLOR, False
+
+
+def splash_html(color=DEFAULT_COLOR, dark=False):
+    """Ecrã de arranque da janela própria, enquanto a aplicação se prepara (autocontido: o ícone vai embutido).
+    `pmSplash(texto, erro)` muda a mensagem (chamado por evaluate_js durante o arranque)."""
+    import base64
+    from pathlib import Path
+    if not valid_color(color):
+        color, dark = DEFAULT_COLOR, False
+    try:
+        icon = base64.b64encode((Path(__file__).parent / "static" / "icons" / "icon-192.png").read_bytes()).decode()
+        img = f'<img src="data:image/png;base64,{icon}" alt="" width="96" height="96">'
+    except OSError:
+        img = ""
+    fg, muted, track, bar = (("#e9ecef", "#adb5bd", "rgba(255,255,255,.12)", "#6ea8fe") if dark
+                             else ("#212529", "#6c757d", "rgba(0,0,0,.08)", "#0d6efd"))
+    return f"""<!doctype html><html lang="pt"><head><meta charset="utf-8"><title>{TITLE}</title><style>
+html,body{{margin:0;height:100%;background:{color};color:{fg};font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}}
+body{{display:flex;align-items:center;justify-content:center;user-select:none;cursor:default}}
+.box{{text-align:center;max-width:32rem;padding:2rem}}
+img{{border-radius:22px;box-shadow:0 6px 24px rgba(0,0,0,.18)}}
+h1{{font-size:1.4rem;font-weight:600;margin:1.25rem 0 1.5rem}}
+.track{{width:220px;height:3px;margin:0 auto;border-radius:3px;background:{track};overflow:hidden}}
+.bar{{width:40%;height:100%;border-radius:3px;background:{bar};animation:slide 1.2s ease-in-out infinite}}
+@keyframes slide{{0%{{transform:translateX(-100%)}}100%{{transform:translateX(250%)}}}}
+p{{font-size:.9rem;color:{muted};margin:1rem 0 0;line-height:1.4}}
+p.error{{color:#dc3545;font-size:1rem}}
+.hidden{{display:none}}
+</style></head><body><div class="box">{img}<h1>{TITLE}</h1>
+<div class="track" id="track"><div class="bar"></div></div>
+<p id="msg">A preparar a aplicação…</p></div>
+<script>window.pmSplash=function(t,e){{var m=document.getElementById("msg");m.textContent=t;
+if(e){{m.className="error";document.getElementById("track").className="track hidden";}}}};</script>
+</body></html>"""

@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **Executável: ecrã de arranque**  
+  A janela própria abre logo, com um ecrã de arranque na cor do tema (o ícone, o nome, uma barra de progresso e o passo: «A abrir a base de dados…», «A arrancar o servidor…»), e só depois mostra a aplicação; os erros de arranque (base de dados de uma versão mais recente, porta ocupada) aparecem nesse ecrã. No Windows há ainda o ecrã do PyInstaller (packaging/splash.png) enquanto o executável se descompacta, fechado quando a janela aparece. A cor do tema para a janela fica num ficheiro da pasta de dados (janela.txt), porque a janela abre antes da base de dados.
 - **Versão 0.4.3**  
   Executáveis novos: a janela própria abre com 85% do ecrã, centrada, e a barra de título acompanha a cor do tema (Windows 11 com a cor; Windows 10 só clara ou escura; macOS com a aparência e o fundo do tema). Quem tem uma versão anterior vê a faixa «Há uma versão nova».
 - **Janela própria: 85% do ecrã, centrada**  

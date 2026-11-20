@@ -42,5 +42,12 @@ icon = str(PKG / "static" / "icons" / "icon-512.png")  # convertido para .ico/.i
 a = Analysis([str(ROOT / "packaging" / "arranque.py")], pathex=[str(ROOT)], binaries=binaries, datas=datas,
              hiddenimports=hiddenimports, excludes=["tkinter", "pytest", "IPython", "matplotlib"], noarchive=False)
 pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, a.binaries, a.datas, [], name="PortfolioInvestimentos", console=True, upx=False,
+# ecrã de arranque enquanto o executável se descompacta (o PyInstaller só o tem no Windows e no Linux; no Linux o
+# executável abre no browser, por isso só no Windows). A aplicação fecha-o quando a janela própria aparece.
+splash = []
+if sys.platform == "win32":
+    sp = Splash(str(ROOT / "packaging" / "splash.png"), binaries=a.binaries, datas=a.datas, text_pos=None,
+                always_on_top=False)
+    splash = [sp, sp.binaries]
+exe = EXE(pyz, a.scripts, *splash, a.binaries, a.datas, [], name="PortfolioInvestimentos", console=True, upx=False,
           icon=icon if sys.platform != "linux" else None, strip=False)

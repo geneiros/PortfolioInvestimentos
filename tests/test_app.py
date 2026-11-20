@@ -3310,57 +3310,104 @@ def json_dumps(obj):
     return json.dumps(obj)
 
 
-def test_native_window_with_browser_fallback(monkeypatch):
-    """Executável: abre numa janela própria (pywebview); sem ela, o chamador abre o browser."""
+def test_native_window_with_browser_fallback(monkeypatch, tmp_path):
+    """Executável: abre já a janela própria com o ecrã de arranque e prepara a aplicação por trás; sem janela,
+    o chamador segue pelo browser."""
+    import socket
     import sys
     import types
     from portfolio_investimentos import __main__ as main
+    monkeypatch.setenv("PORTFOLIO_DATA_DIR", str(tmp_path))
     monkeypatch.setitem(sys.modules, "webview", None)  # pywebview não instalado
-    assert main._webview_available() is False and main._run_window("http://127.0.0.1:1/", wait=0) is False
+    args = types.SimpleNamespace(host="127.0.0.1", port=None)
+    assert main._webview_available() is False and main._window_app(args) is False
+
+    class FakeWindow:
+        def __init__(self):
+            self.js, self.loaded = [], []
+            self.events = types.SimpleNamespace(shown=_Hooks())
+
+        def evaluate_js(self, code):
+            self.js.append(code)
+
+        def load_url(self, url):
+            self.loaded.append(url)
+
+    class _Hooks(list):
+        def __iadd__(self, fn):
+            self.append(fn)
+            return self
     calls = {}
     fake = types.ModuleType("webview")
     fake.settings = {}
     fake.screens = [types.SimpleNamespace(x=0, y=0, width=1920, height=1080)]
-    def create_window(title, url, **kw):
+    win = FakeWindow()
+
+    def create_window(title, url=None, **kw):
         calls.update(title=title, url=url, **kw)
-        return types.SimpleNamespace()  # sem «events» (versões antigas do pywebview): continua a funcionar
-    fake.create_window = create_window
-    fake.start = lambda **kw: calls.update(started=kw)
+        return win
+
+    def start(func=None, args=(), **kw):
+        calls["started"] = kw
+        func(*args)  # o pywebview chama-a numa thread, com a janela já à vista
+    fake.create_window, fake.start = create_window, start
     monkeypatch.setitem(sys.modules, "webview", fake)
     assert main._webview_available() is True
-    assert main._run_window("http://127.0.0.1:1/", wait=0) is True
-    assert calls["title"] == "Portfolio Investimentos" and calls["url"] == "http://127.0.0.1:1/"
-    assert calls["started"] == {"private_mode": False}  # o tema e as preferências ficam entre arranques
-    assert "maximized" not in calls and calls["background_color"] == "#ffffff"  # tamanho normal, não maximizada
-    # 85% do ecrã principal, centrada
+    with socket.socket() as sk:  # uma porta livre para o servidor de teste
+        sk.bind(("127.0.0.1", 0))
+        port = sk.getsockname()[1]
+    args = types.SimpleNamespace(host="127.0.0.1", port=port)
+    assert main._window_app(args) is True
+    # primeiro o ecrã de arranque (HTML), na cor do tema guardada, com 85% do ecrã e centrada
+    assert calls["title"] == "Portfolio Investimentos" and calls["url"] is None
+    assert "A preparar a aplicação" in calls["html"] and calls["background_color"] == "#ffffff"
     assert (calls["width"], calls["height"], calls["x"], calls["y"]) == (1632, 918, 144, 81)
-    assert calls["min_size"] == (900, 600)
-    assert callable(calls["js_api"].set_theme)
+    assert "maximized" not in calls and callable(calls["js_api"].set_theme)
+    assert calls["started"] == {"private_mode": False}  # o tema e as preferências ficam entre arranques
     assert fake.settings == {"ALLOW_DOWNLOADS": True, "OPEN_EXTERNAL_LINKS_IN_BROWSER": True}
+    # depois a aplicação: mensagens de progresso e o endereço do servidor (que já responde)
+    assert any("A abrir a base de dados" in j for j in win.js) and any("A arrancar o servidor" in j for j in win.js)
+    assert win.loaded == [f"http://127.0.0.1:{port}/"]
+    import urllib.request
+    assert urllib.request.urlopen(win.loaded[0] + "ping", timeout=5).status in (200, 204)
 
-    def broken(**kw):
+    def broken(*a, **kw):
         raise RuntimeError("sem motor web")
     fake.start = broken  # ex.: Linux sem GTK/Qt: volta ao browser
-    assert main._run_window("http://127.0.0.1:1/", wait=0) is False
+    assert main._window_app(args) is False
     monkeypatch.setattr(sys, "argv", ["portfolio_investimentos", "--testar-janela"])
     with pytest.raises(SystemExit) as exc:
         main.main()
     assert exc.value.code == 0
 
 
-def test_window_title_bar_follows_theme(app, monkeypatch):
-    """Janela própria: a página avisa a cor do tema (window.pywebview.api.set_theme); fica guardada para o arranque
-    seguinte e a barra de título é pintada (Windows/macOS; noutros sistemas não faz nada)."""
+def test_window_boot_shows_startup_errors(monkeypatch, tmp_path):
+    """Um erro no arranque (ex.: porta ocupada por outro programa) aparece no próprio ecrã de arranque."""
+    import types
+    from portfolio_investimentos import __main__ as main
+    monkeypatch.setenv("PORTFOLIO_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(main, "_choose_port", lambda host, wanted: (None, False))
+    js, loaded = [], []
+    win = types.SimpleNamespace(evaluate_js=js.append, load_url=loaded.append)
+    main._boot(win, types.SimpleNamespace(host="127.0.0.1", port=5000), wait=0)
+    assert loaded == [] and any("ocupada" in j and "true" in j for j in js)
+
+def test_window_title_bar_follows_theme(monkeypatch, tmp_path):
+    """Janela própria: a página avisa a cor do tema (window.pywebview.api.set_theme); fica guardada num ficheiro
+    para o arranque seguinte (a janela abre antes da base de dados) e a barra de título é pintada."""
     from portfolio_investimentos import desktop
+    store = lambda: tmp_path / "janela.txt"  # noqa: E731
     applied = []
-    api = desktop.WindowApi(app, apply=lambda color, dark: applied.append((color, dark)) or True)
+    api = desktop.WindowApi(apply=lambda color, dark: applied.append((color, dark)) or True, store=store)
     assert api.set_theme("#272236", True) is True and applied == [("#272236", True)]
-    assert desktop.saved_color(app) == ("#272236", True)
+    assert desktop.saved_color(store) == ("#272236", True)
     assert api.set_theme("red; drop", False) is False and len(applied) == 1  # só #rrggbb
-    assert desktop.saved_color(None) == ("#ffffff", False)
+    assert desktop.saved_color(lambda: tmp_path / "nao-existe.txt") == ("#ffffff", False)
+    html = desktop.splash_html("#272236", True)
+    assert "#272236" in html and "data:image/png;base64," in html and "pmSplash" in html
+    assert "#ffffff" in desktop.splash_html("vermelho")  # cor inválida: a do tema claro
     monkeypatch.setattr(desktop.sys, "platform", "linux")
     assert desktop.title_bar("#212529", True) is False  # Linux: o executável abre no browser, nada a pintar
-
 
 def test_window_geometry():
     import types

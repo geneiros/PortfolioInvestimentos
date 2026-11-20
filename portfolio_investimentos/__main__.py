@@ -39,6 +39,14 @@ def main():
         raise SystemExit(0 if ok else 1)
     if args.testar_yahoo:
         raise SystemExit(_test_yahoo())
+    # o executável abre numa janela própria (pywebview), logo com o ecrã de arranque; o resto prepara-se por trás.
+    # Sem ela (Linux sem GTK/Qt, --browser, --no-browser, comandos que saem), segue como antes, no browser.
+    one_shot = args.demo or args.refresh or args.importar
+    if (not args.no_browser and not args.browser and not one_shot
+            and (getattr(sys, "frozen", False) or args.janela) and _webview_available()):
+        if _window_app(args):
+            return
+        print("Não foi possível abrir a janela própria; a abrir no browser.")
     from .migrations import MigrationError
     try:
         app = create_app()
@@ -88,11 +96,16 @@ def main():
         print(f"Aberta na rede em {args.host}:{args.port}. Os outros dispositivos só entram depois de definires "
               "uma palavra-passe (Definições → Segurança ou variável PORTFOLIO_PASSWORD).")
     print(f"Dados guardados em {data_dir()}")
-    # o executável abre numa janela própria (pywebview); sem ela (ex.: Linux sem GTK/Qt), no browser, como antes
-    window = not args.no_browser and not args.browser and (getattr(sys, "frozen", False) or args.janela)
-    window = window and _webview_available()
-    print("Fecha a janela da aplicação para terminar." if window else "Fecha esta janela (ou Ctrl+C) para terminar.")
+    print("Fecha esta janela (ou Ctrl+C) para terminar.")
+    _close_pyi_splash()
+    _start_background(app)
+    if not args.no_browser:
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    _serve(app, args.host, args.port)
 
+
+def _start_background(app):
+    """Tarefas em segundo plano: cotações rápidas, aviso de versão nova (executável) e as dos plugins."""
     threading.Thread(target=_quick_quotes_loop, args=(app,), daemon=True, name="cotacoes-rapidas").start()
     if getattr(sys, "frozen", False):  # executável único: há uma versão nova no GitHub?
         threading.Timer(10.0, _check_updates, args=(app,)).start()
@@ -100,19 +113,14 @@ def main():
         threading.Thread(target=_plugin_task_loop, args=(app, fn, every), daemon=True,
                          name=f"plugin-{getattr(fn, '__name__', 'tarefa')}").start()
 
-    if window:
-        server = threading.Thread(target=_serve, args=(app, args.host, args.port), daemon=True, name="servidor")
-        server.start()
-        if _run_window(url, app):
-            return  # a janela fechou: termina (o servidor corre numa thread que acaba com o programa)
-        print("Não foi possível abrir a janela própria; a abrir no browser.")
-        webbrowser.open(url)
-        print("Fecha esta janela (ou Ctrl+C) para terminar.")
-        server.join()
-        return
-    if not args.no_browser:
-        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    _serve(app, args.host, args.port)
+
+def _close_pyi_splash():
+    """Fecha o ecrã de arranque do PyInstaller (só existe no executável do Windows, enquanto se descompacta)."""
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except Exception:
+        pass
 
 
 def _serve(app, host, port):
@@ -131,28 +139,19 @@ def _webview_available():
         return False
 
 
-def _run_window(url, app=None, wait=30.0):
-    """Abre a aplicação numa janela nativa (pywebview: WebView2 no Windows, WebKit no macOS, GTK/Qt no Linux) e
-    espera que se feche. Devolve False se não for possível (o chamador abre então o browser)."""
-    import time
-    import urllib.request
+def _window_app(args):
+    """Executável: abre já a janela própria com o ecrã de arranque e prepara a aplicação por trás (_boot), numa
+    thread do pywebview. Devolve False se a janela não abrir (o chamador segue pelo browser)."""
     try:
         import webview
     except Exception:
         return False
-    deadline = time.monotonic() + wait
-    while time.monotonic() < deadline:  # espera que o servidor responda, para a janela não abrir em branco
-        try:
-            urllib.request.urlopen(url + "ping", timeout=1)
-            break
-        except Exception:
-            time.sleep(0.2)
+    from . import desktop
     settings = getattr(webview, "settings", None)
     if isinstance(settings, dict):
         settings["ALLOW_DOWNLOADS"] = True                 # exportações CSV, cópias de segurança
         settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True  # notícias, GitHub, sites dos emitentes
-    from . import desktop
-    color, dark = desktop.saved_color(app)  # a cor do tema da última vez: não abre branca no tema escuro
+    color, dark = desktop.saved_color()  # a cor do tema da última vez: não abre branca no tema escuro
     try:  # 85% do ecrã principal, centrada
         screens = webview.screens
     except Exception:
@@ -160,17 +159,65 @@ def _run_window(url, app=None, wait=30.0):
     width, height, x, y = desktop.window_geometry(screens)
     place = {"x": x, "y": y} if x is not None else {}
     try:
-        window = webview.create_window(desktop.TITLE, url, width=width, height=height,
-                                       min_size=(min(900, width), min(600, height)), text_select=True,
-                                       background_color=color, js_api=desktop.WindowApi(app), **place)
+        window = webview.create_window(desktop.TITLE, html=desktop.splash_html(color, dark), width=width,
+                                       height=height, min_size=(min(900, width), min(600, height)),
+                                       text_select=True, background_color=color, js_api=desktop.WindowApi(),
+                                       **place)
         events = getattr(window, "events", None)
         if events is not None and hasattr(events, "shown"):  # a barra de título com a cor do tema, logo ao abrir
             events.shown += lambda *a: desktop.title_bar(color, dark)
-        webview.start(private_mode=False)  # guarda o armazenamento local (tema, preferências) entre arranques
+        # guarda o armazenamento local (tema, preferências) entre arranques
+        webview.start(_boot, args=(window, args), private_mode=False)
         return True
     except Exception as exc:  # sem motor web no sistema (ex.: Linux sem GTK/Qt, Windows sem WebView2)
         print(f"Janela própria indisponível: {exc}")
         return False
+
+
+def _boot(window, args, wait=30.0):
+    """Prepara a aplicação com o ecrã de arranque à vista: base de dados, porta, servidor; depois abre-a na janela.
+    Os erros (base de dados mais recente, porta ocupada) aparecem no próprio ecrã de arranque."""
+    import json
+    import time
+    import urllib.request
+    from .migrations import MigrationError
+    _close_pyi_splash()
+
+    def status(text, error=False):
+        print(text)
+        try:
+            window.evaluate_js(f"window.pmSplash && pmSplash({json.dumps(text)}, {json.dumps(error)})")
+        except Exception:
+            pass
+    status("A abrir a base de dados…")
+    try:
+        app = create_app()
+    except MigrationError as exc:
+        status(str(exc), error=True)
+        return
+    port, running = _choose_port(args.host, args.port)
+    if port is None:
+        status(f"A porta {args.port} está ocupada por outro programa. Fecha esse programa ou arranca com "
+               f"--port {args.port + 1}.", error=True)
+        return
+    url = f"http://127.0.0.1:{port}/"
+    if running:  # a aplicação já está aberta (outra janela): mostra-a aqui
+        window.load_url(url)
+        return
+    args.port = port
+    print(f"Portfolio Investimentos a correr em {url} · dados em {data_dir()}")
+    print("Fecha a janela da aplicação para terminar.")
+    status("A arrancar o servidor…")
+    _start_background(app)
+    threading.Thread(target=_serve, args=(app, args.host, port), daemon=True, name="servidor").start()
+    deadline = time.monotonic() + wait
+    while time.monotonic() < deadline:  # espera que o servidor responda, para não abrir uma página em branco
+        try:
+            urllib.request.urlopen(url + "ping", timeout=1)
+            break
+        except Exception:
+            time.sleep(0.2)
+    window.load_url(url)
 
 
 DEFAULT_PORT = 5000

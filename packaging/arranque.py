@@ -7,6 +7,11 @@ import sys
 
 
 def _wait_before_closing():
+    try:  # o ecrã de arranque (Windows) não pode tapar a mensagem de erro
+        import pyi_splash
+        pyi_splash.close()
+    except Exception:
+        pass
     if getattr(sys, "frozen", False) and sys.stdin and sys.stdin.isatty():
         try:
             input("\nCarrega em Enter para fechar esta janela.")
