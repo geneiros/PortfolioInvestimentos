@@ -21,8 +21,10 @@
 {% from "macros.html" import broker_badge %}
 <body data-offline="{{ 1 if offline_enabled else 0 }}"{% if quick_quotes %} data-quick="1"{% endif %} data-generated="{{ generated_at }}">
 <div id="pmProgress" aria-hidden="true"></div>
-<script>(function () {  // barra de progresso ao abrir a página, só no computador (rato e ecrã largo)
+<script>(function () {  // barra de progresso ao abrir a página: só no computador (rato e ecrã largo) e com a aplicação
+  // acedida online (no próprio computador ou na rede de casa as páginas abrem logo); a mesma regra de pm.js
   if (!matchMedia("(hover: hover) and (pointer: fine) and (min-width: 768px)").matches) return;
+  if (/^(localhost|\[?::1\]?|127(\.\d+){3}|10(\.\d+){3}|192\.168(\.\d+){2}|172\.(1[6-9]|2\d|3[01])(\.\d+){2}|.+\.local)$/i.test(location.hostname)) return;
   const b = document.getElementById("pmProgress"); b.classList.add("pm-on"); b.style.width = "30%";
 })();</script>
 <div class="pm-shell">

@@ -20,11 +20,15 @@
 
   // ---------------------------------------------------------------- barra de progresso ao mudar de página
   // À maneira do Pace: começa logo no clique (na página antiga, enquanto o servidor responde) e acaba quando a página
-  // nova aparece. Só no computador (rato e ecrã largo); no telemóvel e nos tablets táteis não aparece. Os pedidos à
-  // API (ex.: mudar o período) não a usam.
+  // nova aparece. Só no computador (rato e ecrã largo); no telemóvel e nos tablets táteis não aparece. E só com a
+  // aplicação acedida online: no próprio computador (executável, python -m) ou na rede de casa as páginas abrem logo e
+  // a barra só piscava (a mesma regra do script no início de base.html). Os pedidos à API (ex.: mudar o período) não
+  // a usam.
   const DESKTOP = window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 768px)").matches;
+  const LOCAL = /^(localhost|\[?::1\]?|127(\.\d+){3}|10(\.\d+){3}|192\.168(\.\d+){2}|172\.(1[6-9]|2\d|3[01])(\.\d+){2}|.+\.local)$/i.test(location.hostname);
+  const SHOW = DESKTOP && !LOCAL;
   pm.progress = (() => {
-    const bar = DESKTOP ? document.getElementById("pmProgress") : null;
+    const bar = SHOW ? document.getElementById("pmProgress") : null;
     let count = 0, value = 0, timer = null, hide = null, guard = null;
     const set = (v) => { value = v; if (bar) bar.style.width = (v * 100).toFixed(1) + "%"; };
     const tick = () => set(value + (0.9 - value) * 0.08);  // cada vez mais devagar, sem passar dos 90%
@@ -62,7 +66,7 @@
     return { start, done, reset };
   })();
 
-  if (DESKTOP) {
+  if (SHOW) {
     // clique num link da aplicação, envio de um formulário normal ou saída da página
     document.addEventListener("click", (e) => {
       const a = e.target.closest && e.target.closest("a[href]");

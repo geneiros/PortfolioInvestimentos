@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **Barra de progresso só com a aplicação acedida online**  
+  A barra fina no topo ao mudar de página (no computador) passa a aparecer só quando a aplicação é acedida online (ex.: PythonAnywhere). No próprio computador (executável, python -m portfolio_investimentos) ou na rede de casa (localhost, 127.x, 10.x, 192.168.x, 172.16–31.x, *.local) as páginas abrem logo e a barra só piscava, por isso deixa de aparecer. No telemóvel continua sem barra.
 - **Versão 0.4.0**  
   Executáveis novos (Windows, macOS e Linux) com tudo o que mudou desde a 0.3.0: importação da DEGIRO e da Interactive Brokers; Raio-X dos ETF com gráficos por empresa, país e setor; «E se tivesse investido no índice?»; simulador de venda com FIFO, imposto estimado, perdas por realizar e «vender e recomprar»; relatório anual para imprimir ou guardar em PDF; preços das posições abertas de 5 em 5 minutos (opcional); cartão Carteira com variação diária, retorno total e o período escolhido; dinheiro e ações a caminho entre corretoras contam no valor total; paginação das Transações; tema Purple; barra do sistema da aplicação instalada com a cor do tema; desligar todas as fontes de notícias; extensões (plugins).
 - **Aviso de versão nova (executável)**  
