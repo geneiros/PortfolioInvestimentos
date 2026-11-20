@@ -3320,6 +3320,7 @@ def test_native_window_with_browser_fallback(monkeypatch):
     calls = {}
     fake = types.ModuleType("webview")
     fake.settings = {}
+    fake.screens = [types.SimpleNamespace(x=0, y=0, width=1920, height=1080)]
     def create_window(title, url, **kw):
         calls.update(title=title, url=url, **kw)
         return types.SimpleNamespace()  # sem «events» (versões antigas do pywebview): continua a funcionar
@@ -3331,6 +3332,9 @@ def test_native_window_with_browser_fallback(monkeypatch):
     assert calls["title"] == "Portfolio Investimentos" and calls["url"] == "http://127.0.0.1:1/"
     assert calls["started"] == {"private_mode": False}  # o tema e as preferências ficam entre arranques
     assert "maximized" not in calls and calls["background_color"] == "#ffffff"  # tamanho normal, não maximizada
+    # 85% do ecrã principal, centrada
+    assert (calls["width"], calls["height"], calls["x"], calls["y"]) == (1632, 918, 144, 81)
+    assert calls["min_size"] == (900, 600)
     assert callable(calls["js_api"].set_theme)
     assert fake.settings == {"ALLOW_DOWNLOADS": True, "OPEN_EXTERNAL_LINKS_IN_BROWSER": True}
 
@@ -3356,3 +3360,14 @@ def test_window_title_bar_follows_theme(app, monkeypatch):
     assert desktop.saved_color(None) == ("#ffffff", False)
     monkeypatch.setattr(desktop.sys, "platform", "linux")
     assert desktop.title_bar("#212529", True) is False  # Linux: o executável abre no browser, nada a pintar
+
+
+def test_window_geometry():
+    import types
+    from portfolio_investimentos.desktop import window_geometry
+    scr = lambda x, y, w, h: types.SimpleNamespace(x=x, y=y, width=w, height=h)  # noqa: E731
+    assert window_geometry([scr(0, 0, 1920, 1080)]) == (1632, 918, 144, 81)
+    assert window_geometry([scr(1920, 0, 2560, 1440)]) == (2176, 1224, 1920 + 192, 108)  # ecrã principal à direita
+    assert window_geometry([scr(0, 0, 1366, 768)]) == (1161, 653, 102, 57)  # portátil pequeno: cabe no ecrã
+    assert window_geometry([]) == (1400, 900, None, None)  # sem ecrã conhecido: o pywebview centra
+    assert window_geometry([scr(0, 0, 0, 0)]) == (1400, 900, None, None)

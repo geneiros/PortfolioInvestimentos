@@ -74,6 +74,25 @@ def _macos(color, dark):
     return True
 
 
+DEFAULT_SIZE = (1400, 900)
+
+
+def window_geometry(screens, fraction=0.85):
+    """(largura, altura, x, y) da janela: `fraction` do ecrã principal (o primeiro da lista), centrada nele.
+    Sem informação do ecrã, (1400, 900, None, None): o pywebview centra a janela sozinho."""
+    try:
+        screen = screens[0]
+        sw, sh = int(screen.width), int(screen.height)
+        if sw <= 0 or sh <= 0:
+            raise ValueError
+    except Exception:
+        return DEFAULT_SIZE[0], DEFAULT_SIZE[1], None, None
+    width, height = round(sw * fraction), round(sh * fraction)
+    x = int(getattr(screen, "x", 0) or 0) + (sw - width) // 2
+    y = int(getattr(screen, "y", 0) or 0) + (sh - height) // 2
+    return width, height, x, y
+
+
 class WindowApi:
     """Ponte JavaScript → Python (window.pywebview.api) da janela própria: a página avisa quando muda de tema."""
 

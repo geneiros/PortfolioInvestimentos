@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **Janela própria: 85% do ecrã, centrada**  
+  A janela própria do executável abre com 85% da largura e da altura do ecrã principal, centrada nele (sem informação do ecrã, 1400×900 centrada).
 - **Janela própria: deixa de abrir maximizada**  
   A janela própria volta a abrir no tamanho normal (1400×900), a pedido; a barra de título continua com a cor do tema.
 - **Janela própria: maximizada e com a cor do tema**  

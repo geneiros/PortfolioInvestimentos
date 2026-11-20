@@ -153,10 +153,16 @@ def _run_window(url, app=None, wait=30.0):
         settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True  # notícias, GitHub, sites dos emitentes
     from . import desktop
     color, dark = desktop.saved_color(app)  # a cor do tema da última vez: não abre branca no tema escuro
+    try:  # 85% do ecrã principal, centrada
+        screens = webview.screens
+    except Exception:
+        screens = []
+    width, height, x, y = desktop.window_geometry(screens)
+    place = {"x": x, "y": y} if x is not None else {}
     try:
-        window = webview.create_window(desktop.TITLE, url, width=1400, height=900, min_size=(900, 600),
-                                       text_select=True, background_color=color,
-                                       js_api=desktop.WindowApi(app))
+        window = webview.create_window(desktop.TITLE, url, width=width, height=height,
+                                       min_size=(min(900, width), min(600, height)), text_select=True,
+                                       background_color=color, js_api=desktop.WindowApi(app), **place)
         events = getattr(window, "events", None)
         if events is not None and hasattr(events, "shown"):  # a barra de título com a cor do tema, logo ao abrir
             events.shown += lambda *a: desktop.title_bar(color, dark)
