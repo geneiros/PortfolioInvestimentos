@@ -1,11 +1,12 @@
 """Arranque local: `python -m portfolio_investimentos` abre a aplicação no browser."""
 import argparse
 import os
+from pathlib import Path
 import sys
 import threading
 import webbrowser
 
-from . import create_app, data_dir
+from . import PORTABLE_NAME, create_app, data_dir, is_portable, portable_dir
 
 
 def main():
@@ -27,12 +28,25 @@ def main():
                         help="importar extratos (XTB .xlsx, Trading 212, Trade Republic ou CSV genérico) e sair")
     parser.add_argument("--corretora", choices=["generic", "trading212", "traderepublic", "xtb"],
                         help="corretora dos extratos de --importar (por omissão, detetada pelo conteúdo)")
+    parser.add_argument("--portatil", action="store_true",
+                        help=f"executável: guardar os dados na pasta {PORTABLE_NAME} ao lado do executável "
+                             "(automático numa pen USB no Windows)")
     parser.add_argument("--testar-janela", action="store_true",
                         help="dizer se a janela própria (pywebview) está disponível e sair")
     parser.add_argument("--testar-yahoo", action="store_true",
                         help="testar a ligação ao Yahoo Finance (cotações, câmbios e pesquisa) e sair")
     args = parser.parse_args()
 
+    if args.portatil:
+        if getattr(sys, "frozen", False):
+            folder = Path(sys.executable).resolve().parent / PORTABLE_NAME
+            try:
+                folder.mkdir(exist_ok=True)
+            except OSError as exc:
+                print(f"Não foi possível criar {folder}: {exc}")
+            portable_dir.cache_clear()
+        else:
+            print("--portatil só se aplica ao executável; a correr a partir do código, usa PORTFOLIO_DATA_DIR.")
     if args.testar_janela:
         ok = _webview_available()
         print("Janela própria (pywebview): " + ("disponível" if ok else "indisponível (abre no browser)"))
@@ -95,7 +109,7 @@ def main():
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print(f"Aberta na rede em {args.host}:{args.port}. Os outros dispositivos só entram depois de definires "
               "uma palavra-passe (Definições → Segurança ou variável PORTFOLIO_PASSWORD).")
-    print(f"Dados guardados em {data_dir()}")
+    print(f"Dados guardados em {data_dir()}" + (" (modo portátil)" if is_portable() else ""))
     print("Fecha esta janela (ou Ctrl+C) para terminar.")
     _close_pyi_splash()
     _start_background(app)
@@ -167,7 +181,8 @@ def _window_app(args):
         if events is not None and hasattr(events, "shown"):  # a barra de título com a cor do tema, logo ao abrir
             events.shown += lambda *a: desktop.title_bar(color, dark)
         # guarda o armazenamento local (tema, preferências) entre arranques
-        webview.start(_boot, args=(window, args), private_mode=False)
+        extra = {"storage_path": str(data_dir() / "janela")} if is_portable() else {}  # o tema também vai na pen
+        webview.start(_boot, args=(window, args), private_mode=False, **extra)
         return True
     except Exception as exc:  # sem motor web no sistema (ex.: Linux sem GTK/Qt, Windows sem WebView2)
         print(f"Janela própria indisponível: {exc}")
@@ -205,7 +220,8 @@ def _boot(window, args, wait=30.0):
         window.load_url(url)
         return
     args.port = port
-    print(f"Portfolio Investimentos a correr em {url} · dados em {data_dir()}")
+    print(f"Portfolio Investimentos a correr em {url} · dados em {data_dir()}"
+          + (" (modo portátil)" if is_portable() else ""))
     print("Fecha a janela da aplicação para terminar.")
     status("A arrancar o servidor…")
     _start_background(app)

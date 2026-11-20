@@ -3418,3 +3418,74 @@ def test_window_geometry():
     assert window_geometry([scr(0, 0, 1366, 768)]) == (1161, 653, 102, 57)  # portátil pequeno: cabe no ecrã
     assert window_geometry([]) == (1400, 900, None, None)  # sem ecrã conhecido: o pywebview centra
     assert window_geometry([scr(0, 0, 0, 0)]) == (1400, 900, None, None)
+
+
+@pytest.fixture
+def frozen_exe(monkeypatch, tmp_path):
+    """Simula o executável (PyInstaller) numa pasta temporária, sem PORTFOLIO_DATA_DIR."""
+    import sys
+    import portfolio_investimentos as pkg
+    exe_dir = tmp_path / "pen"
+    exe_dir.mkdir()
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(exe_dir / "PortfolioInvestimentos.exe"))
+    monkeypatch.delenv("PORTFOLIO_DATA_DIR", raising=False)
+    monkeypatch.setattr(pkg, "_is_removable", lambda path: False)
+    monkeypatch.setattr(pkg, "_adopt_legacy", lambda old, new: tmp_path / "normal")
+    pkg.portable_dir.cache_clear()
+    yield exe_dir
+    pkg.portable_dir.cache_clear()
+
+
+def test_portable_mode(frozen_exe, monkeypatch, tmp_path):
+    import portfolio_investimentos as pkg
+    folder = frozen_exe / pkg.PORTABLE_NAME
+    # disco fixo, sem a pasta ao lado: a pasta habitual
+    assert pkg.data_dir() == tmp_path / "normal" and not pkg.is_portable() and not folder.exists()
+    # pen USB (Windows): cria a pasta ao lado do executável
+    monkeypatch.setattr(pkg, "_is_removable", lambda path: True)
+    pkg.portable_dir.cache_clear()
+    assert pkg.data_dir() == folder and folder.is_dir() and pkg.is_portable()
+    # num disco fixo, a pasta que já existe continua a ser usada
+    monkeypatch.setattr(pkg, "_is_removable", lambda path: False)
+    pkg.portable_dir.cache_clear()
+    assert pkg.data_dir() == folder
+    # PORTFOLIO_DATA_DIR manda sempre
+    monkeypatch.setenv("PORTFOLIO_DATA_DIR", str(tmp_path / "custom"))
+    assert pkg.data_dir() == tmp_path / "custom" and not pkg.is_portable()
+
+
+def test_portable_mode_falls_back_when_read_only(frozen_exe, monkeypatch, tmp_path):
+    import portfolio_investimentos as pkg
+    (frozen_exe / pkg.PORTABLE_NAME).mkdir()
+    real_write = Path.write_text
+
+    def read_only(self, *a, **k):
+        if pkg.PORTABLE_NAME in str(self):
+            raise PermissionError("protegida contra escrita")
+        return real_write(self, *a, **k)
+    monkeypatch.setattr(Path, "write_text", read_only)
+    assert pkg.portable_dir() is None and pkg.data_dir() == tmp_path / "normal"
+
+
+def test_not_portable_outside_executable(monkeypatch, tmp_path):
+    import sys
+    import portfolio_investimentos as pkg
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "python"))
+    (tmp_path / pkg.PORTABLE_NAME).mkdir()
+    pkg.portable_dir.cache_clear()
+    assert pkg.portable_dir() is None
+    pkg.portable_dir.cache_clear()
+
+
+def test_portatil_option_creates_folder(frozen_exe, monkeypatch):
+    import sys
+    import portfolio_investimentos as pkg
+    from portfolio_investimentos import __main__ as cli
+    monkeypatch.setattr(sys, "argv", ["PortfolioInvestimentos.exe", "--portatil", "--testar-janela"])
+    monkeypatch.setattr(cli, "_webview_available", lambda: True)
+    with pytest.raises(SystemExit):
+        cli.main()
+    assert (frozen_exe / pkg.PORTABLE_NAME).is_dir()
+    assert pkg.data_dir() == frozen_exe / pkg.PORTABLE_NAME

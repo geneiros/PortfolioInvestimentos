@@ -187,7 +187,8 @@
     <div class="pm-card">
       <div class="pm-label mb-2">Os teus dados</div>
       <p class="small text-body-secondary mb-2">Tudo é guardado localmente, num único ficheiro SQLite:</p>
-      <p class="small"><code class="user-select-all">{{ db_path }}</code></p>
+      <p class="small"><code class="user-select-all">{{ db_path }}</code>
+        {% if portable %}<br><span class="badge text-bg-info"><i class="bi bi-usb-drive"></i> Modo portátil</span> <span class="text-body-secondary">os dados estão ao lado do executável (pen USB); não tires a pen com a aplicação aberta.</span>{% endif %}</p>
       <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-sm btn-outline-secondary" href="/api/backup"><i class="bi bi-download"></i> Cópia de segurança (.db)</a>
         <a class="btn btn-sm btn-outline-secondary" href="/api/export_transactions"><i class="bi bi-filetype-csv"></i> Exportar transações (CSV)</a>

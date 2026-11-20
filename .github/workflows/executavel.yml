@@ -66,6 +66,16 @@ jobs:
             echo "$u $code"
             test "$code" = 200
           done
+      - name: Experimentar o modo portátil (dados ao lado do executável)
+        shell: bash
+        run: |
+          set -e
+          mkdir -p "$RUNNER_TEMP/pen"
+          cp "dist/${{ matrix.ficheiro }}" "$RUNNER_TEMP/pen/"
+          cd "$RUNNER_TEMP/pen"
+          "./${{ matrix.ficheiro }}" --portatil --demo
+          ls -la PortfolioInvestimentos-dados
+          test -f PortfolioInvestimentos-dados/portfolio.db
       - name: Nome final
         shell: bash
         run: mv "dist/${{ matrix.ficheiro }}" "dist/${{ matrix.nome }}"

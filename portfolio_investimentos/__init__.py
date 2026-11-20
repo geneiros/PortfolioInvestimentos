@@ -1,7 +1,9 @@
 """Portfolio Investimentos: gestor de carteira de investimentos que corre localmente."""
+import functools
 import mimetypes
 import os
 import secrets
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -23,11 +25,54 @@ def _adopt_legacy(old, new):
     return new
 
 
+PORTABLE_NAME = "PortfolioInvestimentos-dados"
+
+
+def _is_removable(path):
+    """O caminho está num disco amovível (pen USB)? Só no Windows; nos outros sistemas, não se sabe (False)."""
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        drive = os.path.splitdrive(str(path))[0]
+        return bool(drive) and ctypes.windll.kernel32.GetDriveTypeW(drive + "\\") == 2  # DRIVE_REMOVABLE
+    except Exception:
+        return False
+
+
+@functools.lru_cache(maxsize=1)
+def portable_dir():
+    """Modo portátil (só no executável): a pasta PortfolioInvestimentos-dados ao lado do executável, se já existir
+    ou se o executável estiver numa pen USB (Windows). None se não se aplica ou se não for possível escrever lá
+    (pen protegida): nesse caso ficam na pasta habitual."""
+    if not getattr(sys, "frozen", False):
+        return None
+    folder = Path(sys.executable).resolve().parent / PORTABLE_NAME
+    if not folder.is_dir() and not _is_removable(folder):
+        return None
+    try:
+        folder.mkdir(exist_ok=True)
+        probe = folder / ".escrita"
+        probe.write_text("ok")
+        probe.unlink()
+        return folder
+    except OSError as exc:
+        print(f"Não é possível escrever em {folder} ({exc}); os dados ficam na pasta habitual.")
+        return None
+
+
+def is_portable():
+    return not os.environ.get("PORTFOLIO_DATA_DIR") and portable_dir() is not None
+
+
 def data_dir():
-    """Pasta dos dados do utilizador (pode ser alterada com PORTFOLIO_DATA_DIR)."""
+    """Pasta dos dados do utilizador: PORTFOLIO_DATA_DIR; senão, no executável numa pen (ou com a pasta
+    PortfolioInvestimentos-dados ao lado), essa pasta; senão a habitual do sistema."""
     custom = os.environ.get("PORTFOLIO_DATA_DIR")
     if custom:
         path = Path(custom)
+    elif portable_dir() is not None:
+        path = portable_dir()
     elif os.name == "nt":
         appdata = Path(os.environ.get("APPDATA", Path.home()))
         path = _adopt_legacy(appdata / "PortfolioManager", appdata / "PortfolioInvestimentos")

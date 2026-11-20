@@ -8,7 +8,7 @@ from .engine import costs, stress, valuation
 from .engine.portfolio import MERIT_BENCHMARK
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, Fundamental, ImportBatch,
                      Instrument, Price, Setting, Transaction, WatchItem, db)
-from . import auth
+from . import auth, is_portable
 from .services import context as ctx
 from .services import backups, data, insights, market, networth, portfolio_alerts, report, sale_sim, widgets
 from .services import news as news_svc
@@ -621,6 +621,7 @@ def definicoes():
     c.update(instruments=_asset_rows(c["p"], tickers),
              last_price=db.session.query(db.func.max(Price.date)).scalar(),
              db_path=current_app.config["DB_PATH"], backups=backups.list_backups(current_app.config["DB_PATH"]),
+             portable=is_portable(),
              yfinance=yfinance_available(),
              risk_free_pct=round(data.risk_free() * 100, 2), last_refresh=Setting.get("last_refresh"), refresh_report=Setting.get("refresh_report"),
              stale_days=ctx.stale_days(), widget_pages=widgets.customized(),
