@@ -3330,7 +3330,7 @@ def test_native_window_with_browser_fallback(monkeypatch):
     assert main._run_window("http://127.0.0.1:1/", wait=0) is True
     assert calls["title"] == "Portfolio Investimentos" and calls["url"] == "http://127.0.0.1:1/"
     assert calls["started"] == {"private_mode": False}  # o tema e as preferências ficam entre arranques
-    assert calls["maximized"] is True and calls["background_color"] == "#ffffff"
+    assert "maximized" not in calls and calls["background_color"] == "#ffffff"  # tamanho normal, não maximizada
     assert callable(calls["js_api"].set_theme)
     assert fake.settings == {"ALLOW_DOWNLOADS": True, "OPEN_EXTERNAL_LINKS_IN_BROWSER": True}
 

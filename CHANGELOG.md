@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-20
 
+- **Janela própria: deixa de abrir maximizada**  
+  A janela própria volta a abrir no tamanho normal (1400×900), a pedido; a barra de título continua com a cor do tema.
 - **Janela própria: maximizada e com a cor do tema**  
   A janela própria do executável abre maximizada e a barra de título fica da cor do fundo do tema escolhido (Claro #ffffff, Escuro #212529, Purple #272236; no Automático, a do modo do sistema), e acompanha as trocas de tema. Windows 11: cor da barra e do texto (DWM); Windows 10: só barra clara ou escura; macOS: barra transparente sobre o fundo da janela com a aparência clara ou escura. A cor fica guardada para a janela já abrir com ela no arranque seguinte.
 - **Versão 0.4.2**  

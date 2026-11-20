@@ -155,7 +155,7 @@ def _run_window(url, app=None, wait=30.0):
     color, dark = desktop.saved_color(app)  # a cor do tema da última vez: não abre branca no tema escuro
     try:
         window = webview.create_window(desktop.TITLE, url, width=1400, height=900, min_size=(900, 600),
-                                       text_select=True, maximized=True, background_color=color,
+                                       text_select=True, background_color=color,
                                        js_api=desktop.WindowApi(app))
         events = getattr(window, "events", None)
         if events is not None and hasattr(events, "shown"):  # a barra de título com a cor do tema, logo ao abrir
