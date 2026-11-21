@@ -94,6 +94,14 @@
 
   if (!board) return;
 
+  // o quadro ocupa a altura do ecrã; cada coluna faz scroll na vertical só na lista dela
+  const fit = () => {
+    const top = board.getBoundingClientRect().top + window.scrollY;
+    board.style.setProperty("--pm-board-h", `${Math.max(window.innerHeight - top - 16, 352)}px`);
+  };
+  fit();
+  window.addEventListener("resize", fit);
+
   // ---------------------------------------------------------------- os campos do cartão (gravam-se ao mudar)
   const cardOf = (el) => el.closest("[data-card]");
   const saved = (el) => { el.classList.add("pm-saved"); setTimeout(() => el.classList.remove("pm-saved"), 900); };
