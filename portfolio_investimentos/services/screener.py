@@ -229,10 +229,35 @@ def magic_rank(rows):
     return sorted(rows, key=lambda r: r["rank"])
 
 
+def _equity_query(q):
+    """A consulta em dicionário → EquityQuery do yfinance (operadores em minúsculas, como ele os valida)."""
+    from yfinance import EquityQuery
+    ops = [(_equity_query(o) if isinstance(o, dict) else o) for o in q["operands"]]
+    return EquityQuery(q["operator"].lower(), ops)
+
+
+def fetch_yahoo(body):
+    """O filtro do Yahoo: pelo yfinance quando está instalado (trata do cookie e do crumb como um browser, por isso o
+    Yahoo não o limita como faz com pedidos simples); senão pelo acesso direto."""
+    try:
+        import yfinance
+    except ImportError:
+        yfinance = None
+    if yfinance is not None:
+        from . import yahoo
+        try:
+            return yfinance.screen(_equity_query(body["query"]), size=min(int(body.get("size", 100)), 250),
+                                   sortField=body.get("sortField", "intradaymarketcap"),
+                                   sortAsc=body.get("sortType", "DESC") == "ASC") or {}
+        except Exception as exc:  # o yfinance lança vários tipos; mostra-se a mensagem como as do acesso direto
+            raise yahoo.YahooError(str(exc)[:200]) from exc
+    from . import yahoo
+    return yahoo.screener(body)
+
+
 def run(method, region="mundo", min_cap="1e9", values=None, fetch=None, size=100):
     """Corre o método e guarda o resultado. `fetch(body)` é o filtro do Yahoo (substituível nos testes)."""
-    from . import yahoo
-    fetch = fetch or yahoo.screener
+    fetch = fetch or fetch_yahoo
     crit, post = criteria(method, values)
     m = METHODS[method]
     body = {"query": build_query(crit, region, min_cap), "sortField": m.get("sort", "intradaymarketcap"),

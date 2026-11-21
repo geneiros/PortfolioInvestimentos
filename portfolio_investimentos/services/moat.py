@@ -170,7 +170,7 @@ def sources(industry, sector, m):
 def analyse(ticker, fetch_info=None, fetch_series=None, today=None):
     """Busca os dados ao Yahoo, calcula e guarda a análise («moat:<ticker>»)."""
     from . import yahoo
-    fetch_info = fetch_info or (lambda t: yahoo.Ticker(t).info)
+    fetch_info = fetch_info or info_of
     fetch_series = fetch_series or (lambda t: yahoo.fundamentals(t, years=6, types=TYPES))
     info = fetch_info(ticker) or {}
     raw = fetch_series(ticker) or {}
@@ -189,6 +189,19 @@ def analyse(ticker, fetch_info=None, fetch_series=None, today=None):
            "date": (today or date.today()).isoformat()}
     Setting.set(f"moat:{ticker}", json.dumps(out, ensure_ascii=False))
     return out
+
+
+def info_of(ticker):
+    """Os dados da ação no Yahoo: pelo yfinance quando está instalado (o Yahoo limita os pedidos simples com HTTP
+    429), senão pelo acesso direto. Qualquer falha chega como YahooError."""
+    from . import yahoo
+    from .market import _yahoo_client
+    try:
+        return _yahoo_client().Ticker(ticker).info or {}
+    except yahoo.YahooError:
+        raise
+    except Exception as exc:
+        raise yahoo.YahooError(str(exc)[:200]) from exc
 
 
 def _js(d):

@@ -1876,6 +1876,7 @@ def test_fundamentals_fall_back_to_financial_statements(app, monkeypatch):
             {"meta": {"type": ["trailingFreeCashFlow"]}, "trailingFreeCashFlow": [point("2026-08-31", 8.8e9)]},
             {"meta": {"type": ["annualFreeCashFlow"]}}]}}
     monkeypatch.setattr(yahoo, "_get_json", fake_get)
+    monkeypatch.setattr(yahoo, "_get_json_any", fake_get)  # sem ir à rede pelo yfinance
     series = yahoo.fundamentals("ADBE")
     assert series["trailingDilutedEPS"] == [("2026-08-31", 16.5, "USD")] and "annualFreeCashFlow" not in series
     assert len(series["annualDilutedEPS"]) == 3
@@ -3686,7 +3687,8 @@ def test_opportunities_page_and_actions(app, client, monkeypatch):
     assert 'id="radarTabs"' in html and "Oportunidades" in html
     html = client.get("/oportunidades").get_data(as_text=True)
     assert "Carrega em <b>Procurar</b>" in html.replace("carrega", "Carrega") and "Benjamin Graham" in html
-    monkeypatch.setattr(yahoo, "screener", lambda body: {"total": 2, "quotes": [
+    from portfolio_investimentos.services import screener
+    monkeypatch.setattr(screener, "fetch_yahoo", lambda body: {"total": 2, "quotes": [
         _q("KO", "The Coca-Cola Company", "NYQ"), _q("MSFT", "Microsoft Corporation")]})
     r = post(client, "run_screen", token, method="buffett", region="eua", min_cap="1e10", c0="16", c0b="90")
     assert r.status_code == 200 and "2 ações" in r.get_json()["message"]
@@ -3696,7 +3698,7 @@ def test_opportunities_page_and_actions(app, client, monkeypatch):
 
     def boom(body):
         raise yahoo.YahooError("HTTP 429")
-    monkeypatch.setattr(yahoo, "screener", boom)
+    monkeypatch.setattr(screener, "fetch_yahoo", boom)
     assert post(client, "run_screen", token, method="buffett").status_code == 400
     # 2.º passo: o moat e o checklist
     monkeypatch.setattr(moat, "analyse", lambda t: moat.Setting.set(f"moat:{t}", json.dumps(
@@ -3710,3 +3712,12 @@ def test_opportunities_page_and_actions(app, client, monkeypatch):
     assert "Largo · 80" in html and "Microsoft Corporation" not in html  # só KO passa o 2.º passo
     html = client.get("/oportunidades?metodo=buffett").get_data(as_text=True)
     assert "cloud" in html and "sugerido" in html
+
+
+def test_screener_query_for_yfinance():
+    pytest.importorskip("yfinance")
+    from portfolio_investimentos.services import screener
+    crit, _ = screener.criteria("buffett")
+    q = screener._equity_query(screener.build_query(crit, "europa", "1e9"))
+    d = q.to_dict()
+    assert d["operator"].lower() == "and" and len(d["operands"]) == 2 + len(crit)

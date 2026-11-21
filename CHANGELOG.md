@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **Oportunidades: sem o erro «HTTP 429» do Yahoo**  
+  O filtro de ações, os dados de cada empresa e as demonstrações financeiras passam a ser pedidos pelo yfinance quando está instalado (trata do cookie e do crumb como um browser, e o Yahoo não o limita como faz com os pedidos simples); sem ele, como antes, pelo acesso direto.
 - **Radar e alertas: Oportunidades**  
   Novo separador com as ações de todo o mundo que cumprem os critérios dos grandes investidores (Graham, Buffett e Munger, Lynch, Greenblatt, O'Neil, Templeton e o resumo dos métodos), com os limites editáveis, pelo filtro de ações do Yahoo Finance; uma linha por empresa na bolsa principal. 2.º passo: o moat de cada empresa, com a prova nos números (pontuação de 0 a 100), a fonte provável sugerida pela indústria e o checklist dos 5 pilares e dos 3 testes de Buffett; filtro «Só com moat» e «Juntar ao Radar».
 - **Planeamento novo**  

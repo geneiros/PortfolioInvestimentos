@@ -95,6 +95,19 @@ def _get_json(url, params, attempts=4):
     raise YahooError(_describe(last))
 
 
+def _get_json_any(url, params):
+    """Pela ligação do yfinance quando está instalado (cookie e crumb como um browser: o Yahoo limita menos os
+    pedidos); senão, ou se ela falhar, pelo acesso direto."""
+    try:
+        from yfinance.data import YfData
+    except ImportError:
+        return _get_json(url, params)
+    try:
+        return YfData().get_raw_json(url, params=params)
+    except Exception:
+        return _get_json(url, params)
+
+
 class History:
     """Histórico diário com a interface usada por `market._closes`: `empty` e `iterrows()`."""
 
@@ -212,9 +225,9 @@ def fundamentals(symbol, years=6, types=None):
     Devolve {tipo: [(data, valor, moeda), ...]} por ordem de data, só com os tipos que vierem.
     """
     end = int(_time.time())
-    data = _get_json(TIMESERIES_URL.format(symbol=urllib.parse.quote(symbol)),
-                     {"type": ",".join(types or TIMESERIES_TYPES), "period1": end - years * 366 * 86400, "period2": end,
-                      "merge": "false", "padTimeSeries": "true", "lang": "en-US", "region": "US"})
+    data = _get_json_any(TIMESERIES_URL.format(symbol=urllib.parse.quote(symbol)),
+                         {"type": ",".join(types or TIMESERIES_TYPES), "period1": end - years * 366 * 86400,
+                          "period2": end, "merge": "false", "padTimeSeries": "true", "lang": "en-US", "region": "US"})
     out = {}
     for item in ((data.get("timeseries") or {}).get("result") or []):
         kind = ((item.get("meta") or {}).get("type") or [None])[0]
