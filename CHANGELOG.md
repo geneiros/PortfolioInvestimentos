@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-21
+
+- **Versão 0.4.7**  
+  Primeira versão com a app Android (PortfolioInvestimentos-android.apk), ao lado dos executáveis de Windows, macOS e Linux. Quem tem uma versão anterior vê a faixa «Há uma versão nova».
+
 ## 2026-11-20
 
 - **App Android**  
