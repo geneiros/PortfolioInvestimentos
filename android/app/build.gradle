@@ -18,7 +18,8 @@ android {
         versionCode parts[0] * 10000 + parts[1] * 100 + parts[2]
         versionName pkgVersion
         ndk {
-            abiFilters "arm64-v8a", "x86_64"  // telemóveis (arm64) e o emulador do teste (x86_64)
+            // telemóveis de 64 bits (arm64-v8a) e de 32 bits (armeabi-v7a, ex.: Galaxy A13) e o emulador do teste
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
         }
     }
 
@@ -48,7 +49,7 @@ android {
 
 chaquopy {
     defaultConfig {
-        version "3.12"
+        version "3.11"  // o Chaquopy só tem o Python 3.12+ para 64 bits; o 3.11 também para armeabi-v7a
         pip {
             // sem dependências automáticas: só pacotes em Python puro (as extensões em C ficam de fora)
             options "--no-deps"

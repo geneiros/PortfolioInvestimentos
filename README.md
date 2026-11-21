@@ -97,7 +97,8 @@ O script abre a aplicação no browser do telemóvel. No Chrome, **menu ⋮ → 
 ### App Android
 
 Na release há também a **`PortfolioInvestimentos-android.apk`**. É a aplicação completa a correr no telemóvel, com
-os dados no telemóvel e sem Termux nem browser.
+os dados no telemóvel e sem Termux nem browser. Precisa do Android 7 ou mais recente; funciona em telemóveis de
+64 e de 32 bits (ex.: Galaxy A13).
 
 - **Instalar:** descarrega a APK no telemóvel e abre-a. Na primeira vez, o Android pede para permitir instalar apps
   desta origem (o browser ou o gestor de ficheiros). O Play Protect pode avisar que a app é desconhecida: escolhe

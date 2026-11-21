@@ -35,7 +35,7 @@ Sem estes segredos:
 
 ## Gerar à mão
 
-Precisa do Android SDK, do Java 17, do Gradle 8.7 e do Python 3.12:
+Precisa do Android SDK, do Java 17, do Gradle 8.7 e do Python 3.11:
 
 ```bash
 mkdir -p android/app/src/main/python
