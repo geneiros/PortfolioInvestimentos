@@ -652,114 +652,18 @@ def _asset_rows(p, tickers):
     return rows
 
 
-def fire_settings(p):
-    """Parâmetros do plano FIRE: os guardados em Planeamento ou, por omissão, valores a partir da carteira."""
-    def get(key, default):
-        try:
-            return float(Setting.get(key))
-        except (TypeError, ValueError):
-            return default
-    s = p.series
-    monthly = 0.0
-    if s.dates:
-        k = next((i for i, d in enumerate(s.dates) if d >= s.dates[-1] - timedelta(days=365)), 0)
-        span = max((s.dates[-1] - s.dates[k]).days / 30.44, 1)
-        monthly = max((s.net_deposits[-1] - s.net_deposits[k]) / span, 0.0)
-    gains = sum(pos.unrealized_eur for pos in p.open_positions)
-    gain_share = min(max(gains / p.holdings_value, 0.0), 1.0) if p.holdings_value > 0 else 0.5
-    return {"expenses": get("fire_expenses", 12000.0), "swr": get("fire_swr", 4.0),
-            "tax": get("fire_tax", round(28 * max(gain_share, 0.5), 1)), "monthly": get("fire_monthly", round(monthly)),
-            "custom": Setting.get("fire_expenses") is not None,
-            "age": get("fire_age", None), "until": get("fire_until", 90.0), "pension": get("fire_pension", 0.0),
-            "pension_age": get("fire_pension_age", 67.0), "stop_age": get("fire_stop_age", None)}
-
-
 @bp.route("/planeamento")
 def planeamento():
-    from .engine import fire
+    from .services import planning
     c = ctx.build("planeamento", "Planeamento")
     p = c["p"]
     if not p.transactions:
         return render_template("pages/planeamento.html", **c)
-    cfg = fire_settings(p)
-    age = cfg["age"] or None
-    pension = cfg["pension"] * 14 if age and cfg["pension"] else 0.0  # pensão mensal líquida × 14 meses
-    pension_age = cfg["pension_age"] if pension else None
-    stop_age = cfg["stop_age"] if age and cfg["stop_age"] else None
-    others = networth.fire_extra()  # outros ativos (Património) marcados para o FIRE
-    value = p.total_value + others
-    plan = fire.plan(value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100, cfg["monthly"], age=age,
-                     pension=pension, pension_age=pension_age, stop_age=stop_age,
-                     horizon_age=cfg["until"] if age else None)
-    with_pension = None
-    if age and pension:
-        with_pension = fire.pension_plan(value, cfg["expenses"], cfg["swr"] / 100, cfg["tax"] / 100,
-                                         cfg["monthly"], age, pension, pension_age, cfg["until"], stop_age=stop_age)
-    life = None
-    if age:
-        life = fire.lifetime_plan(value, cfg["expenses"], cfg["tax"] / 100, cfg["monthly"], age,
-                                  cfg["until"], pension, pension_age, stop_age=stop_age)
-    s = p.series
-    history = [(d, v) for d, v in zip(s.dates, s.value)]
-    shown = life or plan  # com a idade, o gráfico mostra a vida inteira até à idade indicada
-    if age:
-        end_year = date.today().year + int(cfg["until"] - age)
-    else:
-        last = plan["date"] or plan["latest"] or plan["earliest"]
-        end_year = min((last.year if last else date.today().year) + 30, date.today().year + fire.MAX_YEARS)
-    year = lambda d: round(d.year + (d.month - 1) / 12 + (d.day - 1) / 365, 3)  # noqa: E731
-    chart = {
-        "history": [{"x": year(d), "y": round(v)} for i, (d, v) in enumerate(history)
-                    if i % 5 == 0 or i == len(history) - 1],
-        "scenarios": [{"name": sc["name"], "rate": sc["rate"], "fire": year(sc["date"]) if sc["date"] else None,
-                       "data": [{"x": year(d), "y": round(v)} for d, v in sc["points"] if d.year <= end_year]}
-                      for sc in shown["scenarios"]],
-        "target": round(plan["number"]), "start": year(history[0][0]) if history else date.today().year,
-        "end": end_year,
-    }
-    # números FIRE como linhas horizontais (o valor na data FIRE do cenário base)
-    targets = [{"label": "Para sempre", "value": round(plan["number"]), "color": "#f59e0b"}]
-    if with_pension and with_pension["number"] is not None:
-        targets.append({"label": f"Para sempre, com a pensão aos {int(pension_age)}",
-                        "value": round(with_pension["number"]), "color": "#a855f7"})
-    if life and life["number"] is not None:
-        label = f"Até aos {int(cfg['until'])} anos" + (f", com a pensão aos {int(pension_age)}" if pension else "")
-        targets.append({"label": label, "value": round(life["number"]), "color": "#ec4899"})
-    chart["targets"] = targets
-    # quando cada cenário chega a cada número FIRE (a investir até lá); no gráfico, um ponto por número e cenário
-    calcs = [("Para sempre", "#f59e0b", plan)]
-    if with_pension:
-        calcs.append((f"Para sempre, com a pensão aos {int(pension_age)}", "#a855f7", with_pension))
-    if life:
-        calcs.append((f"Até aos {int(cfg['until'])} anos" + (f", com a pensão aos {int(pension_age)}" if pension else ""),
-                      "#ec4899", life))
-    reach = [{"label": label, "color": color,
-              "cells": [{"name": sc["name"], "date": sc["date"], "age": sc["age"], "number": sc["number"]}
-                        for sc in calc["scenarios"]]} for label, color, calc in calcs]
-    chart["markers"] = [{"label": r["label"], "color": r["color"],
-                         "data": [{"x": year(cell["date"]), "y": round(cell["number"]), "s": cell["name"],
-                                   "age": None if cell["age"] is None else int(cell["age"])}
-                                  for cell in r["cells"] if cell["date"] and cell["date"].year <= end_year]}
-                        for r in reach]
-    # depois da data FIRE desenhada, a curva "se continuasses a investir" até ao último número que o cenário alcança
-    start = date.today().replace(day=1)
-    for sc, out in zip(shown["scenarios"], chart["scenarios"]):
-        dates = [cell["date"] for r in reach for cell in r["cells"]
-                 if cell["name"] == sc["name"] and cell["date"] and cell["date"].year <= end_year]
-        last = max(dates, default=None)
-        if not last or not sc["date"] or last <= sc["date"]:  # sem data FIRE, a curva já só acumula
-            continue
-        months = (last.year - start.year) * 12 + last.month - start.month
-        pts, _, _ = fire.simulate(value, cfg["monthly"], sc["rate"], start, months, lambda m, v: False,
-                                  cfg["expenses"], cfg["tax"] / 100, age, pension, pension_age, stop_age)
-        first = year(sc["date"])
-        keep = [(d, v) for i, (d, v) in enumerate(pts)
-                if year(d) >= first or (i + 1 < len(pts) and year(pts[i + 1][0]) > first)]
-        extra = [{"x": m["x"], "y": m["y"]} for mk in chart["markers"] for m in mk["data"]
-                 if m["s"] == sc["name"] and m["x"] > first]
-        out["more"] = sorted([{"x": year(d), "y": round(v)} for d, v in keep] + extra, key=lambda q: q["x"])
-    c.update(fire_extra=others, cfg=cfg, plan=plan, life=life, with_pension=with_pension, chart=ctx.js_json(chart), reach=reach,
-             track=fire.monthly_track(s.dates, s.value, plan["number"]))
+    plan = planning.build(p, request.args)
+    if "chart" in plan:
+        plan["chart"] = ctx.js_json(plan["chart"])
+    c.update(plan=plan, cfg=plan["cfg"], q=lambda **kw: planning.query(plan["cfg"], **kw), duration=planning.duration,
+             levels=planning.LEVELS)
     return render_template("pages/planeamento.html", **c)
 
 
