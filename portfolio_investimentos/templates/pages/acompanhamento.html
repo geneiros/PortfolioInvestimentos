@@ -97,7 +97,7 @@
             {% elif rule.kind == 'moat' %}Moat {{ rule.state or '' }}
             {% else %}{{ chip(rule, c.currency) }}{% endif %}
           </span>{% endfor %}
-          {% if v.moat %}<span class="badge {{ 'text-bg-success' if v.moat.verdict == 'Largo' else 'text-bg-warning' if v.moat.verdict == 'Estreito' else 'text-bg-secondary' }}">Moat {{ v.moat.verdict }}{% if v.moat.score is not none %} · {{ v.moat.score }}{% endif %}</span>{% endif %}
+          {% if v.moat %}<span class="badge {{ 'text-bg-success' if v.moat.verdict == 'Largo' else 'text-bg-warning' if v.moat.verdict == 'Estreito' else 'text-bg-secondary' }}">{{ 'Sem moat evidente' if v.moat.verdict == 'Sem moat evidente' else 'Moat ' ~ v.moat.verdict|lower }}{% if v.moat.score is not none %} · {{ v.moat.score }}{% endif %}</span>{% endif %}
         </div>
         <div class="d-flex align-items-center gap-2 mt-2 small">
           <a href="#" data-track-edit="{{ w.name }}" data-ticker="{{ w.instrument }}" data-currency="{{ c.currency }}" data-note="{{ w.notes or '' }}" data-method="{{ w.method or '' }}" data-rules='{{ rules_json(c.rules)|tojson }}'><i class="bi bi-sliders"></i> Parâmetros e alertas</a>

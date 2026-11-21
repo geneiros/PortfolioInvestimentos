@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **README: capturas e funcionalidades atualizadas**  
+  Todas as capturas refeitas, claro e escuro, com os dados de demonstração e uma triagem real. As de Prospeção passam a mostrar o quadro de uma lista, a triagem com a ficha aberta e a ficha com «O valor da ação». A descrição passa a incluir as lentes e o cabeçalho fixos, os valores por ação na moeda da cotação, o scroll do quadro e a pausa dos alertas da carteira no sino da Carteira. O aviso de um alerta mantém a moeda em maiúsculas («preço acima de 164 800,00 KRW»).
 - **Prospeção: as listas em quadro e o valor da ação na ficha**  
   Cada lista passa a um quadro: os estados são colunas (Por abrir, A ler relatórios, Em tese, Parqueada e Descartada, que se criam, mudam de nome, de ordem e se apagam) e cada ação é um cartão que se arrasta entre eles. No cartão:
   - os dados (país, setor, P/L, dividendo, capitalização), as lentes onde entra e a ficha completa ao lado;

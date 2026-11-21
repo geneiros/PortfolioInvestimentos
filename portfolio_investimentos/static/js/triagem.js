@@ -132,7 +132,7 @@
     document.getElementById("triageBody").innerHTML = rows.slice(0, shown).map(rowHtml).join("")
       || `<tr><td colspan="11" class="text-center text-secondary py-4">Nenhuma ação ${f.only.checked ? "entra nesta lente com estes filtros. Desliga «Só as que entram» para veres as que ficam perto." : "com estes filtros."}</td></tr>`;
     const more = document.getElementById("triageMore");
-    more.innerHTML = rows.length > shown ? `A mostrar ${shown} de ${rows.length} · <a href="#" data-more>mostrar mais</a>` : (rows.length ? `${rows.length} ações` : "");
+    more.innerHTML = rows.length > shown ? `A mostrar ${shown} de ${rows.length} · <a href="#" data-more>mostrar mais</a>` : (rows.length ? `${rows.length} ${rows.length === 1 ? "ação" : "ações"}` : "");
   };
   document.getElementById("triageMore").addEventListener("click", (e) => {
     if (e.target.closest("[data-more]")) { e.preventDefault(); shown += 300; render(); }

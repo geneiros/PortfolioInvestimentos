@@ -160,6 +160,14 @@ def describe(rule, currency=""):
     return f"{label} {rule.threshold:g}{unit}".replace(".", ",")
 
 
+def _first_lower(text):
+    """«Preço acima de 10 EUR» → «preço acima de 10 EUR»: só a primeira letra (as siglas e a moeda ficam como estão;
+    «P/L» e «P/VP» também)."""
+    if len(text) > 1 and (text[1] == "/" or text[1].isupper()):
+        return text
+    return text[:1].lower() + text[1:]
+
+
 def check(now=None):
     """Verifica todos os parâmetros e devolve os alertas que dispararam agora."""
     now = now or datetime.now()
@@ -184,7 +192,7 @@ def check(now=None):
                 msg = f"{w.instrument}: o moat passou de {r.state} para {state}"
             else:
                 changed = met and not r.met
-                msg = f"{w.instrument}: {describe(r, currencies.get(w.instrument, '')).lower()}"
+                msg = f"{w.instrument}: {_first_lower(describe(r, currencies.get(w.instrument, '')))}"
             if changed and r.alert:
                 r.triggered_on, r.message = now, msg
                 fired.append(r)
