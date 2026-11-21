@@ -1,13 +1,13 @@
 name: Executável único (PyInstaller)
 
 # Gera o executável para Windows, macOS e Linux (e a APK para Android), para quem não quer instalar o Python, e confirma que arranca
-# e serve as páginas. Numa etiqueta v* (ex.: v0.4.7), junta os executáveis a uma release do GitHub. Corrido à mão
+# e serve as páginas. Numa etiqueta v* (ex.: v0.4.8), junta os executáveis a uma release do GitHub. Corrido à mão
 # com «etiqueta» preenchida, cria essa etiqueta (no commit escolhido) e a release, sem ser preciso enviar a etiqueta.
 on:
   workflow_dispatch:
     inputs:
       etiqueta:
-        description: "Versão a publicar como release (ex.: v0.4.7); vazio = só gerar e experimentar"
+        description: "Versão a publicar como release (ex.: v0.4.8); vazio = só gerar e experimentar"
         required: false
         default: ""
   push:

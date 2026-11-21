@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **Versão 0.4.8**  
+  A app Android passa a instalar também em telemóveis de 32 bits (ex.: Galaxy A13). Quem tem uma versão anterior vê a faixa «Há uma versão nova».
 - **App Android: também para telemóveis de 32 bits**  
   A APK passa a incluir o Python para armeabi-v7a, além de arm64-v8a e x86_64, e passa a usar o Python 3.11, porque o Chaquopy não tem o 3.12 para 32 bits. Assim instala também em telemóveis com o Android de 32 bits, como o Galaxy A13, onde aparecia «a app não é compatível com o seu telemóvel».
 - **Versão 0.4.7**  
