@@ -353,7 +353,7 @@ span.pm-logo { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; f
 /* ---------------------------------------------------------------- Prospeção → Ações (triagem) */
 .pm-radar-tabs { overflow-x: auto; overflow-y: hidden; }
 .pm-triage { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr) 25rem; gap: 1rem; align-items: start; }
-.pm-triage-lenses { position: sticky; top: 4rem; max-height: calc(100vh - 5rem); overflow-y: auto; }
+.pm-triage-lenses { position: sticky; top: 4rem; }
 .pm-triage-lenses .list-group-item { background: transparent; border-radius: .5rem; border: 0; padding: .45rem .6rem; margin-bottom: .1rem; color: var(--pm-text); }
 .pm-triage-lenses .list-group-item.active { background: rgba(var(--bs-primary-rgb), .14); color: var(--pm-text); }
 .pm-triage-lenses .list-group-item.active .fw-semibold { color: var(--pm-accent); }
@@ -363,9 +363,10 @@ span.pm-logo { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; f
 .pm-triage-table tbody tr { cursor: pointer; }
 .pm-triage-table td, .pm-triage-table th { white-space: nowrap; padding: .45rem .4rem; font-size: .875rem; }
 .pm-triage-table th { font-size: .72rem; }
-/* a lista de ações faz scroll dentro do cartão, com o cabeçalho sempre visível no topo */
-.pm-triage-scroll { overflow: auto; max-height: calc(100vh - 5rem); border-radius: inherit; }  /* a altura certa vem do triagem.js */
-.pm-triage-table thead th { position: sticky; top: 0; z-index: 2; box-shadow: inset 0 -1px 0 var(--bs-border-color); }
+/* o cabeçalho da lista de ações fica no topo (por baixo da barra de cima) ao fazer scroll na página */
+.pm-triage-table thead th { position: sticky; top: 3.4375rem; z-index: 2; box-shadow: inset 0 -1px 0 var(--bs-border-color); }  /* 3,4375rem = 55px, a altura da barra de cima */
+.pm-triage-main .pm-card { overflow: clip; }  /* «hidden» faria do cartão um contentor de scroll e o sticky não funcionaria */
+@media (max-width: 991.98px) { .pm-triage-wrap { overflow-x: auto; } }  /* ecrãs estreitos: a tabela passa de lado */
 .pm-triage-name { max-width: 11rem; }
 .pm-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .12rem; border: 1.5px solid var(--pm-up); vertical-align: middle; }
 .pm-dot-e { background: var(--pm-up); }
@@ -381,8 +382,8 @@ span.pm-logo { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; f
 .pm-ic-pm-near { color: var(--bs-warning); }
 .pm-ic-pm-out { color: var(--pm-down); }
 .pm-ic-pm-none { color: var(--pm-muted); }
-.pm-triage-panel { position: sticky; top: 4rem; max-height: calc(100vh - 5rem); }
-.pm-triage-panel > .pm-card { overflow-y: auto; max-height: calc(100vh - 5rem); }
+.pm-triage-panel { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); }
+.pm-triage-panel > .pm-card { overflow-y: auto; max-height: calc(100vh - 2rem); }
 .pm-tag-up { background: rgba(var(--bs-success-rgb), .14); color: var(--pm-up); }
 .pm-tag-warn { background: rgba(var(--bs-warning-rgb), .18); color: var(--bs-warning-text-emphasis); }
 .pm-tag-down { background: rgba(var(--bs-danger-rgb), .14); color: var(--pm-down); }

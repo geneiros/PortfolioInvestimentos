@@ -111,25 +111,7 @@
         data-save-ticker="${esc(r.t)}" data-save-name="${esc(r.n)}" data-save-currency="${esc(r.cur || "USD")}" data-save-lens="${lens === "varias" ? "" : lens}">
         <i class="bi ${saved ? "bi-bookmark-fill" : "bi-bookmark"}"></i></button></td></tr>`;
   };
-  const scroller = document.getElementById("triageScroll");
-  // a lista ocupa o resto do ecrã: a página não faz scroll, só a lista (com o cabeçalho sempre no topo)
-  const fit = () => {
-    if (!scroller || window.innerWidth < 768) { if (scroller) scroller.style.maxHeight = ""; return; }
-    const top = scroller.getBoundingClientRect().top + window.scrollY;
-    const more = document.getElementById("triageMore");
-    const below = (more ? more.offsetHeight : 0) + 26;
-    scroller.style.maxHeight = `${Math.max(window.innerHeight - top - below, 320)}px`;
-    // as lentes e a ficha também cabem no ecrã (cada uma com o seu scroll)
-    const lensesEl = document.getElementById("triageLenses");
-    const card = document.getElementById("triagePanelBody");
-    [[lensesEl, true], [card, window.innerWidth >= 1400]].forEach(([el, on]) => {
-      if (!el) return;
-      el.style.maxHeight = on ? `${Math.max(window.innerHeight - (el.getBoundingClientRect().top + window.scrollY) - 26, 320)}px` : "";
-    });
-  };
-  window.addEventListener("resize", fit);
-  const render = (keep) => {
-    if (!keep && scroller) scroller.scrollTop = 0;  // lente ou filtros novos: a lista volta ao início
+  const render = () => {
     const rows0 = base();
     counts(rows0);
     let rows = rows0.filter((r) => !f.only.checked || st(r, lens) === "e");
@@ -153,7 +135,7 @@
     more.innerHTML = rows.length > shown ? `A mostrar ${shown} de ${rows.length} · <a href="#" data-more>mostrar mais</a>` : (rows.length ? `${rows.length} ações` : "");
   };
   document.getElementById("triageMore").addEventListener("click", (e) => {
-    if (e.target.closest("[data-more]")) { e.preventDefault(); shown += 300; render(true); }
+    if (e.target.closest("[data-more]")) { e.preventDefault(); shown += 300; render(); }
   });
   [f.search, f.region, f.sector, f.sort, f.only].forEach((el) => el.addEventListener(el === f.search ? "input" : "change", () => { shown = 150; render(); }));
   document.querySelectorAll("[data-lens]").forEach((b) => b.addEventListener("click", () => {
@@ -162,7 +144,7 @@
     shown = 150;
     render();
   }));
-  document.addEventListener("pm:saved", () => render(true));
+  document.addEventListener("pm:saved", render);
 
   // ---------------------------------------------------------------- a ficha
   const panel = document.getElementById("triagePanel");
@@ -218,5 +200,4 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") panel.classList.remove("pm-open"); });
 
   render();
-  fit();
 })();
