@@ -231,7 +231,7 @@ LENSES = {
         "name": "Templeton", "sub": "Pechincha fora dos EUA",
         "text": "Pechincha fora do mercado americano.", "no_us": True,
         "query": [("peratio.lasttwelvemonths", "btwn", (2, 14))],
-        "criteria": [_custom("Fora dos EUA", _not_us), _c("Preço / lucro", "pe", "<=", 12), _profit,
+        "criteria": [_not_us, _c("Preço / lucro", "pe", "<=", 12), _profit,
                      _c("Dívida / capital", "de", "<=", 0.8, "{:.2f}"), _size(1000)],
     },
     "oneil": {
