@@ -4007,3 +4007,19 @@ def test_migration_watch_board(tmp_path, monkeypatch):
         sts = tracking.states(w.list_id)
         assert sts[0].title == "Por abrir" and WatchItem.query.one().state_id == sts[0].id
         assert WatchState.query.count() == 5
+
+
+def test_triage_peers_same_industry():
+    from portfolio_investimentos.services import triage
+    rows = [{"ticker": f"P{i}", "exchange_code": "NYQ"} for i in range(8)]
+    data = {f"P{i}": {"info": {"industry": "Oil & Gas Integrated", "sector": "Energy", "regularMarketPrice": 10.0,
+                              "trailingPE": 6.0 + i, "returnOnEquity": 0.05 + i * 0.02, "currency": "USD"}}
+            for i in range(8)}
+    me = {"pe": 8.0, "roe": 0.30}
+    out = triage.peers("SHEL", me, {"industry": "Oil & Gas Integrated"}, data, rows)
+    assert out["scope"] == "industry" and out["n"] == 8
+    pe = next(r for r in out["rows"] if r["key"] == "pe")
+    assert pe["median"] == pytest.approx(9.5) and 0 < pe["me"] < pe["mid"] and pe["p25"] < pe["mid"] < pe["p75"]
+    assert next(r for r in out["rows"] if r["key"] == "roe")["me"] == 100  # acima do máximo: no fim da barra
+    assert [r["key"] for r in out["rows"]] == ["pe", "roe"]  # sem dados suficientes, a medida não aparece
+    assert triage.peers("X", me, {"industry": "Outra", "sector": "Outro"}, data, rows) is None  # poucos pares

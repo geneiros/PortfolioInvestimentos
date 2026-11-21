@@ -82,6 +82,33 @@
   </div>
   {% endif %}
 
+  {# ---------------------------------------------------------------- ao lado dos pares #}
+  {% set pr = d.peers %}
+  {% if pr %}
+  <div class="pm-peers mb-3" id="fichaPeers">
+    <div class="d-flex flex-wrap align-items-baseline gap-2 mb-1">
+      <span class="pm-label">Ao lado dos pares {{ help("Cada barra vai das empresas mais baixas às mais altas (sem os 5% de cada ponta). A parte mais clara é onde fica a metade do meio (25% a 75%), o traço é a mediana e o ponto é esta ação. Os pares são as ações do universo da triagem da mesma indústria (ou do mesmo setor, quando há poucas).") }}</span>
+      <span class="small text-secondary ms-auto">{{ pr.n }} empresas {{ 'da mesma indústria' if pr.scope == 'industry' else 'do mesmo setor' }}{% if pr.label %} ({{ pr.label }}){% endif %}, com mais de 2 mil M$</span>
+    </div>
+    {% for r in pr.rows %}
+    <div class="pm-peer-row" data-peer="{{ r.key }}">
+      <div class="pm-peer-name"><b>{{ r.name }}</b><div class="small text-secondary">{{ r.sub }}</div></div>
+      <div class="pm-peer-value text-end">
+        {% if r.value is none %}<b class="text-secondary">—</b>
+        {% elif r.pct %}<b class="{{ ('text-up' if r.value > 0 else 'text-down') if r.key == 'rev_growth' else '' }}">{{ r.value|pct(1 if r.key in ('div', 'rev_growth') else 0, sign=(r.key == 'rev_growth')) }}</b>
+        {% else %}<b>{{ r.value|number(1) }}</b>{% endif %}
+        <div class="small text-secondary">mediana {{ r.median|pct(1 if r.key in ('div', 'rev_growth') else 0, sign=(r.key == 'rev_growth')) if r.pct else r.median|number(1) }}</div>
+      </div>
+      <div class="pm-peer-track">
+        <div class="pm-peer-range" style="left: {{ r.p25 }}%; width: {{ [r.p75 - r.p25, 0.5]|max }}%"></div>
+        <div class="pm-peer-mid" style="left: {{ r.mid }}%"></div>
+        {% if r.me is not none %}<div class="pm-peer-me" style="left: {{ r.me }}%" title="{{ d.ticker }}"></div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {# ---------------------------------------------------------------- as lentes #}
   {% set labels = {"entra": ("Entra", "pm-in", "bi-check-circle-fill"), "quase": ("Quase", "pm-near", "bi-dash-circle-fill"), "falha": ("Falha", "pm-out", "bi-x-circle-fill"), None: ("Sem dados", "pm-none", "bi-circle")} %}
   <div class="pm-label mb-1">Várias lentes <span class="text-secondary text-lowercase">· entra em {{ d.enters|length }} de {{ real|length }}</span></div>

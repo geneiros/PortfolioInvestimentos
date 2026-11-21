@@ -387,6 +387,62 @@ def valuation_of(ticker, m, info):
     return v
 
 
+PEER_METRICS = (("pe", "P/E", "o preço a dividir pelo lucro"), ("div", "Dividendo", "por ano, em % do preço"),
+                ("net_margin", "Margem líquida", "o lucro em % das vendas"),
+                ("roe", "ROE", "o lucro em % do capital próprio"), ("rev_growth", "Vendas", "o crescimento do último ano"))
+MIN_PEERS = 5
+
+
+def _pct(values, q):
+    """O percentil `q` (0–1) de uma lista ordenada, com interpolação."""
+    if not values:
+        return None
+    i = (len(values) - 1) * q
+    lo, hi = int(i), min(int(i) + 1, len(values) - 1)
+    return values[lo] + (values[hi] - values[lo]) * (i - lo)
+
+
+def peers(ticker, m, info, data=None, rows=None):
+    """«Ao lado dos pares»: a ação face às empresas da mesma indústria no universo da triagem (ou do mesmo setor,
+    se forem menos de `MIN_PEERS`). Para cada medida: mínimo e máximo (5–95%), o intervalo 25–75%, a mediana e o valor
+    da ação. Usa só os dados guardados (nada ao Yahoo)."""
+    data = infos() if data is None else data
+    rows = (universe() or {"rows": []})["rows"] if rows is None else rows
+    info = info or {}
+
+    def group(key):
+        val = info.get(key)
+        if not val:
+            return []
+        out = []
+        for r in rows:
+            i = (data.get(r["ticker"]) or {}).get("info") or {}
+            if r["ticker"] != ticker and i.get(key) == val:
+                out.append(lenses.metrics_from_info(i, r))
+        return out
+    scope, label = "industry", info.get("industry")
+    group_m = group("industry")
+    if len(group_m) < MIN_PEERS:
+        scope, label, group_m = "sector", SECTOR_PT.get(info.get("sector"), info.get("sector")), group("sector")
+    if len(group_m) < MIN_PEERS:
+        return None
+    out = []
+    for key, name, sub in PEER_METRICS:
+        vals = sorted(x[key] for x in group_m if x.get(key) is not None and (key != "pe" or x[key] > 0))
+        if len(vals) < MIN_PEERS:
+            continue
+        lo, hi = _pct(vals, 0.05), _pct(vals, 0.95)
+        span = (hi - lo) or 1.0
+
+        def pos(v, lo=lo, span=span):
+            return None if v is None else max(0.0, min(100.0, (v - lo) / span * 100))
+        p25, med, p75, me = _pct(vals, 0.25), _pct(vals, 0.5), _pct(vals, 0.75), m.get(key)
+        out.append({"key": key, "name": name, "sub": sub, "value": me, "median": med, "n": len(vals),
+                    "p25": pos(p25), "p75": pos(p75), "mid": pos(med), "me": pos(me),
+                    "pct": key != "pe"})
+    return {"scope": scope, "label": label, "n": len(group_m), "rows": out} if out else None
+
+
 def detail(ticker):
     """A ficha de uma ação do universo (ou de qualquer ação, lendo os dados ao Yahoo)."""
     from . import moat
@@ -411,4 +467,4 @@ def detail(ticker):
             "enters": [k for k, (s, _) in evals.items() if s == "entra"], "tags": lenses.tags(m),
             "blurb": lenses.blurb(m), "graham": lenses.graham_number(m), "bazin": lenses.bazin_ceiling(m),
             "row": row, "in_universe": me is not None, "questions": QUESTIONS, "answers": answers(ticker),
-            "val": valuation_of(ticker, m, info)}
+            "val": valuation_of(ticker, m, info), "peers": peers(ticker, m, info, data, u["rows"])}

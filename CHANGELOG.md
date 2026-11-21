@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **Triagem: «Ao lado dos pares» na ficha**  
+  A ficha da ação mostra o P/E, o dividendo, a margem líquida, o ROE e o crescimento das vendas face às empresas da mesma indústria no universo da triagem (ou do mesmo setor, quando há menos de 5). Cada barra vai das mais baixas às mais altas, com a metade do meio, a mediana e o ponto da ação. Usa só os dados guardados, sem pedidos ao Yahoo.
 - **README: capturas e funcionalidades atualizadas**  
   Todas as capturas refeitas, claro e escuro, com os dados de demonstração e uma triagem real. As de Prospeção passam a mostrar o quadro de uma lista, a triagem com a ficha aberta e a ficha com «O valor da ação». A descrição passa a incluir as lentes e o cabeçalho fixos, os valores por ação na moeda da cotação, o scroll do quadro e a pausa dos alertas da carteira no sino da Carteira. O aviso de um alerta mantém a moeda em maiúsculas («preço acima de 164 800,00 KRW»).
 - **Prospeção: as listas em quadro e o valor da ação na ficha**  
