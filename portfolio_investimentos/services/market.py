@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..engine.formatting import WEEKDAYS
 from . import yahoo
-from ..models import (Alert, DividendHistory, Event, Fundamental, FxRate, Instrument, Price, Setting, Transaction,
+from ..models import (DividendHistory, Event, Fundamental, FxRate, Instrument, Price, Setting, Transaction,
                       db)
 
 log = logging.getLogger(__name__)
@@ -269,29 +269,6 @@ def upcoming_events(tickers, today=None, days=90):
                                        estimated=True, timing=None, eps_estimate=None, revenue_estimate=None,
                                        amount=None))
     return sorted(out, key=lambda e: e.date)
-
-
-def check_alerts(p):
-    """Marca como disparados os alertas cujas condições se verificam nas últimas cotações."""
-    fired = []
-    for a in Alert.query.filter_by(active=True).all():
-        last = p.book.last_date(a.instrument)
-        if not last:
-            row = Price.query.filter_by(instrument=a.instrument).order_by(Price.date.desc()).limit(2).all()
-            if not row:
-                continue
-            price, prev = row[0].close, (row[1].close if len(row) > 1 else None)
-        else:
-            price, prev = p.book.price(a.instrument, last), p.book.previous_close(a.instrument, last)
-        hit = (a.kind == "price_above" and price >= a.threshold) or \
-              (a.kind == "price_below" and price <= a.threshold) or \
-              (a.kind == "change_pct" and prev and abs(price / prev - 1) * 100 >= a.threshold)
-        if hit:
-            a.active, a.triggered_on = False, datetime.now()
-            fired.append(a)
-    if fired:
-        db.session.commit()
-    return fired
 
 
 # --------------------------------------------------------------------- yfinance

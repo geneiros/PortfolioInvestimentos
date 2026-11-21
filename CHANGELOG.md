@@ -4,6 +4,14 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **Radar e alertas: Oportunidades primeiro e Acompanhamento**  
+  O separador Oportunidades passa a ser o primeiro e abre por omissão. «Alertas e radar» passa a Acompanhamento: as ações juntadas a partir das Oportunidades (com o método e os limites usados) ou à mão. Em cada uma escolhes os parâmetros a acompanhar e, em cada um, se queres ser avisado:
+  - preço abaixo/acima de um valor, variação do dia e queda desde o máximo de 52 semanas;
+  - P/L, P/VP e dividendo;
+  - se ainda cumpre os critérios do método;
+  - a leitura do moat.
+
+  «Atualizar indicadores» lê os dados ao Yahoo. Os alertas verificam-se ao abrir a aplicação e depois de cada atualização, e ficam na lista dos últimos dias. Os alertas de preço e o preço-alvo das versões anteriores passam sozinhos para o Acompanhamento; os alertas da carteira ficam no fim da página.
 - **Oportunidades: sem o erro «HTTP 429» do Yahoo**  
   O filtro de ações, os dados de cada empresa e as demonstrações financeiras passam a ser pedidos pelo yfinance quando está instalado (trata do cookie e do crumb como um browser, e o Yahoo não o limita como faz com os pedidos simples); sem ele, como antes, pelo acesso direto.
 - **Radar e alertas: Oportunidades**  

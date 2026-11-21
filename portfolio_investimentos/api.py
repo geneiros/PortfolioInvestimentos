@@ -11,7 +11,7 @@ from datetime import date
 from flask import Blueprint, Response, abort, current_app, jsonify, request, send_file, session
 
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, FxRate, ImportBatch, Instrument,
-                     OtherAsset, OtherAssetValue, PortfolioAlert, Price, Setting, Transaction, WatchItem, db)
+                     OtherAsset, OtherAssetValue, PortfolioAlert, Price, Setting, Transaction, WatchItem, WatchRule, db)
 from . import auth
 from .engine.formatting import parse_number
 from .engine.portfolio import ASSET_TYPES
@@ -301,18 +301,6 @@ def update_instrument(ticker, instrument_name=None, sector=None, data_symbol=Non
 
 # ---------------------------------------------------------- radar e alertas
 @action
-def add_alert(instrument, kind, threshold):
-    if kind not in Alert.KINDS:
-        raise ApiError("Condição inválida.")
-    if not db.session.get(Instrument, instrument):
-        raise ApiError("Ativo desconhecido.")
-    a = Alert(instrument=instrument, kind=kind, threshold=_float(threshold), active=True)
-    db.session.add(a)
-    db.session.commit()
-    return a.id
-
-
-@action
 def add_portfolio_alert(threshold, direction="down", broker=""):
     """Alerta da variação do dia da carteira (toda ou de uma corretora), em %."""
     from .services.portfolio_alerts import LEVELS
@@ -454,31 +442,86 @@ def set_market_indices(tickers=""):
 
 
 @action
-def toggle_alert(name, active):
-    a = _get(Alert, name)
-    a.active, a.triggered_on = str(active) in ("1", "true", "True"), None
-    db.session.commit()
-
-
-@action
-def delete_alert(name):
-    db.session.delete(_get(Alert, name))
-    db.session.commit()
-
-
-@action
-def add_watch(instrument, target_price=None, note=None, currency="EUR", instrument_name=None):
+def add_watch(instrument, target_price=None, note=None, currency="EUR", instrument_name=None, method=None):
+    """Junta uma ação ao Acompanhamento. Das Oportunidades vem o método (e os limites da última pesquisa), e começa
+    com os parâmetros desse método e do moat."""
+    from .services import moat, screener, tracking
     ticker = _ensure_instrument(instrument, instrument_name, currency)
-    w = WatchItem(instrument=ticker, target_price=_float(target_price) or None, note=note)
+    if WatchItem.query.filter_by(instrument=ticker).first():
+        raise ApiError(f"{ticker} já está em Acompanhamento.")
+    w = WatchItem(instrument=ticker, target_price=_float(target_price) or None, note=note or None)
+    if method in screener.METHODS:
+        last = screener.last() or {}
+        w.method = method
+        w.criteria = json.dumps(last.get("values") or {} if last.get("method") == method else {})
     db.session.add(w)
+    db.session.flush()
+    if w.method:
+        db.session.add_all(tracking.default_rules(w, has_moat=moat.get(ticker) is not None))
+    if w.target_price:
+        db.session.add(WatchRule(watch_id=w.id, kind="price_below", threshold=w.target_price, alert=False))
     db.session.commit()
-    return w.id
+    return f"{ticker} juntada ao Acompanhamento."
 
 
 @action
 def delete_watch(name):
-    db.session.delete(_get(WatchItem, name))
+    w = _get(WatchItem, name)
+    WatchRule.query.filter_by(watch_id=w.id).delete()
+    db.session.delete(w)
     db.session.commit()
+
+
+@action
+def save_watch_rules(name, rules="[]", note=None):
+    """Os parâmetros a acompanhar numa ação: [{"kind", "threshold", "alert"}]. Substitui os que havia (os que já
+    existiam mantêm o estado, para não voltarem a disparar)."""
+    from .services import tracking
+    w = _get(WatchItem, name)
+    try:
+        data = json.loads(rules) if isinstance(rules, str) else rules
+    except ValueError as exc:
+        raise ApiError("Lista inválida.") from exc
+    if not isinstance(data, list) or len(data) > 30:
+        raise ApiError("Lista inválida.")
+    old = {(r.kind, r.threshold): r for r in WatchRule.query.filter_by(watch_id=w.id).all()}
+    keep = []
+    for r in data:
+        kind = str(r.get("kind", ""))
+        if kind not in WatchRule.KINDS:
+            raise ApiError("Parâmetro desconhecido.")
+        needs = tracking.KINDS[kind][1] is not None
+        raw = r.get("threshold")
+        threshold = _float(raw) if needs and str(raw if raw is not None else "").strip() else None
+        if needs and threshold is None:
+            raise ApiError(f"Indica o valor de «{tracking.KINDS[kind][0]}».")
+        alert = str(r.get("alert")).lower() in ("1", "true", "on")
+        rule = old.pop((kind, threshold), None) or WatchRule(watch_id=w.id, kind=kind, threshold=threshold)
+        rule.alert = alert
+        keep.append(rule)
+    for r in old.values():
+        db.session.delete(r)
+    db.session.add_all(keep)
+    if note is not None:
+        w.note = str(note).strip()[:255] or None
+    db.session.commit()
+    tracking.check()
+    return "Parâmetros guardados."
+
+
+@action
+def refresh_tracking(ticker):
+    """Atualiza os indicadores do Yahoo de uma ação em Acompanhamento (P/L, P/VP, dividendo, critérios do método)."""
+    from .services import tracking, yahoo
+    ticker = (ticker or "").strip().upper()
+    if not WatchItem.query.filter_by(instrument=ticker).first():
+        raise ApiError("Essa ação não está em Acompanhamento.")
+    try:
+        tracking.refresh(ticker)
+    except yahoo.YahooError as exc:
+        raise ApiError(f"Não foi possível ler os dados de {ticker} no Yahoo: {exc}") from exc
+    fired = tracking.check()
+    return f"{ticker} atualizada." + (f" {len(fired)} alerta(s) disparado(s)." if fired else "")
 
 
 @action
@@ -1014,7 +1057,7 @@ def reset_data(confirm=""):
     from .models import EtfHolding, Fundamental, Logo, NewsItem
     for row in Setting.query.filter(Setting.key.like("xray:%")).all():
         db.session.delete(row)
-    for model in (EtfHolding, NewsItem, Logo, Transaction, ImportBatch, Alert, PortfolioAlert, WatchItem, Event, DividendHistory, Price, FxRate,
+    for model in (EtfHolding, NewsItem, Logo, Transaction, ImportBatch, Alert, PortfolioAlert, WatchRule, WatchItem, Event, DividendHistory, Price, FxRate,
                   OtherAssetValue, OtherAsset, Fundamental):
         model.query.delete()
     Broker.query.delete()
