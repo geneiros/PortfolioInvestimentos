@@ -97,7 +97,10 @@
   // o quadro ocupa a altura do ecrã; cada coluna faz scroll na vertical só na lista dela
   const fit = () => {
     const top = board.getBoundingClientRect().top + window.scrollY;
-    board.style.setProperty("--pm-board-h", `${Math.max(window.innerHeight - top - 16, 352)}px`);
+    const below = parseFloat(getComputedStyle(board).marginBottom) || 0;
+    const main = board.closest("main") || document.body;  // o espaço do fundo da página
+    const pad = parseFloat(getComputedStyle(main).paddingBottom) || 0;
+    board.style.setProperty("--pm-board-h", `${Math.max(window.innerHeight - top - below - pad - 1, 352)}px`);
   };
   fit();
   window.addEventListener("resize", fit);

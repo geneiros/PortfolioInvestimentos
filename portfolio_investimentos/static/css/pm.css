@@ -407,23 +407,19 @@ span.pm-logo { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; f
 }
 
 /* ---------------------------------------------------------------- Prospeção → listas (quadro) */
-.pm-board { display: flex; gap: .9rem; align-items: stretch; height: var(--pm-board-h, 70vh); min-height: 22rem; }
-.pm-board-col { flex: 1 1 0; min-width: 12rem; display: flex; flex-direction: column; }
-.pm-board { overflow-x: auto; }  /* só com muitos estados (as colunas não ficam mais estreitas do que 12rem) */
+.pm-board { display: flex; gap: .9rem; align-items: stretch; height: var(--pm-board-h, 70vh); min-height: 22rem;
+  overflow-x: auto; overflow-y: hidden; padding-bottom: .5rem; scroll-snap-type: x proximity; }
+.pm-board-col { flex: 0 0 20rem; max-width: 85vw; display: flex; flex-direction: column; scroll-snap-align: start; }
 .pm-board-col > header { flex: 0 0 auto; }
 .pm-board-cards { flex: 1 1 auto; min-height: 4.5rem; overflow-y: auto; overflow-x: hidden; padding: 0 .25rem .5rem 0; border-radius: .6rem; transition: background .15s; display: flex; flex-direction: column; gap: .7rem; }
 .pm-board-cards > * { flex: 0 0 auto; }
-@media (max-width: 991.98px) {  /* no telemóvel as colunas não cabem: o quadro passa de lado, uma coluna de cada vez */
-  .pm-board { overflow-x: auto; scroll-snap-type: x proximity; }
-  .pm-board-col { flex: 0 0 min(20rem, 85vw); scroll-snap-align: start; }
-}
 .pm-board-cards.pm-drop-on { background: rgba(var(--bs-primary-rgb), .07); outline: 1px dashed rgba(var(--bs-primary-rgb), .5); }
 .pm-board-empty { border: 1px dashed var(--bs-border-color); border-radius: .6rem; color: var(--pm-muted); text-align: center; padding: 1.4rem .5rem; font-size: .875rem; }
 .pm-board-card { cursor: grab; }
 .pm-board-card textarea, .pm-board-card select { cursor: auto; }
 .pm-board-card.pm-dragging { opacity: .45; }
 .pm-board-card .pm-rule { font-size: .72rem; }
-.pm-board-new { flex: 0 0 11rem; padding-top: 1.9rem; }
+.pm-board-new { flex: 0 0 14rem; padding-top: 1.9rem; }
 .pm-prio { padding: .05rem .6rem; border-radius: 1rem; font-size: .78rem; background: var(--bs-secondary-bg); color: var(--pm-muted); border: 0; }
 .pm-prio-on { background: var(--pm-accent); color: #fff; }
 .pm-prio-on[data-prio="baixa"] { background: var(--bs-secondary); }
