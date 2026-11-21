@@ -16,6 +16,7 @@ SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search"
 SUMMARY_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}"
 SUMMARY_MODULES = "assetProfile,financialData,defaultKeyStatistics,summaryDetail,quoteType"
 TIMESERIES_URL = "https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{symbol}"
+SCREENER_PATH = "/v1/finance/screener"
 TIMESERIES_TYPES = ("trailingDilutedEPS", "trailingFreeCashFlow", "annualFreeCashFlow", "annualStockholdersEquity",
                     "annualOrdinarySharesNumber", "annualShareIssued", "annualDilutedEPS",
                     # Owner Earnings (Buffett) e Earnings Power Value (Greenwald)
@@ -165,14 +166,54 @@ class Ticker:
         return hist
 
 
-def fundamentals(symbol, years=6):
+def screener(body, attempts=4):
+    """Filtro de ações do Yahoo (POST com o cookie e o crumb): devolve o primeiro resultado (`total` e `quotes`).
+
+    `body` é a consulta no formato do Yahoo: {"query": {"operator": "AND", "operands": [...]}, "size": ..., ...}.
+    """
+    payload = json.dumps({"offset": 0, "size": 100, "sortType": "DESC", "quoteType": "EQUITY", "userId": "",
+                          "userIdType": "guid", **body}).encode()
+    last = None
+    for attempt in range(attempts):
+        host = HOSTS[(attempt + 1) % 2]
+        try:
+            crumb = _crumb()
+        except OSError as exc:
+            _state["crumb"] = None
+            last = exc
+            _time.sleep(1.5 * (attempt + 1))
+            continue
+        url = f"https://{host}{SCREENER_PATH}?" + urllib.parse.urlencode(
+            {"crumb": crumb, "lang": "en-US", "region": "US", "formatted": "false"})
+        req = urllib.request.Request(url, data=payload, headers={**HEADERS, "Content-Type": "application/json"})
+        try:
+            with _opener().open(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode())
+        except urllib.error.HTTPError as exc:
+            last = exc
+            if exc.code in (401, 403):
+                _state["crumb"] = None  # crumb vencido: pede outro
+            elif exc.code == 429:
+                _time.sleep(1.5 * (attempt + 1))
+            continue
+        except (OSError, ValueError) as exc:
+            last = exc
+            continue
+        finance = data.get("finance") or {}
+        if finance.get("error"):
+            raise YahooError(f"o Yahoo recusou o filtro ({(finance['error'] or {}).get('description', '')})")
+        return ((finance.get("result") or [{}])[0]) or {}
+    raise YahooError(_describe(last))
+
+
+def fundamentals(symbol, years=6, types=None):
     """Séries das demonstrações financeiras (o serviço que o yfinance usa para os balanços; não pede crumb).
 
     Devolve {tipo: [(data, valor, moeda), ...]} por ordem de data, só com os tipos que vierem.
     """
     end = int(_time.time())
     data = _get_json(TIMESERIES_URL.format(symbol=urllib.parse.quote(symbol)),
-                     {"type": ",".join(TIMESERIES_TYPES), "period1": end - years * 366 * 86400, "period2": end,
+                     {"type": ",".join(types or TIMESERIES_TYPES), "period1": end - years * 366 * 86400, "period2": end,
                       "merge": "false", "padTimeSeries": "true", "lang": "en-US", "region": "US"})
     out = {}
     for item in ((data.get("timeseries") or {}).get("result") or []):

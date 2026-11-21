@@ -288,3 +288,9 @@ span.pm-logo { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; f
 @media (hover: none), (pointer: coarse), (max-width: 767.98px) { #pmProgress { display: none; } }
 @media print { #pmProgress { display: none; } }
 @media (prefers-reduced-motion: reduce) { #pmProgress, #pmProgress.pm-done { transition: none; } }
+
+/* ---------------------------------------------------------------- Oportunidades */
+.pm-method { border: 1px solid transparent; transition: border-color .15s; }
+.pm-method:hover { border-color: rgba(var(--bs-primary-rgb), .4); }
+.pm-method-active { border-color: var(--pm-accent); box-shadow: inset 0 0 0 1px var(--pm-accent); }
+.pm-moat-detail, .pm-moat-detail td, .pm-moat-detail th, .pm-moat-detail label { white-space: normal; }

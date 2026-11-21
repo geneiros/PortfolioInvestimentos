@@ -1062,3 +1062,49 @@ def remove_password(current_password=""):
 @action
 def logout():
     session.clear()
+
+
+# ---------------------------------------------------------------- Oportunidades (Radar e alertas)
+@action
+def run_screen(method, region="mundo", min_cap="1e9", **values):
+    """Procura ações com os critérios de um grande investidor (filtro de ações do Yahoo)."""
+    from .services import screener, yahoo
+    limits = {k: v for k, v in values.items() if k[:1] in ("c", "p") and k[1:2].isdigit()}
+    try:
+        out = screener.run(method, region, min_cap, limits)
+    except screener.ScreenError as exc:
+        raise ApiError(str(exc)) from exc
+    except yahoo.YahooError as exc:
+        raise ApiError(f"Não foi possível procurar no Yahoo: {exc}") from exc
+    n = len(out["rows"])
+    return f"{n} ações encontradas." if n != 1 else "1 ação encontrada."
+
+
+@action
+def analyse_moat(ticker):
+    """2.º passo: a prova do moat nos números de uma empresa e a fonte provável."""
+    from .services import moat, yahoo
+    ticker = (ticker or "").strip().upper()
+    if not ticker:
+        raise ApiError("Indica o ticker.")
+    try:
+        out = moat.analyse(ticker)
+    except yahoo.YahooError as exc:
+        raise ApiError(f"Não foi possível ler os dados de {ticker} no Yahoo: {exc}") from exc
+    return f"{ticker}: moat {out['verdict'].lower()}" + (f" ({out['score']}/100)." if out["score"] is not None else ".")
+
+
+@action
+def save_moat_checklist(ticker, pillars="[]", tests="[]", note=""):
+    """O que confirmaste sobre o moat de uma empresa (os 5 pilares e os 3 testes de Buffett)."""
+    from .services import moat
+    ticker = (ticker or "").strip().upper()
+    if not ticker:
+        raise ApiError("Indica o ticker.")
+    try:
+        p = json.loads(pillars) if isinstance(pillars, str) else pillars
+        t = json.loads(tests) if isinstance(tests, str) else tests
+    except ValueError as exc:
+        raise ApiError("Lista inválida.") from exc
+    moat.save_checklist(ticker, p or [], t or [], note)
+    return "Checklist guardado."
