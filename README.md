@@ -2,10 +2,10 @@
 
 [![Testes](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml/badge.svg)](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml) [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/geneiros)
 
-Gestor de carteira de investimentos local: desempenho, dividendos, património, planeamento FIRE, notícias, fiscalidade (PT) e importação de extratos da Trading 212, XTB, Trade Republic, DEGIRO e Interactive Brokers. **Corre no teu computador**, com alertas de preço e da carteira e lista de observação.
+Gestor de carteira de investimentos local: desempenho, dividendos, património, planeamento FIRE, oportunidades com os critérios dos grandes investidores (Graham, Buffett, Lynch…) e o moat de cada empresa, notícias, fiscalidade (PT) e importação de extratos da Trading 212, XTB, Trade Republic, DEGIRO e Interactive Brokers. **Corre no teu computador**, com alertas de preço e da carteira e lista de observação.
 
 - **Sem servidor e sem base de dados para instalar.** Os dados ficam num único ficheiro SQLite no teu computador.
-- **Abre-se com um duplo clique.** O script de arranque prepara tudo na primeira vez e abre o browser; sem Python, há um **executável único** para Windows, macOS e Linux.
+- **Abre-se com um duplo clique.** O script de arranque prepara tudo na primeira vez e abre o browser; sem Python, há um **executável único** para Windows, macOS e Linux e uma **app Android** (APK).
 - **Interface Bootstrap 5.3 nativa**, com modo claro, escuro ou automático (segue o sistema operativo).
 - **Barra de progresso no topo** (à maneira do Pace) ao mudar de página, no browser do computador: começa logo no clique, enquanto o servidor responde. Só com a aplicação acedida online (ex.: PythonAnywhere): no próprio computador ou na rede de casa as páginas abrem logo e a barra não aparece. No telemóvel não aparece.
 - **Cartões à tua medida:** em todas as páginas, um clique longo (2 segundos no fundo de um cartão, com o rato ou o dedo) levanta o cartão para o arrastar para outro lugar; a ordem fica guardada na aplicação, igual em todos os dispositivos, e repõe-se em Definições.
@@ -146,8 +146,14 @@ python -m portfolio_investimentos --no-browser # não abre o browser
 python -m portfolio_investimentos --demo       # carrega os dados de demonstração e sai
 python -m portfolio_investimentos --refresh    # atualiza as cotações e sai
 python -m portfolio_investimentos --importar extrato.xlsx  # importa extratos (corretora detetada) e sai
+python -m portfolio_investimentos --refresh --abertas  # atualiza só as cotações das posições abertas e sai
+python -m portfolio_investimentos --importar extrato.csv --corretora trading212  # indica a corretora em vez de a detetar
+python -m portfolio_investimentos --janela     # abre numa janela própria (precisa do pywebview: pip install ".[janela]")
+python -m portfolio_investimentos --browser    # no executável, abre no browser em vez da janela própria
 python -m portfolio_investimentos --testar-yahoo  # testa a ligação ao Yahoo Finance (cotações e dados fundamentais) e sai
 ```
+
+Só no executável: `--portatil` guarda os dados na pasta `PortfolioInvestimentos-dados` ao lado do executável (ver **Numa pen USB**) e, no Windows, `--terminal` mostra a janela do terminal com as mensagens da aplicação.
 
 O que mudou em cada versão está no [histórico de alterações](CHANGELOG.md).
 
@@ -252,7 +258,7 @@ O tema escolhe-se no botão **Tema**, no fundo da barra lateral: Claro, Escuro, 
 | **Fiscal** | Por ano: mais-valias pelo método FIFO resumidas por ativo (as linhas de cada lote abrem a pedido e vão todas no CSV), dividendos com o crédito de imposto estrangeiro limitado a cada dividendo, juros e estimativa de imposto a 28% (Portugal). **Simular uma venda**: escolhes a posição (por corretora), a quantidade (ou «tudo»), o preço (por omissão, o último) e as comissões, e vês os lotes que saem pelo FIFO, o custo de aquisição, o valor de realização, a mais ou menos-valia e o imposto das mais-valias do ano antes e depois da venda (com as vendas de todas as corretoras); mais as **perdas por realizar** (posições com menos-valia latente e quanto baixariam o imposto do ano, sozinhas e acumuladas) e a exportação em CSV. **Vender e recomprar** (cartão próprio, não é preciso simular uma venda antes): a partir do saldo de mais-valias do ano — ou, se quiseres, do saldo depois da venda simulada acima —, escolhes as perdas a realizar, a comissão por ordem e o custo de câmbio, e vês a poupança no imposto do ano, os custos, o benefício líquido agora e, com a recompra, o novo custo de aquisição e o imposto adiado para uma venda futura (com aviso quando realizas mais menos-valia do que o saldo do ano precisa). É só uma simulação: nada é vendido. |
 | **Importar** | Extratos da Trading 212 (CSV), XTB (XLSX), Trade Republic (CSV), DEGIRO (Transações e Extrato de conta, CSV), Interactive Brokers (Activity Statement, CSV) e CSV genérico, com deduplicação (podes carregar o mesmo ficheiro várias vezes) e histórico de extratos. Antes de importar fica uma cópia automática da base de dados. |
 | **Transações** | Lista filtrável, inserção manual (com validação da quantidade detida nas vendas) e exportação CSV; a paginação ocupa a largura da tabela (a primeira e a última página, as vizinhas da atual e «…»). |
-| **Definições** | Corretoras; ativos com filtro (posições abertas, sem cotações, todos), pesquisa, último fecho e «Juntar» para o mesmo título com dois tickers; logótipo de cada ativo (imagem carregada ou ícone do site; sem ele, as iniciais); atualização de cotações (todas ou só as posições abertas, com o progresso ativo a ativo); taxa sem risco; aviso de cotações antigas (os dias configuram-se; 5 por omissão, 0 desliga); preços das posições abertas de 5 em 5 minutos (opcional); notícias: chaves do Finnhub e do Marketaux, escolha das fontes (podes desligar todas; sem nenhuma, o menu Notícias deixa de aparecer), notícias de cada fonte e «Atualizar todas as fontes»; repor a ordem dos cartões (por página ou todas); disponível offline; cópias de segurança automáticas com «Restaurar» e «Eliminar»; demonstração e limpeza de dados. |
+| **Definições** | Corretoras; ativos com filtro (posições abertas, sem cotações, todos), pesquisa, último fecho e «Juntar» para o mesmo título com dois tickers; logótipo de cada ativo (imagem carregada ou ícone do site; sem ele, as iniciais); atualização de cotações (todas ou só as posições abertas, com o progresso ativo a ativo); taxa sem risco; aviso de cotações antigas (os dias configuram-se; 5 por omissão, 0 desliga); preços das posições abertas de 5 em 5 minutos (opcional); notícias: chaves do Finnhub e do Marketaux, escolha das fontes (podes desligar todas; sem nenhuma, o menu Notícias deixa de aparecer), notícias de cada fonte e «Atualizar todas as fontes»; repor a ordem dos cartões (por página ou todas); disponível offline; segurança (palavra-passe); «Os teus dados», com a pasta da base de dados (e «Modo portátil» no executável numa pen USB), cópias de segurança automáticas com «Restaurar» e «Eliminar», demonstração e limpeza de dados; a versão instalada e, no executável e na app Android, o aviso de versão nova (verificar agora ou desligar); as secções dos plugins instalados. |
 
 Também há um seletor de corretora (todas ou uma conta específica) e um botão com um olho que esconde os valores.
 
@@ -378,9 +384,10 @@ python -m portfolio_investimentos
 
 ## Próximos passos
 
-- Parsers para DEGIRO, IBKR, Revolut e eToro.
-- Análise da sobreposição de ETFs (as mesmas empresas em vários fundos); no Planeamento, «Próximo dinheiro» (onde pôr o próximo depósito) e «Simular uma decisão» (o efeito de vender ou comprar).
-- Executável único (PyInstaller) para quem não quer instalar o Python.
+- Parsers para Revolut e eToro.
+- No Planeamento, «Próximo dinheiro» (onde pôr o próximo depósito) e «Simular uma decisão» (o efeito de vender ou comprar).
+- Nas Oportunidades, mais anos de contas para a prova do moat (o Yahoo só dá 4) e alertas quando uma ação passa a cumprir os critérios.
+- A app Android na Google Play.
 
 ## Apoiar o projeto
 
