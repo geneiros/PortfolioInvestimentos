@@ -52,6 +52,36 @@
     </div></div>
   </div>
 
+  {# ---------------------------------------------------------------- o valor da ação (como na Carteira) #}
+  {% set v = d.val %}
+  {% if v %}
+  {% macro val_row(mm, v) -%}
+  <div class="pm-val-row" data-method="{{ mm.key }}">
+    <span class="pm-val-name text-nowrap">{{ mm.name }} {{ help(mm.formula) }}</span>
+    <div class="pm-val-track">
+      {% if mm.low is not none and v.scale %}<div class="pm-val-range" style="left: {{ mm.low / v.scale * 100 }}%; width: {{ [(mm.high - mm.low) / v.scale * 100, 1]|max }}%"></div>{% endif %}
+      {% if v.price and v.scale %}<div class="pm-val-price" style="left: {{ v.price / v.scale * 100 }}%"></div>{% endif %}
+    </div>
+    <span class="pm-val-value text-end small">{% if mm.low is not none %}<span class="money">{{ mm.low|money(0 if mm.high >= 100 else 2, currency=v.currency) }}</span>–<span class="money">{{ mm.high|money(0 if mm.high >= 100 else 2, currency=v.currency) }}</span>{% else %}<span class="text-secondary">— {{ mm.why }}</span>{% endif %}</span>
+  </div>
+  {%- endmacro %}
+  <div class="pm-valuation mb-3" id="fichaValuation">
+    <div class="pm-label mb-1">O valor da ação {{ help("Os mesmos métodos de «O valor de cada ação», na Carteira: sempre em intervalo, com as hipóteses no «?» de cada um. O traço é o preço de hoje. " ~ ("Usa os dados fundamentais da Carteira (com as tuas correções)." if v.from_portfolio else "Usa os dados do Yahoo, por ação e na moeda da cotação (câmbio aproximado quando as contas são noutra moeda).") ~ " Uma ilustração para pensar, não uma recomendação.") }}</div>
+    {% for mm in v.methods if not mm.more %}{{ val_row(mm, v) }}{% endfor %}
+    <details class="pm-val-more"><summary class="small text-secondary">Mais métodos (Owner Earnings, EPV, Bazin, PEG)</summary>
+      {% for mm in v.methods if mm.more %}{{ val_row(mm, v) }}{% endfor %}
+      <div class="small mt-1" data-method="peg">PEG de Peter Lynch {{ help(v.peg.formula if v.peg else "PEG = P/E ÷ crescimento dos lucros (em %). PEG 1 sugere preço justo; abaixo de 1, potencialmente subavaliada.") }}:
+        {% if v.peg %}<b class="{{ 'text-up' if v.peg.peg < 1 else ('text-down' if v.peg.peg > 2 else '') }}">{{ v.peg.peg|number(2) }}</b>
+          <span class="text-secondary">(P/E {{ v.peg.pe|number(1) }} ÷ crescimento {{ (v.growth * 100)|number(1) }}) · preço com PEG 1: <span class="money">{{ v.peg.fair|money(2, currency=v.currency) }}</span></span>
+        {% else %}<span class="text-secondary">— sem lucro ou crescimento positivos</span>{% endif %}</div>
+    </details>
+    <div class="small text-secondary mt-2">
+      {% if v.implied is not none %}Ao preço de hoje, o mercado assume {{ v.base_kind }} a crescer <b class="{{ 'text-down' if v.implied > v.growth + 0.05 else '' }}">{{ v.implied|pct(1, sign=False) if v.implied >= 0 else v.implied|pct(1) }}</b> ao ano durante 10 anos (desconto de 9%); a hipótese usada é {{ v.growth|pct(1, sign=False) }}{% if v.growth_default %} (por omissão, sem estimativa){% endif %}.
+      {% else %}Sem {{ v.base_kind }} positivo para calcular o crescimento que o preço assume.{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   {# ---------------------------------------------------------------- as lentes #}
   {% set labels = {"entra": ("Entra", "pm-in", "bi-check-circle-fill"), "quase": ("Quase", "pm-near", "bi-dash-circle-fill"), "falha": ("Falha", "pm-out", "bi-x-circle-fill"), None: ("Sem dados", "pm-none", "bi-circle")} %}
   <div class="pm-label mb-1">Várias lentes <span class="text-secondary text-lowercase">· entra em {{ d.enters|length }} de {{ real|length }}</span></div>
@@ -110,7 +140,7 @@
       {{ row("Dívida líquida / EBITDA", m.net_debt_ebitda|number(1) if m.net_debt_ebitda is not none else dash) }}
       {{ row("Liquidez corrente", m.current|number(2) if m.current is not none else dash, "Ativo corrente ÷ passivo corrente.") }}
       {{ row("Liquidez reduzida", m.quick|number(2) if m.quick is not none else dash) }}
-      {{ row("Caixa livre (FCF)", ((m.fcf / 1e9)|number(2) ~ " mM " ~ (m.currency or "")) if m.fcf is not none else dash) }}
+      {{ row("Caixa livre (FCF)", ((m.fcf / 1e9)|number(2) ~ " mM " ~ (m.fin_currency or m.currency or "")) if m.fcf is not none else dash) }}
     </div>
     <div class="col-12">
       <div class="pm-label mb-1">Acionista</div>

@@ -13,7 +13,7 @@ disparam quando a condição passa a verificar-se e voltam a ficar prontos quand
 import json
 from datetime import date, datetime, timedelta
 
-from ..models import Instrument, Price, Setting, WatchItem, WatchList, WatchRule, db
+from ..models import Instrument, Price, Setting, WatchItem, WatchList, WatchRule, WatchState, db
 from . import lenses, moat
 
 KINDS = {
@@ -227,3 +227,97 @@ def watch_lists():
         WatchItem.query.filter(WatchItem.list_id.is_(None)).update({"list_id": out[0].id})
         db.session.commit()
     return out
+
+
+DEFAULT_STATES = ("Por abrir", "A ler relatórios", "Em tese", "Parqueada", "Descartada")
+PRIORITIES = {"alta": "Alta", "media": "Média", "baixa": "Baixa"}
+
+
+def states(list_id):
+    """Os estados (colunas) de uma lista, por ordem. Cria os de omissão se a lista ainda não tiver nenhum; as ações
+    sem estado (ou com um estado de outra lista) vão para o primeiro."""
+    out = WatchState.query.filter_by(list_id=list_id).order_by(WatchState.position, WatchState.id).all()
+    if not out:
+        db.session.add_all(WatchState(list_id=list_id, title=t, position=i) for i, t in enumerate(DEFAULT_STATES))
+        db.session.commit()
+        out = WatchState.query.filter_by(list_id=list_id).order_by(WatchState.position, WatchState.id).all()
+    ids = {st.id for st in out}
+    loose = [w for w in WatchItem.query.filter_by(list_id=list_id).all() if w.state_id not in ids]
+    if loose:
+        end = (db.session.query(db.func.max(WatchItem.position)).filter(WatchItem.state_id == out[0].id).scalar() or 0)
+        for i, w in enumerate(sorted(loose, key=lambda w: w.creation or datetime.min), 1):
+            w.state_id, w.position = out[0].id, end + i
+        db.session.commit()
+    return out
+
+
+def next_position(state_id):
+    return (db.session.query(db.func.max(WatchItem.position)).filter(WatchItem.state_id == state_id).scalar() or 0) + 1
+
+
+def export_list(wl):
+    """A lista num dicionário (para o ficheiro JSON de «Exportar»)."""
+    from . import triage
+    sts = states(wl.id)
+    names = {st.id: st.title for st in sts}
+    items = []
+    for w in WatchItem.query.filter_by(list_id=wl.id).order_by(WatchItem.position).all():
+        inst = db.session.get(Instrument, w.instrument)
+        items.append({"ticker": w.instrument, "nome": inst.instrument_name if inst else None,
+                      "moeda": inst.currency if inst else None, "lente": w.method, "estado": names.get(w.state_id),
+                      "prioridade": w.priority or "media", "porque": w.reason, "notas": w.notes,
+                      "preco_alvo": w.target_price,
+                      "parametros": [{"kind": r.kind, "threshold": r.threshold, "alert": bool(r.alert)}
+                                     for r in WatchRule.query.filter_by(watch_id=w.id).order_by(WatchRule.id)],
+                      "respostas": triage.answers(w.instrument)})
+    return {"formato": "portfolio-investimentos/lista", "versao": 1, "titulo": wl.title,
+            "estados": [st.title for st in sts], "acoes": items}
+
+
+def import_list(data, ensure_instrument):
+    """Cria uma lista nova a partir de um ficheiro de «Exportar». `ensure_instrument(ticker, nome, moeda)` cria o
+    ativo se faltar e devolve o ticker. Devolve a lista."""
+    from . import lenses, triage
+    if not isinstance(data, dict) or not isinstance(data.get("acoes"), list) or not data.get("titulo"):
+        raise ValueError("O ficheiro não é uma lista exportada da aplicação.")
+    title = str(data["titulo"]).strip()[:48]
+    taken = {wl.title.lower() for wl in WatchList.query.all()}
+    if title.lower() in taken:
+        title = f"{title} (importada)"
+        n = 2
+        while title.lower() in taken:
+            title = f"{str(data['titulo']).strip()[:44]} ({n})"
+            n += 1
+    wl = WatchList(title=title)
+    db.session.add(wl)
+    db.session.flush()
+    titles = [str(t).strip()[:40] for t in data.get("estados") or [] if str(t).strip()] or list(DEFAULT_STATES)
+    sts = [WatchState(list_id=wl.id, title=t, position=i) for i, t in enumerate(titles)]
+    db.session.add_all(sts)
+    db.session.flush()
+    by_title = {st.title: st for st in sts}
+    for pos, a in enumerate(data["acoes"][:500]):
+        if not isinstance(a, dict) or not a.get("ticker"):
+            continue
+        ticker = ensure_instrument(str(a["ticker"]), a.get("nome"), a.get("moeda") or "EUR")
+        if WatchItem.query.filter_by(instrument=ticker, list_id=wl.id).first():
+            continue
+        st = by_title.get(str(a.get("estado") or "").strip()[:40]) or sts[0]
+        target = a.get("preco_alvo")
+        w = WatchItem(instrument=ticker, list_id=wl.id, state_id=st.id, position=pos,
+                      priority=a.get("prioridade") if a.get("prioridade") in PRIORITIES else "media",
+                      method=a.get("lente") if a.get("lente") in lenses.REAL else None,
+                      reason=(str(a["porque"])[:2000] if a.get("porque") else None),
+                      notes=(str(a["notas"])[:5000] if a.get("notas") else None),
+                      target_price=target if isinstance(target, (int, float)) else None)
+        db.session.add(w)
+        db.session.flush()
+        for r in a.get("parametros") or []:
+            if isinstance(r, dict) and r.get("kind") in WatchRule.KINDS:
+                t = r.get("threshold")
+                db.session.add(WatchRule(watch_id=w.id, kind=r["kind"], alert=bool(r.get("alert")),
+                                         threshold=t if isinstance(t, (int, float)) else None))
+        if isinstance(a.get("respostas"), dict) and a["respostas"] and not triage.answers(ticker):
+            triage.save_answers(ticker, a["respostas"])
+    db.session.commit()
+    return wl

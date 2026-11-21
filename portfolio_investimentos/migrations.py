@@ -102,6 +102,23 @@ def _m008_watch_lists(conn):
     conn.execute("UPDATE watch_item SET method = 'graham_def' WHERE method = 'graham'")
 
 
+def _m009_watch_board(conn):
+    """As listas passam a quadro: estados (colunas) por lista e, em cada ação, o estado, a prioridade, a ordem, o
+    «porque entrou» e as notas da leitura (a nota que havia passa para lá). Os estados criam-se ao abrir a lista."""
+    conn.execute("""CREATE TABLE IF NOT EXISTS watch_state (
+        id INTEGER NOT NULL PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES watch_list (id) ON DELETE CASCADE,
+        title VARCHAR(40) NOT NULL, position INTEGER)""")
+    if not _columns(conn, "watch_item"):
+        return
+    _add_column(conn, "watch_item", "state_id", "INTEGER REFERENCES watch_state (id) ON DELETE SET NULL")
+    _add_column(conn, "watch_item", "priority", "VARCHAR(8) DEFAULT 'media'")
+    _add_column(conn, "watch_item", "position", "INTEGER DEFAULT 0")
+    _add_column(conn, "watch_item", "reason", "TEXT")
+    _add_column(conn, "watch_item", "notes", "TEXT")
+    conn.execute("UPDATE watch_item SET notes = note WHERE notes IS NULL AND note IS NOT NULL")
+    conn.execute("UPDATE watch_item SET priority = 'media' WHERE priority IS NULL")
+
+
 MIGRATIONS = [
     (1, "Resultado indicado pela corretora em cada venda", _m001_transaction_result),
     (2, "Data da última cotação obtida de cada ativo", _m002_instrument_last_quote),
@@ -111,6 +128,7 @@ MIGRATIONS = [
     (6, "Valor de cada ação: owner earnings, NOPAT e caixa líquida", _m006_fundamental_more),
     (7, "Acompanhamento: parâmetros e alertas de cada ação (os alertas de preço passam para lá)", _m007_watch_rules),
     (8, "Prospeção: várias listas de acompanhamento e as lentes da triagem", _m008_watch_lists),
+    (9, "Prospeção: as listas em quadro (estados, prioridade, notas)", _m009_watch_board),
 ]
 LATEST = MIGRATIONS[-1][0]
 

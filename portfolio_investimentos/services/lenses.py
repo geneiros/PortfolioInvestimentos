@@ -80,6 +80,21 @@ def metrics_from_info(info, quote=None):
     }
     if out["pe"] is not None and not 1 <= out["pe"] <= 1000:  # P/L abaixo de 1 é erro de dados
         out["pe"] = None
+    # por ação, na moeda da cotação: o Yahoo dá o lucro, o valor contabilístico e o dividendo por ação na moeda das
+    # contas ou em libras com a cotação em pence (ex.: Shell em Londres, TSMC nos EUA); os rácios dele, não
+    out["fin_currency"] = i.get("financialCurrency") or currency
+    if price and out["pe"]:
+        out["eps"] = price / out["pe"]
+    if price and out["fpe"] and out["fpe"] > 0:
+        out["fwd_eps"] = price / out["fpe"]
+    if price and out["pb"] and 0 < out["pb"] < 50:
+        out["bvps"] = price / out["pb"]
+    elif out["fin_currency"] != MAJOR.get(currency, currency):
+        out["bvps"] = None
+    if out["div"] and price:
+        out["dps"] = out["div"] * price
+    if out["pb"] is not None and out["pb"] > 200:  # erro de dados (ex.: o valor contabilístico noutra moeda)
+        out["pb"] = None
     if out["pb"] is not None and out["pb"] < 0:  # capital próprio negativo: ROE e dívida/capital não dizem nada
         out["roe"] = out["de"] = None
     return out

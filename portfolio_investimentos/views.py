@@ -520,28 +520,54 @@ def _radar_lists():
 
 @bp.route("/radar/acompanhamento")
 def acompanhamento():
-    """Prospeção → uma lista de acompanhamento: as ações, os parâmetros e os alertas de cada uma."""
-    from .services import lenses, moat, tracking
+    """Prospeção → uma lista de acompanhamento, em quadro: os estados (colunas) e as ações (cartões), com os
+    parâmetros e os alertas de cada uma."""
+    from .services import lenses, tracking, triage
     c = ctx.build("radar", "Prospeção")
     fired = tracking.check()
     lists = _radar_lists()
     sel = _int(request.args.get("lista"))
     current = next((wl for wl in lists if wl.id == sel), lists[0])
+    states = tracking.states(current.id)
     currencies = {i.ticker: i for i in Instrument.query.all()}
-    rows = []
-    for w in WatchItem.query.filter_by(list_id=current.id).order_by(WatchItem.creation.desc()).all():
+    tab = {r["t"]: r for r in (triage.table() or {}).get("rows", [])}
+    cards = {st.id: [] for st in states}
+    count = 0
+    for w in WatchItem.query.filter_by(list_id=current.id).order_by(WatchItem.position, WatchItem.id).all():
         inst = currencies.get(w.instrument)
         rules = WatchRule.query.filter_by(watch_id=w.id).order_by(WatchRule.id).all()
-        rows.append(SimpleNamespace(w=w, inst=inst, currency=inst.currency if inst else "", v=tracking.values(w),
-                                    rules=rules, method=lenses.LENSES.get(w.method) if w.method in lenses.REAL
-                                    else None, user=moat.checklist(w.instrument)))
-    c.update(rows=rows, fired_now=fired, recent=tracking.recent(), kinds=tracking.KINDS, groups=tracking.GROUPS,
-             describe=tracking.describe, chip=tracking.chip, method_short=tracking.METHOD_SHORT,
-             evaluate=tracking.evaluate, lists=lists, current_list=current,
+        t = tab.get(w.instrument)
+        v = tracking.values(w)
+        answers = triage.answers(w.instrument)
+        cards.setdefault(w.state_id, []).append(SimpleNamespace(
+            w=w, inst=inst, currency=inst.currency if inst else "", v=v, rules=rules, t=t,
+            name=(t["n"] if t else None) or (inst.instrument_name if inst else None) or w.instrument,
+            enters=[lenses.LENSES[k]["name"] for k in lenses.REAL if t and t["st"].get(k) == "entra"],
+            method=lenses.LENSES.get(w.method) if w.method in lenses.REAL else None, answers=answers,
+            answered=sum(1 for k, _, _ in triage.QUESTIONS if answers.get(k))))
+        count += 1
+    c.update(states=states, cards=cards, count=count, fired_now=fired, recent=tracking.recent(),
+             kinds=tracking.KINDS, groups=tracking.GROUPS, describe=tracking.describe, chip=tracking.chip,
+             method_short=tracking.METHOD_SHORT, evaluate=tracking.evaluate, lists=lists, current_list=current,
+             priorities=tracking.PRIORITIES, questions=triage.QUESTIONS,
              rules_json=lambda rules: [{"kind": r.kind, "threshold": r.threshold, "alert": bool(r.alert)} for r in rules],
              portfolio_fired=portfolio_alerts.check(), portfolio_alert_rows=portfolio_alerts.rows(),
              instruments=Instrument.query.filter(Instrument.kind != "index").order_by(Instrument.ticker).all())
     return render_template("pages/acompanhamento.html", **c)
+
+
+@bp.route("/radar/lista/<int:list_id>.json")
+def lista_json(list_id):
+    """«Exportar»: a lista num ficheiro JSON (estados, ações, notas, respostas e parâmetros)."""
+    import json
+    from .models import WatchList
+    from .services import tracking
+    wl = db.session.get(WatchList, list_id)
+    if wl is None:
+        abort(404)
+    name = "".join(ch for ch in wl.title if ch.isalnum() or ch in "-_ ").strip().replace(" ", "-") or "lista"
+    return Response(json.dumps(tracking.export_list(wl), ensure_ascii=False, indent=2), mimetype="application/json",
+                    headers={"Content-Disposition": f"attachment; filename=lista-{name}.json"})
 
 
 @bp.route("/oportunidades")

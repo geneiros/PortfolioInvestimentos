@@ -122,6 +122,18 @@ class WatchList(db.Model):
     creation = db.Column(db.DateTime, default=utcnow)
 
 
+class WatchState(db.Model):
+    """Um estado (coluna) do quadro de uma lista, ex.: «Por abrir», «Em tese»."""
+    id = db.Column(db.Integer, primary_key=True)
+    list_id = db.Column(db.Integer, db.ForeignKey("watch_list.id", ondelete="CASCADE"), nullable=False)
+    title = db.Column(db.String(40), nullable=False)
+    position = db.Column(db.Integer, default=0)
+
+    @property
+    def name(self):
+        return str(self.id)
+
+
 class WatchItem(NameMixin, db.Model):
     """Uma ação numa lista de acompanhamento (Prospeção): vem da triagem (com a lente onde entrou) ou é juntada à
     mão. Os parâmetros a acompanhar e os alertas são as `WatchRule`."""
@@ -133,6 +145,11 @@ class WatchItem(NameMixin, db.Model):
     method = db.Column(db.String(16))   # lente da triagem onde foi encontrada (ex.: "buffett")
     criteria = db.Column(db.Text)       # (das Oportunidades antigas: os limites usados na pesquisa, JSON)
     list_id = db.Column(db.Integer, db.ForeignKey("watch_list.id", ondelete="CASCADE"))  # None: a primeira lista
+    state_id = db.Column(db.Integer, db.ForeignKey("watch_state.id", ondelete="SET NULL"))  # None: o primeiro estado
+    priority = db.Column(db.String(8), default="media")  # alta, media, baixa
+    position = db.Column(db.Integer, default=0)  # ordem na coluna
+    reason = db.Column(db.Text)  # «Porque entrou»
+    notes = db.Column(db.Text)  # «Notas da leitura»
 
 
 class WatchRule(NameMixin, db.Model):
