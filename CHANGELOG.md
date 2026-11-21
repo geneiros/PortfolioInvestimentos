@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **Versão 0.5.0**  
+  Executáveis e APK novos com o Planeamento novo, as Oportunidades (grandes investidores e moat) e o Acompanhamento com parâmetros e alertas. Ao abrir, os alertas de preço e o preço-alvo passam sozinhos para o Acompanhamento, com uma cópia da base de dados guardada antes. Quem tem uma versão anterior vê a faixa «Há uma versão nova».
 - **README: capturas e funcionalidades atualizadas**  
   Todas as capturas refeitas com os mesmos dados (demonstração, uma pesquisa real nas Oportunidades e ações em Acompanhamento com um alerta disparado). A descrição passa a incluir o Acompanhamento na introdução, nas páginas disponíveis offline e no aviso da Visão Geral. O aviso de um alerta mantém as siglas em maiúsculas («P/L abaixo de 30»).
 - **Radar e alertas: Oportunidades primeiro e Acompanhamento**  
