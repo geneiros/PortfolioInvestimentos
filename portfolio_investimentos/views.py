@@ -510,23 +510,34 @@ def fiscal_simulation_csv():
                     headers={"Content-Disposition": f"attachment; filename=simulacao-venda-{name}.csv"})
 
 
+def _radar_lists():
+    """As listas de acompanhamento com o número de ações de cada uma (para os separadores e o «Guardar»)."""
+    from .services import tracking
+    lists = tracking.watch_lists()
+    counts = dict(db.session.query(WatchItem.list_id, db.func.count(WatchItem.id)).group_by(WatchItem.list_id).all())
+    return [SimpleNamespace(id=wl.id, title=wl.title, n=counts.get(wl.id, 0)) for wl in lists]
+
+
 @bp.route("/radar/acompanhamento")
 def acompanhamento():
-    """Prospeção → Acompanhamento: as ações que juntaste, os parâmetros e os alertas de cada uma."""
-    from .services import moat, screener, tracking
+    """Prospeção → uma lista de acompanhamento: as ações, os parâmetros e os alertas de cada uma."""
+    from .services import lenses, moat, tracking
     c = ctx.build("radar", "Prospeção")
     fired = tracking.check()
+    lists = _radar_lists()
+    sel = _int(request.args.get("lista"))
+    current = next((wl for wl in lists if wl.id == sel), lists[0])
     currencies = {i.ticker: i for i in Instrument.query.all()}
     rows = []
-    for w in WatchItem.query.order_by(WatchItem.creation.desc()).all():
+    for w in WatchItem.query.filter_by(list_id=current.id).order_by(WatchItem.creation.desc()).all():
         inst = currencies.get(w.instrument)
         rules = WatchRule.query.filter_by(watch_id=w.id).order_by(WatchRule.id).all()
         rows.append(SimpleNamespace(w=w, inst=inst, currency=inst.currency if inst else "", v=tracking.values(w),
-                                    rules=rules, method=screener.METHODS.get(w.method),
-                                    user=moat.checklist(w.instrument)))
+                                    rules=rules, method=lenses.LENSES.get(w.method) if w.method in lenses.REAL
+                                    else None, user=moat.checklist(w.instrument)))
     c.update(rows=rows, fired_now=fired, recent=tracking.recent(), kinds=tracking.KINDS, groups=tracking.GROUPS,
              describe=tracking.describe, chip=tracking.chip, method_short=tracking.METHOD_SHORT,
-             evaluate=tracking.evaluate,
+             evaluate=tracking.evaluate, lists=lists, current_list=current,
              rules_json=lambda rules: [{"kind": r.kind, "threshold": r.threshold, "alert": bool(r.alert)} for r in rules],
              portfolio_fired=portfolio_alerts.check(), portfolio_alert_rows=portfolio_alerts.rows(),
              instruments=Instrument.query.filter(Instrument.kind != "index").order_by(Instrument.ticker).all())
@@ -535,38 +546,58 @@ def acompanhamento():
 
 @bp.route("/oportunidades")
 def oportunidades_antiga():
-    """O endereço antigo das Oportunidades (agora o primeiro separador de Prospeção)."""
+    """O endereço antigo das Oportunidades (agora a triagem, o primeiro separador de Prospeção)."""
     from flask import redirect
-    q = request.query_string.decode()
-    return redirect("/radar" + (f"?{q}" if q else ""))
+    return redirect("/radar")
+
+
+def _short(v, digits=4):
+    """Um número com poucos algarismos significativos (a tabela da triagem vai inteira para a página)."""
+    if v is None:
+        return None
+    return float(f"{v:.{digits}g}")
 
 
 @bp.route("/radar")
-def oportunidades():
-    """Prospeção → Oportunidades (o primeiro separador): as ações que cumprem os critérios dos grandes
-    investidores e o moat."""
-    from .services import moat, screener
+def triagem():
+    """Prospeção → Ações: a triagem das ações do mundo pelas lentes dos grandes investidores. A tabela filtra-se
+    na página; ao clicar numa ação, a ficha abre ao lado."""
+    from .services import lenses, triage
     c = ctx.build("radar", "Prospeção")
-    res = screener.last()
-    method = request.args.get("metodo") or (res or {}).get("method") or "buffett"
-    if method not in screener.METHODS:
-        method = "buffett"
-    same = bool(res and res.get("method") == method)
-    crit, post = screener.criteria(method, res.get("values") if same else None)
-    rows = res["rows"] if same else []
-    watched = {w.instrument for w in WatchItem.query.all()}
-    for r in rows:
-        r["moat"] = moat.get(r["ticker"])
-        r["user"] = moat.checklist(r["ticker"])
-        r["has_moat"] = moat.has_moat(r["moat"], r["user"])
-        r["watched"] = r["ticker"] in watched
-    only = request.args.get("moat") == "1"
-    c.update(methods=screener.METHODS, method=method, m=screener.METHODS[method], crit=crit, post=post,
-             regions=screener.REGIONS, caps=screener.MIN_CAPS, res=res if same else None,
-             rows=[r for r in rows if r["has_moat"]] if only else rows, only_moat=only,
-             analysed=sum(1 for r in rows if r["moat"]), with_moat=sum(1 for r in rows if r["has_moat"]),
-             pillars=moat.PILLARS, tests=moat.TESTS)
-    return render_template("pages/oportunidades.html", **c)
+    tab = triage.table()
+    order = lenses.REAL + ["varias"]
+    code = {"entra": "e", "quase": "q", "falha": "f", None: "-"}
+    rows = []
+    for r in (tab or {}).get("rows", []):
+        rows.append([r["t"], r["n"], r["c"], r["g"], r["s"], r["cur"], _short(r["p"]), _short(r["cap"], 3),
+                     _short(r["pe"], 3), _short(r["pb"], 3), _short(r["roe"], 3), _short(r["rg"], 3),
+                     _short(r["dv"], 3), _short(r["de"], 3), "".join(code[r["st"][k]] for k in order), r["k"],
+                     1 if r["full"] else 0])
+    watched = {}
+    for w in WatchItem.query.all():
+        watched.setdefault(w.instrument, []).append(w.list_id)
+    lens_list = [{"key": k, "name": v["name"], "sub": v["sub"], "text": v["text"]}
+                 for k, v in lenses.LENSES.items()]
+    c.update(tab=tab, lists=_radar_lists(), lens_list=lens_list,
+             triage_json=ctx.js_json({"order": order, "rows": rows, "watched": watched}),
+             regions=sorted({r["g"] for r in (tab or {}).get("rows", [])}),
+             sectors=sorted({r["s"] for r in (tab or {}).get("rows", []) if r["s"]}))
+    return render_template("pages/triagem.html", **c)
+
+
+@bp.route("/radar/acao/<ticker>")
+def triagem_acao(ticker):
+    """A ficha completa de uma ação (o painel ao lado da tabela da triagem)."""
+    from .services import lenses, moat, triage, yahoo
+    ticker = ticker.strip().upper()[:32]
+    try:
+        d = triage.detail(ticker)
+    except yahoo.YahooError as exc:
+        return render_template("pages/_triagem_ficha.html", error=str(exc), ticker=ticker)
+    in_lists = [w.list_id for w in WatchItem.query.filter_by(instrument=ticker).all()]
+    return render_template("pages/_triagem_ficha.html", d=d, lenses=lenses.LENSES, real=lenses.REAL,
+                           a=moat.get(ticker), u=moat.checklist(ticker), pillars=moat.PILLARS, tests=moat.TESTS,
+                           lists=_radar_lists(), in_lists=in_lists, error=None, ticker=ticker)
 
 
 def radar_instruments():

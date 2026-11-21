@@ -290,9 +290,6 @@ span.pm-logo { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; f
 @media (prefers-reduced-motion: reduce) { #pmProgress, #pmProgress.pm-done { transition: none; } }
 
 /* ---------------------------------------------------------------- Oportunidades */
-.pm-method { border: 1px solid transparent; transition: border-color .15s; }
-.pm-method:hover { border-color: rgba(var(--bs-primary-rgb), .4); }
-.pm-method-active { border-color: var(--pm-accent); box-shadow: inset 0 0 0 1px var(--pm-accent); }
 .pm-moat-detail, .pm-moat-detail td, .pm-moat-detail th, .pm-moat-detail label { white-space: normal; }
 /* ---------------------------------------------------------------- Planeamento */
 .pm-plan-hero { background-image: linear-gradient(120deg, transparent 55%, rgba(var(--bs-primary-rgb), .08)); }
@@ -352,3 +349,59 @@ span.pm-logo { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; f
 .pm-rule { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); font-weight: 500; margin: 0 .2rem .25rem 0; white-space: normal; text-align: left; }
 .pm-rule-met { background: rgba(var(--bs-success-rgb), .15); color: var(--pm-up); }
 .pm-rule-unknown { background: transparent; border: 1px dashed var(--bs-border-color); }
+
+/* ---------------------------------------------------------------- Prospeção → Ações (triagem) */
+.pm-radar-tabs { overflow-x: auto; overflow-y: hidden; }
+.pm-triage { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr) 25rem; gap: 1rem; align-items: start; }
+.pm-triage-lenses { position: sticky; top: 1rem; }
+.pm-triage-lenses .list-group-item { background: transparent; border-radius: .5rem; border: 0; padding: .45rem .6rem; margin-bottom: .1rem; color: var(--pm-text); }
+.pm-triage-lenses .list-group-item.active { background: rgba(var(--bs-primary-rgb), .14); color: var(--pm-text); }
+.pm-triage-lenses .list-group-item.active .fw-semibold { color: var(--pm-accent); }
+.pm-lens-sub { color: var(--pm-muted); }
+.pm-lens-count { background: var(--bs-secondary-bg); color: var(--pm-text); }
+.pm-lens.active .pm-lens-count { background: var(--pm-accent); color: #fff; }
+.pm-triage-table tbody tr { cursor: pointer; }
+.pm-triage-table td, .pm-triage-table th { white-space: nowrap; padding: .45rem .4rem; font-size: .875rem; }
+.pm-triage-table th { font-size: .72rem; }
+.pm-triage-name { max-width: 11rem; }
+.pm-dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .12rem; border: 1.5px solid var(--pm-up); vertical-align: middle; }
+.pm-dot-e { background: var(--pm-up); }
+.pm-dot-q { background: linear-gradient(90deg, var(--bs-warning) 50%, transparent 50%); border-color: var(--bs-warning); }
+.pm-dot-f { border-color: var(--bs-border-color); }
+.pm-dot-none { border: 1.5px dashed var(--bs-border-color); }
+.pm-dot-here { outline: 2px solid rgba(var(--bs-primary-rgb), .45); outline-offset: 1px; }
+.pm-in { background: rgba(var(--bs-success-rgb), .16); color: var(--pm-up); }
+.pm-near { background: rgba(var(--bs-warning-rgb), .18); color: var(--bs-warning-text-emphasis); }
+.pm-out { background: var(--bs-secondary-bg); color: var(--pm-muted); }
+.pm-none { background: transparent; border: 1px dashed var(--bs-border-color); color: var(--pm-muted); }
+.pm-ic-pm-in { color: var(--pm-up); }
+.pm-ic-pm-near { color: var(--bs-warning); }
+.pm-ic-pm-out { color: var(--pm-down); }
+.pm-ic-pm-none { color: var(--pm-muted); }
+.pm-triage-panel { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); }
+.pm-triage-panel > .pm-card { overflow-y: auto; max-height: calc(100vh - 2rem); }
+.pm-tag-up { background: rgba(var(--bs-success-rgb), .14); color: var(--pm-up); }
+.pm-tag-warn { background: rgba(var(--bs-warning-rgb), .18); color: var(--bs-warning-text-emphasis); }
+.pm-tag-down { background: rgba(var(--bs-danger-rgb), .14); color: var(--pm-down); }
+.pm-lens-detail { border: 1px solid var(--bs-border-color-translucent); border-radius: .5rem; padding: .35rem .6rem; }
+.pm-lens-detail summary { cursor: pointer; list-style: none; }
+.pm-lens-detail summary::-webkit-details-marker { display: none; }
+.pm-lens-detail summary::before { content: "\F285"; font-family: bootstrap-icons; font-size: .7rem; color: var(--pm-muted); transition: transform .15s; }
+.pm-lens-detail[open] summary::before { transform: rotate(90deg); }
+.pm-kv { font-size: .875rem; }
+.pm-range { position: relative; height: .4rem; border-radius: .2rem; background: linear-gradient(90deg, rgba(var(--bs-danger-rgb), .45), rgba(var(--bs-warning-rgb), .45), rgba(var(--bs-success-rgb), .45)); }
+.pm-range span { position: absolute; top: -.3rem; width: .25rem; height: 1rem; margin-left: -.125rem; border-radius: .1rem; background: var(--pm-text); }
+@media (max-width: 1399.98px) {
+  .pm-triage { grid-template-columns: 13rem minmax(0, 1fr); }
+  .pm-triage-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(30rem, 100vw); max-height: none; z-index: 1045;
+    transform: translateX(105%); transition: transform .2s ease-out; box-shadow: -.5rem 0 1.5rem rgba(0, 0, 0, .25); }
+  .pm-triage-panel > .pm-card { height: 100%; max-height: none; border-radius: 0; }
+  .pm-triage-panel.pm-open { transform: none; }
+}
+@media (max-width: 767.98px) {
+  .pm-triage { grid-template-columns: minmax(0, 1fr); }
+  .pm-triage-lenses { position: static; }
+  .pm-triage-lenses .list-group { flex-direction: row; overflow-x: auto; gap: .25rem; }
+  .pm-triage-lenses .list-group-item { flex: 0 0 auto; }
+  .pm-lens-sub { display: none; }
+}

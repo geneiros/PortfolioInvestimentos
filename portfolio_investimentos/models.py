@@ -111,16 +111,28 @@ class ImportBatch(NameMixin, db.Model):
     creation = db.Column(db.DateTime, default=utcnow)
 
 
+class WatchList(db.Model):
+    """Uma lista de ações em acompanhamento (Prospeção → Listas), ex.: «A minha lista», «Dividendos»."""
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(60), nullable=False)
+
+    @property
+    def name(self):
+        return str(self.id)
+    creation = db.Column(db.DateTime, default=utcnow)
+
+
 class WatchItem(NameMixin, db.Model):
-    """Uma ação em Acompanhamento (Prospeção): vem das Oportunidades (com o método e os limites usados) ou é
-    juntada à mão. Os parâmetros a acompanhar e os alertas são as `WatchRule`."""
+    """Uma ação numa lista de acompanhamento (Prospeção): vem da triagem (com a lente onde entrou) ou é juntada à
+    mão. Os parâmetros a acompanhar e os alertas são as `WatchRule`."""
     id = db.Column(db.Integer, primary_key=True)
     instrument = db.Column(db.String(32), db.ForeignKey("instrument.ticker"), nullable=False)
     target_price = db.Column(db.Float)
     note = db.Column(db.String(255))
     creation = db.Column(db.DateTime, default=utcnow)
-    method = db.Column(db.String(16))   # método das Oportunidades onde foi encontrada (ex.: "buffett")
-    criteria = db.Column(db.Text)       # limites usados nessa pesquisa (JSON)
+    method = db.Column(db.String(16))   # lente da triagem onde foi encontrada (ex.: "buffett")
+    criteria = db.Column(db.Text)       # (das Oportunidades antigas: os limites usados na pesquisa, JSON)
+    list_id = db.Column(db.Integer, db.ForeignKey("watch_list.id", ondelete="CASCADE"))  # None: a primeira lista
 
 
 class WatchRule(NameMixin, db.Model):

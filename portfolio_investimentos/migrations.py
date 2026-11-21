@@ -88,6 +88,20 @@ def _m007_watch_rules(conn):
         conn.execute("DELETE FROM alert")
 
 
+def _m008_watch_lists(conn):
+    """Várias listas de acompanhamento: as ações que já havia ficam na primeira («A minha lista»); as Oportunidades
+    dão lugar à triagem e os métodos passam a lentes (graham → graham_def)."""
+    conn.execute("""CREATE TABLE IF NOT EXISTS watch_list (
+        id INTEGER NOT NULL PRIMARY KEY, title VARCHAR(60) NOT NULL, creation DATETIME)""")
+    if not _columns(conn, "watch_item"):
+        return
+    _add_column(conn, "watch_item", "list_id", "INTEGER REFERENCES watch_list (id) ON DELETE CASCADE")
+    if conn.execute("SELECT COUNT(*) FROM watch_item").fetchone()[0]:
+        cur = conn.execute("INSERT INTO watch_list (title, creation) VALUES ('A minha lista', datetime('now'))")
+        conn.execute("UPDATE watch_item SET list_id = ? WHERE list_id IS NULL", (cur.lastrowid,))
+    conn.execute("UPDATE watch_item SET method = 'graham_def' WHERE method = 'graham'")
+
+
 MIGRATIONS = [
     (1, "Resultado indicado pela corretora em cada venda", _m001_transaction_result),
     (2, "Data da última cotação obtida de cada ativo", _m002_instrument_last_quote),
@@ -96,6 +110,7 @@ MIGRATIONS = [
     (5, "Custo anual (TER) de cada ETF", _m005_instrument_ter),
     (6, "Valor de cada ação: owner earnings, NOPAT e caixa líquida", _m006_fundamental_more),
     (7, "Acompanhamento: parâmetros e alertas de cada ação (os alertas de preço passam para lá)", _m007_watch_rules),
+    (8, "Prospeção: várias listas de acompanhamento e as lentes da triagem", _m008_watch_lists),
 ]
 LATEST = MIGRATIONS[-1][0]
 

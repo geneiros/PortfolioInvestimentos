@@ -1,0 +1,178 @@
+{% autoescape true %}{% from "macros.html" import help %}
+{% if error %}
+<div class="d-flex mb-2"><button class="btn-close ms-auto" type="button" data-panel-close aria-label="Fechar"></button></div>
+<div class="text-center text-secondary py-4"><i class="bi bi-cloud-slash fs-1"></i>
+  <p class="mt-2 mb-0">Não foi possível ler os dados de <b>{{ ticker }}</b> no Yahoo: {{ error }}</p></div>
+{% else %}{% set m = d.m %}{% set i = d.info or {} %}
+{% macro row(label, value, tip=None) -%}
+<div class="d-flex justify-content-between py-1 border-bottom pm-kv"><span class="text-secondary">{{ label }}{% if tip %} {{ help(tip) }}{% endif %}</span><span class="fw-semibold">{{ value }}</span></div>
+{%- endmacro %}
+{% set dash = "—" %}
+<div class="pm-ficha" data-ficha="{{ d.ticker }}">
+  <div class="d-flex align-items-start gap-2 mb-1">
+    <div class="me-auto">
+      <h5 class="fw-bold mb-0">{{ d.name }}</h5>
+      <div class="small text-secondary">{{ d.ticker }}{% if m.country %} · {{ m.country }}{% endif %}{% if m.sector %} · {{ m.sector }}{% endif %}{% if i.industry %} · {{ i.industry }}{% endif %}</div>
+    </div>
+    <button class="btn-close" type="button" data-panel-close aria-label="Fechar"></button>
+  </div>
+  <div class="d-flex flex-wrap align-items-baseline gap-3 mb-2">
+    <span class="fs-4 fw-bold">{{ m.price|number(2) if m.price else dash }} <small class="fs-6 text-secondary">{{ m.currency or "" }}</small></span>
+    {% if m.cap_usd %}<span class="text-secondary">Capitalização <b class="text-body">{{ (m.cap_usd / 1e9)|number(0 if m.cap_usd >= 1e11 else 1) }} mM$</b></span>{% endif %}
+  </div>
+  {% if d.blurb %}<p class="mb-2">{{ d.blurb }}</p>{% endif %}
+  {% if d.tags %}<div class="d-flex flex-wrap gap-1 mb-3">{% for t, kind in d.tags %}<span class="badge pm-tag pm-tag-{{ kind }}">{{ t }}</span>{% endfor %}</div>{% endif %}
+
+  <button class="btn btn-primary w-100 mb-3" type="button" data-save-ticker="{{ d.ticker }}" data-save-name="{{ d.name }}" data-save-currency="{{ m.currency or 'USD' }}"
+          data-save-lens="{{ request.args.get('lente') if request.args.get('lente') in real else (d.enters|first if d.enters else '') }}" data-save-lists='{{ in_lists|tojson }}'>
+    <i class="bi {{ 'bi-bookmark-check-fill' if in_lists else 'bi-bookmark-plus' }}"></i> {{ 'Guardada (' ~ (lists|selectattr("id", "in", in_lists)|map(attribute="title")|join(", ")) ~ ') · guardar noutra' if in_lists else 'Guardar na lista' }}</button>
+
+  <ul class="nav nav-pills nav-fill small mb-3" role="tablist">
+    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#fichaMain" type="button" role="tab">Ficha completa</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#fichaList" type="button" role="tab">Se entrar na lista</button></li>
+  </ul>
+  <div class="tab-content">
+  <div class="tab-pane fade show active" id="fichaMain" role="tabpanel">
+
+  {# ---------------------------------------------------------------- Graham e Bazin #}
+  <div class="row g-2 mb-3">
+    <div class="col-6"><div class="pm-card pm-card-sm h-100">
+      <div class="pm-label">Número de Graham {{ help("√(22,5 × lucro por ação × valor contabilístico por ação): o preço máximo que Graham pagaria por uma empresa defensiva.") }}</div>
+      {% if d.graham %}<div class="fs-5 fw-bold">{{ d.graham|number(2) }} <small class="fs-6 text-secondary">{{ m.currency }}</small></div>
+        {% set gap = m.price / d.graham - 1 if m.price else None %}
+        {% if gap is not none %}<div class="small {{ 'text-success' if gap <= 0 else 'text-danger' }}">{{ 'A cotação está ' ~ ((-gap)|pct(0, sign=False)) ~ ' abaixo' if gap <= 0 else 'A cotação está ' ~ (gap|pct(0, sign=False)) ~ ' acima' }}</div>{% endif %}
+      {% else %}<div class="small text-secondary">Sem lucro ou valor contabilístico positivos.</div>{% endif %}
+    </div></div>
+    <div class="col-6"><div class="pm-card pm-card-sm h-100">
+      <div class="pm-label">Tecto de Bazin {{ help("Dividendo anual ÷ 6%: o preço máximo para render pelo menos 6% em dividendos.") }}</div>
+      {% if d.bazin %}<div class="fs-5 fw-bold">{{ d.bazin|number(2) }} <small class="fs-6 text-secondary">{{ m.currency }}</small></div>
+        {% set gap = m.price / d.bazin - 1 if m.price else None %}
+        {% if gap is not none %}<div class="small {{ 'text-success' if gap <= 0 else 'text-danger' }}">{{ 'A cotação está ' ~ ((-gap)|pct(0, sign=False)) ~ ' abaixo' if gap <= 0 else 'A cotação está ' ~ (gap|pct(0, sign=False)) ~ ' acima' }}</div>{% endif %}
+      {% else %}<div class="small text-secondary">Não paga dividendo.</div>{% endif %}
+    </div></div>
+  </div>
+
+  {# ---------------------------------------------------------------- as lentes #}
+  {% set labels = {"entra": ("Entra", "pm-in", "bi-check-circle-fill"), "quase": ("Quase", "pm-near", "bi-dash-circle-fill"), "falha": ("Falha", "pm-out", "bi-x-circle-fill"), None: ("Sem dados", "pm-none", "bi-circle")} %}
+  <div class="pm-label mb-1">Várias lentes <span class="text-secondary text-lowercase">· entra em {{ d.enters|length }} de {{ real|length }}</span></div>
+  <div class="row g-1 small mb-3">
+    {% for k in real %}{% set s = d.evals[k][0] %}
+    <div class="col-6"><span class="pm-lens-pill"><i class="bi {{ labels[s][2] }} pm-ic-{{ labels[s][1] }}"></i> {{ lenses[k].name }}</span></div>
+    {% endfor %}
+  </div>
+  {% for k in real %}{% set s, rows = d.evals[k] %}
+  <details class="pm-lens-detail mb-1" data-lens-detail="{{ k }}">
+    <summary class="d-flex align-items-center gap-2"><span class="fw-semibold me-auto">{{ lenses[k].name }}</span><span class="badge {{ labels[s][1] }}">{{ labels[s][0] }}</span></summary>
+    <div class="small text-secondary my-1">{{ lenses[k].text }}</div>
+    <ul class="list-unstyled small mb-2">
+      {% for label, text, value, st in rows %}
+      <li class="d-flex gap-2 py-1 border-bottom">
+        <i class="bi {{ 'bi-check-lg text-success' if st == 'pass' else 'bi-exclamation text-warning' if st == 'near' else 'bi-x-lg text-danger' if st == 'fail' else 'bi-dash text-secondary' }}"></i>
+        <span class="me-auto">{{ text }}</span>
+        <span class="text-nowrap {{ 'text-secondary' if value is none }}">{{ value if value is not none else 'sem dados' }}</span>
+        <span class="text-nowrap fw-semibold" style="width: 3.2rem">{{ {'pass': 'Passa', 'near': 'Perto', 'fail': 'Falha'}.get(st, '') }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endfor %}
+
+  {# ---------------------------------------------------------------- os números #}
+  <div class="row g-3 mt-1">
+    <div class="col-12">
+      <div class="pm-label mb-1">Avaliação</div>
+      {{ row("P/L", m.pe|number(1) if m.pe else dash, "Preço ÷ lucro por ação dos últimos 12 meses.") }}
+      {{ row("P/L previsto", m.fpe|number(1) if m.fpe else dash) }}
+      {{ row("P/VP", m.pb|number(2) if m.pb else dash, "Preço ÷ valor contabilístico por ação.") }}
+      {{ row("P/Vendas", m.ps|number(2) if m.ps else dash) }}
+      {{ row("EV/EBITDA", m.ev_ebitda|number(1) if m.ev_ebitda else dash) }}
+      {{ row("PEG", m.peg|number(2) if m.peg else dash, "P/L ÷ crescimento esperado do lucro (5 anos).") }}
+    </div>
+    <div class="col-12">
+      <div class="pm-label mb-1">Resultados</div>
+      {{ row("ROE", m.roe|pct(1, sign=False) if m.roe is not none else dash, "Lucro ÷ capital próprio.") }}
+      {{ row("ROA", m.roa|pct(1, sign=False) if m.roa is not none else dash) }}
+      {{ row("Margem bruta", m.gross_margin|pct(1, sign=False) if m.gross_margin is not none else dash) }}
+      {{ row("Margem operacional", m.op_margin|pct(1, sign=False) if m.op_margin is not none else dash) }}
+      {{ row("Margem líquida", m.net_margin|pct(1, sign=False) if m.net_margin is not none else dash) }}
+      {{ row("Lucro por ação", (m.eps|number(2) ~ " " ~ (m.currency or "")) if m.eps is not none else dash) }}
+    </div>
+    <div class="col-12">
+      <div class="pm-label mb-1">Crescimento</div>
+      {{ row("Vendas (último ano)", m.rev_growth|pct(1) if m.rev_growth is not none else dash) }}
+      {{ row("Lucro (último ano)", m.eps_growth|pct(1) if m.eps_growth is not none else dash) }}
+      {{ row("Lucro previsto por ação", (m.fwd_eps|number(2)) if m.fwd_eps is not none else dash) }}
+      {% if i.targetMeanPrice %}{{ row("Preço-alvo dos analistas", i.targetMeanPrice|number(2) ~ (" (" ~ i.numberOfAnalystOpinions ~ ")" if i.numberOfAnalystOpinions else "")) }}{% endif %}
+    </div>
+    <div class="col-12">
+      <div class="pm-label mb-1">Balanço</div>
+      {{ row("Dívida / capital", m.de|number(2) if m.de is not none else dash) }}
+      {{ row("Dívida líquida / EBITDA", m.net_debt_ebitda|number(1) if m.net_debt_ebitda is not none else dash) }}
+      {{ row("Liquidez corrente", m.current|number(2) if m.current is not none else dash, "Ativo corrente ÷ passivo corrente.") }}
+      {{ row("Liquidez reduzida", m.quick|number(2) if m.quick is not none else dash) }}
+      {{ row("Caixa livre (FCF)", ((m.fcf / 1e9)|number(2) ~ " mM " ~ (m.currency or "")) if m.fcf is not none else dash) }}
+    </div>
+    <div class="col-12">
+      <div class="pm-label mb-1">Acionista</div>
+      {{ row("Dividendo", m.div|pct(2, sign=False) if m.div else dash) }}
+      {{ row("Dividendo por ação", (m.dps|number(2) ~ " " ~ (m.currency or "")) if m.dps else dash) }}
+      {{ row("Payout", m.payout|pct(0, sign=False) if m.payout is not none else dash, "Parte do lucro paga em dividendos.") }}
+      {{ row("Beta", m.beta|number(2) if m.beta is not none else dash, "Quanto a ação costuma mexer face ao mercado (1 = igual).") }}
+    </div>
+    <div class="col-12">
+      <div class="pm-label mb-1">52 semanas</div>
+      {% if m.high and m.low and m.price and m.high > m.low %}{% set pos = ((m.price - m.low) / (m.high - m.low) * 100)|round(0) %}
+      <div class="pm-range my-2" title="{{ pos|int }}% do intervalo"><span style="left: {{ [[pos, 0]|max, 100]|min }}%"></span></div>
+      <div class="d-flex justify-content-between small text-secondary"><span>{{ m.low|number(2) }}</span><span>{{ (m.price / m.high - 1)|pct(0) }} do máximo</span><span>{{ m.high|number(2) }}</span></div>
+      {% else %}<div class="small text-secondary">Sem dados.</div>{% endif %}
+    </div>
+  </div>
+
+  {# ---------------------------------------------------------------- o negócio #}
+  <div class="pm-label mt-3 mb-1">O negócio</div>
+  {% if i.longBusinessSummary %}<p class="small mb-1">{{ i.longBusinessSummary }}</p><p class="small text-secondary mb-0">Descrição do Yahoo Finance (em inglês){% if i.fullTimeEmployees %} · {{ i.fullTimeEmployees|number(0) }} trabalhadores{% endif %}{% if i.website %} · <a href="{{ i.website }}" target="_blank" rel="noopener noreferrer">{{ i.website.replace('https://', '').replace('http://', '').rstrip('/') }}</a>{% endif %}</p>
+  {% else %}<p class="small text-secondary">Sem descrição no Yahoo.</p>{% endif %}
+
+  {# ---------------------------------------------------------------- o moat #}
+  <div class="pm-label mt-3 mb-1">Moat {{ help("A prova do fosso económico nos números (ROIC, margens, cash flow, dívida) e a fonte provável. Confirma tu cada pilar.") }}</div>
+  {% if a %}
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <span class="badge {{ 'text-bg-success' if a.verdict == 'Largo' else 'text-bg-warning' if a.verdict == 'Estreito' else 'text-bg-secondary' }}">{{ a.verdict }}{% if a.score is not none %} · {{ a.score }}/100{% endif %}</span>
+    <span class="small text-secondary">analisado a {{ a.date }} · <a href="#" data-moat="{{ d.ticker }}" onclick="return false">atualizar</a></span>
+  </div>
+  <table class="table table-sm small mb-2">{% for name, pts, mx, why in a.parts %}<tr><td>{{ name }}</td><td class="text-secondary">{{ why }}</td><td class="text-end text-nowrap"><b>{{ pts }}</b>/{{ mx }}</td></tr>{% endfor %}</table>
+  <form class="small" data-moat-form="{{ d.ticker }}">
+    <div class="fw-semibold mb-1">A fonte do moat</div>
+    {% for k, (label, question) in pillars.items() %}
+    <div class="form-check"><input class="form-check-input" type="checkbox" name="pillars" value="{{ k }}" id="fp-{{ loop.index }}" {{ 'checked' if k in u.pillars }}>
+      <label class="form-check-label" for="fp-{{ loop.index }}"><b>{{ label }}</b>{% if k in a.sources %} <span class="badge text-bg-info">sugerido</span>{% endif %} <span class="text-secondary">{{ question }}</span></label></div>
+    {% endfor %}
+    <div class="fw-semibold mt-2 mb-1">Os testes de Buffett</div>
+    {% for k, (label, question) in tests.items() %}
+    <div class="form-check"><input class="form-check-input" type="checkbox" name="tests" value="{{ k }}" id="ft-{{ loop.index }}" {{ 'checked' if k in u.tests }}>
+      <label class="form-check-label" for="ft-{{ loop.index }}"><b>{{ label }}</b> <span class="text-secondary">{{ question }}</span></label></div>
+    {% endfor %}
+    <textarea class="form-control form-control-sm mt-2" name="note" rows="2" placeholder="Notas (o que pode destruir o fosso?)" aria-label="Notas do moat">{{ u.note }}</textarea>
+    <button class="btn btn-sm btn-outline-primary mt-2" type="submit">Guardar checklist</button>
+  </form>
+  {% else %}
+  <p class="small text-secondary mb-2">Ainda sem análise. Lê 4 anos das contas no Yahoo e pontua de 0 a 100.</p>
+  <button class="btn btn-sm btn-outline-primary" type="button" data-moat="{{ d.ticker }}"><i class="bi bi-shield-check"></i> Analisar o moat</button>
+  {% endif %}
+  </div>
+
+  {# ---------------------------------------------------------------- se entrar na lista #}
+  <div class="tab-pane fade" id="fichaList" role="tabpanel">
+    <p class="small text-secondary">Os números dizem se vale a pena olhar; estas perguntas dizem se vale a pena comprar. Responde antes de juntares a ação à carteira.</p>
+    <form data-notes-form="{{ d.ticker }}">
+      {% for key, q, hint in d.questions %}
+      <label class="d-block small mb-3"><span class="fw-semibold">{{ q }}</span><span class="d-block text-secondary">{{ hint }}</span>
+        <textarea class="form-control form-control-sm mt-1" name="{{ key }}" rows="2">{{ d.answers.get(key, '') }}</textarea></label>
+      {% endfor %}
+      <button class="btn btn-sm btn-primary" type="submit">Guardar respostas</button>
+    </form>
+  </div>
+  </div>
+  <p class="small text-secondary mt-3 mb-0">Dados do Yahoo Finance{% if d.row and d.row.exchange %} · {{ d.row.exchange }}{% endif %}. Não é uma recomendação.</p>
+</div>
+{% endif %}{% endautoescape %}
