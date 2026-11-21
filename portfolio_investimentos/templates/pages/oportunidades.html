@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help %}
+{% include "pages/_radar_tabs.html" %}
+
+<div class="mb-3">
+  <h5 class="fw-bold mb-1">Oportunidades</h5>
+  <p class="text-secondary mb-0">Ações de todo o mundo que cumprem os critérios dos grandes investidores (1.º passo) e, entre elas, as que mostram um fosso económico, o <i>moat</i> (2.º passo). É um filtro para encontrar ideias, não uma recomendação.</p>
+</div>
+
+{# ------------------------------------------------------------------ os métodos #}
+<div class="row g-2 mb-3" id="screenMethods">
+  {% for key, mm in methods.items() %}
+  <div class="col-6 col-md-4 col-xl"><a class="pm-card pm-card-sm d-block h-100 text-decoration-none pm-method {{ 'pm-method-active' if key == method }}" href="/oportunidades?metodo={{ key }}">
+    <div class="small text-secondary">{{ mm.investor }}</div>
+    <div class="fw-semibold text-body">{{ mm.title }}</div>
+  </a></div>
+  {% endfor %}
+</div>
+
+<div class="row g-3 mb-3">
+  {# ---------------------------------------------------------------- critérios #}
+  <div class="col-12"><div class="pm-card">
+    <div class="pm-label mb-1">{{ m.investor }}</div>
+    <h6 class="fw-bold">{{ m.title }}</h6>
+    <p class="small text-secondary">{{ m.text }}</p>
+    <form id="screenForm" data-method="{{ method }}" class="small row g-3 align-items-end">
+      <div class="col-lg-4"><div class="row g-2">
+        <label class="col-12">Região
+          <select class="form-select form-select-sm" name="region">{% for k, r in regions.items() %}<option value="{{ k }}" {{ 'selected' if (res.region if res else 'mundo') == k }}>{{ r[0] }}</option>{% endfor %}</select></label>
+        <label class="col-12">Capitalização
+          <select class="form-select form-select-sm" name="min_cap">{% for v, label in caps %}<option value="{{ v }}" {{ 'selected' if (res.min_cap if res else '1e9') == v }}>{{ label }}</option>{% endfor %}</select></label>
+      </div></div>
+      <div class="col-lg-5">
+      {% for c in crit %}
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <span class="flex-grow-1">{{ c.label }}</span>
+        {% if c.op == 'btwn' %}
+        <input class="form-control form-control-sm text-end" style="width: 4.5rem" name="{{ c.key }}" value="{{ '%g'|format(c.value[0]) }}" inputmode="decimal" aria-label="{{ c.label }} mínimo">
+        <span class="text-secondary">a</span>
+        <input class="form-control form-control-sm text-end" style="width: 4.5rem" name="{{ c.key }}b" value="{{ '%g'|format(c.value[1]) }}" inputmode="decimal" aria-label="{{ c.label }} máximo">
+        {% else %}
+        <span class="text-secondary">{{ '>' if c.op == 'gt' else '<' }}</span>
+        <input class="form-control form-control-sm text-end" style="width: 4.5rem" name="{{ c.key }}" value="{{ '%g'|format(c.value) }}" inputmode="decimal" aria-label="{{ c.label }}">
+        {% endif %}
+        <span class="text-secondary" style="width: 1rem">{{ c.unit }}</span>
+      </div>
+      {% endfor %}
+      {% for p_ in post %}
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <span class="flex-grow-1">{{ p_.label }}</span>
+        <span class="text-secondary">{{ '<' if p_.kind == 'pe_pb' else '≤' }}</span>
+        <input class="form-control form-control-sm text-end" style="width: 4.5rem" name="{{ p_.key }}" value="{{ '%g'|format(p_.value) }}" inputmode="decimal" aria-label="{{ p_.label }}">
+        <span class="text-secondary" style="width: 1rem">{{ '%' if p_.kind in ('near_high', 'near_low') }}</span>
+      </div>
+      {% endfor %}
+      </div>
+      <div class="col-lg-3">
+        <p class="text-secondary mb-2"><i class="bi bi-info-circle"></i> {{ m.later }}</p>
+        <button class="btn btn-primary" type="submit" id="screenRun"><i class="bi bi-search"></i> Procurar</button>
+      </div>
+    </form>
+  </div></div>
+
+  {# ---------------------------------------------------------------- resultados #}
+  <div class="col-12"><div class="pm-card" id="screenResults">
+    {% if not res %}
+    <div class="text-center text-secondary py-5"><i class="bi bi-globe2 fs-1"></i>
+      <p class="mt-2 mb-0">Escolhe os limites e carrega em <b>Procurar</b>: o Yahoo Finance devolve as ações que os cumprem.</p></div>
+    {% else %}
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <div class="me-auto">
+        <span class="pm-label">1.º passo</span>
+        <div><b>{{ res.rows|length }}</b> ações cumprem os critérios{% if res.total and res.total > res.rows|length %} <span class="small text-secondary">(das {{ res.total }} do Yahoo, as primeiras {{ res.rows|length }} pela ordem do método)</span>{% endif %}
+          <span class="small text-secondary">· {{ regions[res.region][0] }} · {{ res.at.replace('T', ' ') }}</span></div>
+      </div>
+      <div class="text-end">
+        <span class="pm-label">2.º passo: moat</span>
+        <div><b>{{ with_moat }}</b> com moat <span class="small text-secondary">· {{ analysed }} analisadas</span></div>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <button class="btn btn-sm btn-outline-primary" type="button" id="moatBatch" data-tickers='{{ res.rows|rejectattr("moat")|map(attribute="ticker")|list|tojson }}'><i class="bi bi-shield-check"></i> Analisar o moat das próximas 10</button>
+      <a class="btn btn-sm {{ 'btn-primary' if only_moat else 'btn-outline-secondary' }}" href="/oportunidades?metodo={{ method }}{{ '' if only_moat else '&moat=1' }}"><i class="bi bi-funnel"></i> Só com moat</a>
+      <span class="small text-secondary align-self-center" id="moatProgress"></span>
+    </div>
+    <div class="table-responsive"><table class="table pm-table align-middle mb-0" id="screenTable">
+      <thead><tr><th>Empresa</th><th class="text-end">Preço</th><th class="text-end">Capitaliz. {{ help("Em milhares de milhões (mM), na moeda da cotação.") }}</th><th class="text-end">P/L</th><th class="text-end">P/VP</th>
+        <th class="text-end">P/L prev.</th><th class="text-end">Dividendo</th><th class="text-end">Do máximo {{ help("Distância ao máximo de 52 semanas.") }}</th>
+        {% if m.rank %}<th class="text-end">Ranking</th>{% endif %}<th>Moat</th><th></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><b>{{ r.ticker }}</b><div class="small text-secondary text-truncate" style="max-width: 16rem">{{ r.name }} · {{ r.exchange }}</div></td>
+        <td class="text-end">{{ r.price|number(2) if r.price else "—" }} <small class="text-secondary">{{ r.currency }}</small></td>
+        <td class="text-end">{% if r.cap %}{{ (r.cap / 1e9)|number(0 if r.cap >= 1e11 else 1) }} mM <small class="text-secondary">{{ r.currency }}</small>{% else %}—{% endif %}</td>
+        <td class="text-end">{{ r.pe|number(1) if r.pe else "—" }}</td>
+        <td class="text-end">{{ r.pb|number(1) if r.pb else "—" }}</td>
+        <td class="text-end">{{ r.fpe|number(1) if r.fpe else "—" }}</td>
+        <td class="text-end">{{ r.div|pct(1, sign=False) if r.div else "—" }}</td>
+        <td class="text-end {{ r.from_high|tone if r.from_high is not none }}">{{ r.from_high|pct(0) if r.from_high is not none else "—" }}</td>
+        {% if m.rank %}<td class="text-end">{{ r.rank }}</td>{% endif %}
+        <td>
+          {% if r.moat %}
+          <button class="btn btn-sm btn-link p-0 text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#moat-{{ loop.index }}" aria-expanded="false">
+            <span class="badge {{ 'text-bg-success' if r.moat.verdict == 'Largo' else 'text-bg-warning' if r.moat.verdict == 'Estreito' else 'text-bg-secondary' }}">{{ r.moat.verdict }}{% if r.moat.score is not none %} · {{ r.moat.score }}{% endif %}</span>
+            {% if r.has_moat %}<i class="bi bi-shield-fill-check text-success" title="Passa o 2.º passo"></i>{% endif %}
+          </button>
+          {% else %}<button class="btn btn-sm btn-outline-secondary py-0" type="button" data-moat="{{ r.ticker }}">Analisar</button>{% endif %}
+        </td>
+        <td class="text-end text-nowrap">
+          {% if r.watched %}<span class="small text-secondary" title="Já está no Radar"><i class="bi bi-bookmark-check"></i></span>
+          {% else %}<button class="btn btn-sm btn-link py-0" type="button" title="Juntar ao Radar" data-pm-action="add_watch" data-toast data-args='{{ {"instrument": r.ticker, "currency": r.currency or "USD", "instrument_name": r.name, "note": m.investor}|tojson }}'><i class="bi bi-bookmark-plus"></i></button>{% endif %}
+        </td>
+      </tr>
+      {% if r.moat %}{% set a = r.moat %}{% set u = r.user %}
+      <tr class="collapse" id="moat-{{ loop.index }}"><td colspan="{{ 11 if m.rank else 10 }}" class="bg-body-tertiary pm-moat-detail">
+        <div class="row g-3 py-2">
+          <div class="col-lg-5">
+            <div class="pm-label mb-1">A prova nos números ({{ a.years|first if a.years else "—" }}–{{ a.years|last if a.years else "—" }})</div>
+            <table class="table table-sm small mb-2">
+              {% for name, pts, mx, why in a.parts %}<tr><td>{{ name }}</td><td class="text-secondary">{{ why }}</td><td class="text-end text-nowrap"><b>{{ pts }}</b>/{{ mx }}</td></tr>{% endfor %}
+            </table>
+            {% if a.years %}
+            <table class="table table-sm small mb-0"><thead><tr><th></th>{% for y in a.years %}<th class="text-end">{{ y }}</th>{% endfor %}</tr></thead><tbody>
+              {% for key, label in (("roic", "ROIC"), ("gross_margin", "Margem bruta"), ("fcf_conversion", "FCF ÷ lucro"), ("capex_sales", "CapEx ÷ receitas")) %}
+              <tr><td>{{ label }}</td>{% for y in a.years %}{% set v = a[key].get(y|string) %}<td class="text-end">{{ v|pct(0, sign=False) if v is not none else "—" }}</td>{% endfor %}</tr>
+              {% endfor %}</tbody></table>
+            {% endif %}
+            <div class="small text-secondary mt-1">{{ a.sector or "" }}{% if a.industry %} · {{ a.industry }}{% endif %}{% if a.country %} · {{ a.country }}{% endif %} · analisado a {{ a.date }}
+              · <a href="#" data-moat="{{ r.ticker }}">atualizar</a></div>
+          </div>
+          <div class="col-lg-7">
+            <form class="small" data-moat-form="{{ r.ticker }}">
+              <div class="pm-label mb-1">A fonte do moat {{ help("A sugestão vem da indústria da empresa e dos números (margem bruta muito alta = poder de fixar preços). Confirma tu cada pilar.") }}</div>
+              {% for k, (label, question) in pillars.items() %}
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="pillars" value="{{ k }}" id="p-{{ loop.index }}-{{ r.ticker }}" {{ 'checked' if k in u.pillars }}>
+                <label class="form-check-label" for="p-{{ loop.index }}-{{ r.ticker }}"><b>{{ label }}</b>{% if k in a.sources %} <span class="badge text-bg-info">sugerido</span>{% endif %} <span class="text-secondary">{{ question }}</span></label>
+              </div>
+              {% endfor %}
+              <div class="pm-label mt-2 mb-1">Os testes de Buffett</div>
+              {% for k, (label, question) in tests.items() %}
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="tests" value="{{ k }}" id="t-{{ loop.index }}-{{ r.ticker }}" {{ 'checked' if k in u.tests }}>
+                <label class="form-check-label" for="t-{{ loop.index }}-{{ r.ticker }}"><b>{{ label }}</b> <span class="text-secondary">{{ question }}</span></label>
+              </div>
+              {% endfor %}
+              <textarea class="form-control form-control-sm mt-2" name="note" rows="2" placeholder="Notas (o que pode destruir o fosso?)" aria-label="Notas">{{ u.note }}</textarea>
+              <button class="btn btn-sm btn-primary mt-2" type="submit">Guardar</button>
+              {% if a.summary %}<details class="mt-2"><summary class="text-secondary">O negócio (Yahoo, em inglês)</summary><p class="mt-1 mb-0 text-secondary">{{ a.summary }}</p></details>{% endif %}
+            </form>
+          </div>
+        </div>
+      </td></tr>
+      {% endif %}
+      {% else %}
+      <tr><td colspan="11" class="text-center text-secondary py-4">{% if only_moat %}Nenhuma das ações encontradas passa ainda o 2.º passo. Analisa o moat das outras.{% else %}Nenhuma ação cumpre estes critérios. Experimenta outra região ou limites menos apertados.{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% endif %}
+  </div></div>
+</div>
+
+<div class="pm-card mb-3" id="moatHelp">
+  <div class="pm-label mb-2">Como se lê o moat</div>
+  <div class="row g-3 small">
+    <div class="col-lg-6">
+      <p class="mb-2"><b>1. A prova nos números.</b> Um fosso real aparece nos números: ROIC acima de 15% todos os anos, margem bruta alta e estável (poder de fixar preços), muito cash flow livre e pouco CapEx, receitas a crescer, lucros sempre positivos e pouca dívida. A pontuação vai de 0 a 100: <span class="badge text-bg-success">Largo</span> a partir de 70, <span class="badge text-bg-warning">Estreito</span> de 45 a 69.</p>
+      <p class="mb-0 text-secondary">O Yahoo só dá os últimos 4 anos das contas (o método pede 5 a 10): é uma primeira leitura, não um veredicto.</p>
+    </div>
+    <div class="col-lg-6">
+      <p class="mb-2"><b>2. A fonte e os testes.</b> A fonte provável (marca e patentes, custos de mudança, efeito de rede, custos baixos, escala eficiente) é sugerida pela indústria; confirma-a tu e responde aos três testes de Buffett. Uma ação passa o 2.º passo com pontuação de 70 ou mais, ou com um pilar confirmado e os três testes.</p>
+      <p class="mb-0 text-secondary">Os critérios e os testes seguem os métodos de Graham, Buffett e Munger, Lynch, Greenblatt, O'Neil e Templeton.</p>
+    </div>
+  </div>
+</div>
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/oportunidades.js') }}"></script>
+{% endblock %}

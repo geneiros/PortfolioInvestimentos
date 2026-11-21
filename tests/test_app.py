@@ -1,5 +1,6 @@
 """Testes da aplicação Flask (base de dados SQLite temporária)."""
 import io
+import json
 import re
 from pathlib import Path
 from datetime import date, timedelta
@@ -3592,3 +3593,120 @@ def test_android_start(monkeypatch, tmp_path):
     assert (tmp_path / "dados" / "portfolio.db").exists()
     assert android.start(tmp_path / "outra") == url and len(started) == 1
     assert updates.is_executable()  # a app Android também vê o aviso de versão nova
+
+
+def _q(sym, name, exchange="NMS", pe=12.0, pb=1.2, price=100.0, high=120.0, low=80.0, cur="USD", fin="USD", **kw):
+    return {"symbol": sym, "longName": name, "exchange": exchange, "fullExchangeName": exchange, "currency": cur,
+            "financialCurrency": fin, "regularMarketPrice": price, "marketCap": 5e10, "trailingPE": pe,
+            "priceToBook": pb, "forwardPE": kw.get("fpe", pe), "fiftyTwoWeekHigh": high, "fiftyTwoWeekLow": low,
+            "trailingAnnualDividendYield": kw.get("div", 0.02)}
+
+
+def test_screener_methods_and_listings(app):
+    from portfolio_investimentos.services import screener
+    crit, post = screener.criteria("graham", {"c0": "4", "c0b": "14", "p0": "20"})
+    assert crit[0]["value"] == (4.0, 14.0) and post[0]["value"] == 20
+    q = screener.build_query(crit, "europa", "1e9")
+    assert q["operands"][0]["operator"] == "or" and len(q["operands"][0]["operands"]) == 15
+    assert {"operator": "btwn", "operands": ["peratio.lasttwelvemonths", 4.0, 14.0]} in q["operands"]
+    assert screener.build_query(crit, "portugal")["operands"][0] == {"operator": "eq", "operands": ["region", "pt"]}
+    with pytest.raises(screener.ScreenError):
+        screener.criteria("ninguem")
+    with pytest.raises(screener.ScreenError):
+        screener.criteria("graham", {"c0": "abc"})
+    quotes = [_q("GOOGL.MX", "Alphabet Inc.", "MEX", cur="MXN"), _q("GOOG.TO", "Alphabet Inc. CDR (CAD Hedged)", "TOR",
+              cur="CAD"), _q("GOOGL", "Alphabet Inc."), _q("ABEA.F", "Alphabet Inc.", "FRA", cur="EUR"),
+              _q("GOGL34.SA", "Alphabet Inc.", "SAO", cur="BRL"), _q("0RIH.L", "Alphabet Inc.", "LSE"),
+              _q("CHEAP", "Cheap Co", pe=10, pb=1.5), _q("DEAR", "Dear Co", pe=14, pb=2.5, div=10.0)]
+    sent = {}
+
+    def fetch(body):
+        sent.update(body)
+        return {"total": 8, "quotes": quotes}
+    with app.app_context():
+        out = screener.run("graham", "mundo", "1e9", {}, fetch=fetch)
+        assert sent["sortField"] == "intradaymarketcap" and sent["size"] == 250
+        tickers = [r["ticker"] for r in out["rows"]]
+        # uma linha por empresa (a bolsa principal); P/L × P/VP < 22,5 tira a «Dear» (14 × 2,5 = 35)
+        assert tickers == ["GOOGL", "CHEAP"]
+        assert screener.last()["method"] == "graham"
+        assert screener._dividend({"trailingAnnualDividendYield": 10.0}) is None
+        assert screener._dividend({"dividendYield": 3.65, "trailingAnnualDividendYield": 0.0365}) == pytest.approx(0.0365)
+        # Fórmula Mágica: soma das posições no retorno sobre o capital e no earnings yield (1 ÷ P/L)
+        ranked = screener.magic_rank([{"pe": 20}, {"pe": 5}, {"pe": 10}])
+        assert [r["rank"] for r in ranked] == [3, 4, 5] and ranked[0]["pe"] == 5
+        # Templeton: perto do mínimo de 52 semanas e P/L previsto baixo
+        far = _q("FAR", "Far Co", price=150, low=80, high=160, fpe=8)
+        near = _q("NEAR", "Near Co", price=85, low=80, high=160, fpe=8)
+        rows = screener.run("templeton", fetch=lambda b: {"quotes": [far, near]})["rows"]
+        assert [r["ticker"] for r in rows] == ["NEAR"]
+
+
+def _moat_series(rev=(100, 110, 121, 133), gm=0.6, ebit=0.3, ic=100, fcf=0.25, capex=0.03, debt=10, cash=20):
+    years = ["2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31"]
+
+    def s(vals):
+        return [(y, float(v), "USD") for y, v in zip(years, vals)]
+    return {"annualTotalRevenue": s(rev), "annualGrossProfit": s(r * gm for r in rev),
+            "annualOperatingIncome": s(r * ebit for r in rev), "annualNetIncome": s(r * 0.22 for r in rev),
+            "annualInvestedCapital": s([ic] * 4), "annualFreeCashFlow": s(r * fcf for r in rev),
+            "annualCapitalExpenditure": s(-r * capex for r in rev), "annualEBITDA": s(r * 0.35 for r in rev),
+            "annualTotalDebt": s([debt] * 4), "annualCashAndCashEquivalents": s([cash] * 4),
+            "annualStockholdersEquity": s([80] * 4), "annualTaxRateForCalcs": s([0.21] * 4)}
+
+
+def test_moat_score_sources_and_checklist(app):
+    from portfolio_investimentos.services import moat
+    good = moat.score(moat.metrics(_moat_series()))
+    assert good["value"] >= 85 and good["verdict"] == "Largo"
+    weak = moat.score(moat.metrics(_moat_series(rev=(100, 95, 90, 85), gm=0.15, ebit=0.04, fcf=0.02, capex=0.2,
+                                                debt=200, cash=0)))
+    assert weak["value"] < 45 and weak["verdict"] == "Sem moat evidente"
+    m = moat.metrics(_moat_series(gm=0.4))
+    assert moat.sources("Software - Infrastructure", "Technology", m) == ["mudanca"]
+    assert moat.sources("Credit Services", "Financial Services", m) == ["rede"]
+    assert moat.sources("Utilities - Regulated Electric", "Utilities", moat.metrics(_moat_series(gm=0.3))) == ["escala"]
+    assert "intangiveis" in moat.sources("Something", "", moat.metrics(_moat_series(gm=0.7)))  # margem muito alta
+    with app.app_context():
+        a = moat.analyse("KO", fetch_info=lambda t: {"longName": "Coca", "industry": "Beverages - Non-Alcoholic",
+                                                      "sector": "Consumer Defensive", "longBusinessSummary": "x"},
+                         fetch_series=lambda t: _moat_series())
+        assert a["verdict"] == "Largo" and a["sources"] == ["intangiveis"] and moat.get("KO")["score"] == a["score"]
+        assert a["years"] == [2022, 2023, 2024, 2025] and a["roic"]["2025"] > 0.15
+        user = moat.save_checklist("XYZ", ["rede", "nada"], ["bilhao", "hibernacao", "erosao"], "nota")
+        assert user["pillars"] == ["rede"] and moat.checklist("XYZ")["note"] == "nota"
+        assert moat.has_moat(None, user) and moat.has_moat({"score": 75}, None)
+        assert not moat.has_moat({"score": 60}, {"pillars": ["rede"], "tests": ["bilhao"]})
+
+
+def test_opportunities_page_and_actions(app, client, monkeypatch):
+    from portfolio_investimentos.services import moat, yahoo
+    token = csrf(client)
+    html = client.get("/radar").get_data(as_text=True)
+    assert 'id="radarTabs"' in html and "Oportunidades" in html
+    html = client.get("/oportunidades").get_data(as_text=True)
+    assert "Carrega em <b>Procurar</b>" in html.replace("carrega", "Carrega") and "Benjamin Graham" in html
+    monkeypatch.setattr(yahoo, "screener", lambda body: {"total": 2, "quotes": [
+        _q("KO", "The Coca-Cola Company", "NYQ"), _q("MSFT", "Microsoft Corporation")]})
+    r = post(client, "run_screen", token, method="buffett", region="eua", min_cap="1e10", c0="16", c0b="90")
+    assert r.status_code == 200 and "2 ações" in r.get_json()["message"]
+    assert post(client, "run_screen", token, method="buffett", region="marte").status_code == 400
+    html = client.get("/oportunidades?metodo=buffett").get_data(as_text=True)
+    assert "KO" in html and "Microsoft Corporation" in html and 'value="16"' in html and "Analisar" in html
+
+    def boom(body):
+        raise yahoo.YahooError("HTTP 429")
+    monkeypatch.setattr(yahoo, "screener", boom)
+    assert post(client, "run_screen", token, method="buffett").status_code == 400
+    # 2.º passo: o moat e o checklist
+    monkeypatch.setattr(moat, "analyse", lambda t: moat.Setting.set(f"moat:{t}", json.dumps(
+        {"ticker": t, "score": 80, "verdict": "Largo", "parts": [], "sources": ["intangiveis"], "years": [],
+         "roic": {}, "gross_margin": {}, "fcf_conversion": {}, "capex_sales": {}, "date": "2026-11-21"})) or
+        {"verdict": "Largo", "score": 80})
+    assert "moat largo" in post(client, "analyse_moat", token, ticker="ko").get_json()["message"]
+    assert post(client, "save_moat_checklist", token, ticker="KO", pillars='["mudanca"]', tests="[]",
+                note="cloud").status_code == 200
+    html = client.get("/oportunidades?metodo=buffett&moat=1").get_data(as_text=True)
+    assert "Largo · 80" in html and "Microsoft Corporation" not in html  # só KO passa o 2.º passo
+    html = client.get("/oportunidades?metodo=buffett").get_data(as_text=True)
+    assert "cloud" in html and "sugerido" in html

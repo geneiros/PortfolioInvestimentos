@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **Radar e alertas: Oportunidades**  
+  Novo separador com as ações de todo o mundo que cumprem os critérios dos grandes investidores (Graham, Buffett e Munger, Lynch, Greenblatt, O'Neil, Templeton e o resumo dos métodos), com os limites editáveis, pelo filtro de ações do Yahoo Finance; uma linha por empresa na bolsa principal. 2.º passo: o moat de cada empresa, com a prova nos números (pontuação de 0 a 100), a fonte provável sugerida pela indústria e o checklist dos 5 pilares e dos 3 testes de Buffett; filtro «Só com moat» e «Juntar ao Radar».
 - **Planeamento novo**  
   O Planeamento passa a começar por «Para começar» (o rendimento por ano que queres receber, com o depósito por mês já preenchido pela média do que entrou nas corretoras nos últimos 12 meses) e, com o objetivo escolhido, mostra:
   - a linha do tempo (hoje, metade do caminho, data FIRE com o intervalo prudente–otimista);

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}{% autoescape true %}
 {% from "macros.html" import help %}
+{% include "pages/_radar_tabs.html" %}
 {% include "pages/_portfolio_fired.html" %}
 {% for a in fired_now %}<div class="alert alert-warning"><i class="bi bi-bell-fill"></i> Alerta disparado agora: <b>{{ a.instrument }}</b> — {{ kinds[a.kind]|lower }} {{ a.threshold|number(2) }}.</div>{% endfor %}
 <div class="row g-3">

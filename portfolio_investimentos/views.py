@@ -529,6 +529,33 @@ def radar():
     return render_template("pages/radar.html", **c)
 
 
+@bp.route("/oportunidades")
+def oportunidades():
+    """Radar e alertas → Oportunidades: as ações que cumprem os critérios dos grandes investidores e o moat."""
+    from .services import moat, screener
+    c = ctx.build("radar", "Radar e alertas")
+    res = screener.last()
+    method = request.args.get("metodo") or (res or {}).get("method") or "buffett"
+    if method not in screener.METHODS:
+        method = "buffett"
+    same = bool(res and res.get("method") == method)
+    crit, post = screener.criteria(method, res.get("values") if same else None)
+    rows = res["rows"] if same else []
+    watched = {w.instrument for w in WatchItem.query.all()}
+    for r in rows:
+        r["moat"] = moat.get(r["ticker"])
+        r["user"] = moat.checklist(r["ticker"])
+        r["has_moat"] = moat.has_moat(r["moat"], r["user"])
+        r["watched"] = r["ticker"] in watched
+    only = request.args.get("moat") == "1"
+    c.update(methods=screener.METHODS, method=method, m=screener.METHODS[method], crit=crit, post=post,
+             regions=screener.REGIONS, caps=screener.MIN_CAPS, res=res if same else None,
+             rows=[r for r in rows if r["has_moat"]] if only else rows, only_moat=only,
+             analysed=sum(1 for r in rows if r["moat"]), with_moat=sum(1 for r in rows if r["has_moat"]),
+             pillars=moat.PILLARS, tests=moat.TESTS)
+    return render_template("pages/oportunidades.html", **c)
+
+
 def radar_instruments():
     """Os ativos seguidos em Radar e alertas, do mais recente para o mais antigo, sem repetir."""
     out = {}
