@@ -1,16 +1,21 @@
-"""Independência financeira (FIRE): o número FIRE, a parte já feita e a data em três cenários.
+"""Independência financeira (FIRE): o número FIRE, a data em que lá chegas e o que a mexe.
 
-Tudo em euros de hoje: os retornos dos cenários são reais (já descontada a inflação), por isso as despesas e o
-número FIRE não precisam de ser atualizados ano a ano. É uma simulação, não uma promessa.
+Tudo em euros de hoje: os retornos são reais (já descontada a inflação), por isso o rendimento pretendido e o número
+FIRE não precisam de ser atualizados ano a ano. É uma simulação, não uma promessa.
 
-Cada cenário tem duas fases: até à data FIRE juntas o investimento mensal (ou só até à idade em que deixas de
-investir); a partir dela deixas de investir e passas a levantar o que as despesas pedem (já com o IRS dos
-levantamentos), menos a pensão a partir da idade em que a recebes.
+A carteira junta o depósito mensal todos os meses. O número FIRE de cada mês é o capital que paga o rendimento
+pretendido (depois do IRS) dali em diante:
+- sem rendimentos fora da carteira: rendimento ÷ (1 − imposto) ÷ taxa de levantamento, para sempre;
+- com rendimentos fora da carteira (pensão, rendas) que começam mais tarde: até cada um começar, a carteira paga
+  tudo; a partir daí, só a diferença. Calcula-se para trás, desde o último a começar:
+  necessário(t) = levantamento(t) + necessário(t + 1) / (1 + g).
+A data FIRE é o primeiro mês em que a carteira chega ao número FIRE desse mês.
 """
 from datetime import date
 
-SCENARIOS = (("pessimista", 0.03), ("base", 0.05), ("otimista", 0.07))
+SCENARIOS = (("prudente", "Prudente", 0.03), ("central", "Central", 0.05), ("otimista", "Otimista", 0.07))
 MAX_YEARS = 60
+MONTHS = MAX_YEARS * 12
 
 
 def fire_number(expenses, withdrawal_rate, tax_rate):
@@ -19,163 +24,152 @@ def fire_number(expenses, withdrawal_rate, tax_rate):
     Para gastar `expenses` líquidos é preciso levantar expenses / (1 − imposto efetivo); à taxa de levantamento
     `withdrawal_rate` (ex.: 4%), isso pede um património de levantamento / taxa.
     """
+    if expenses <= 0:
+        return 0.0
     gross = expenses / (1 - tax_rate) if tax_rate < 1 else float("inf")
     return gross / withdrawal_rate if withdrawal_rate > 0 else float("inf")
 
 
-def _add_months(d, n):
+def add_months(d, n):
     y, m = divmod(d.month - 1 + n, 12)
     return date(d.year + y, m + 1, 1)
 
 
-def _withdrawal(expenses, tax_rate, age_t, pension, pension_age):
-    """Levantamento mensal: o que a pensão (a partir da idade dela) não paga, já com o IRS da venda."""
-    income = pension if pension_age is not None and age_t is not None and age_t >= pension_age else 0.0
-    return max(expenses - income, 0.0) / 12 / (1 - tax_rate)
+def months_between(a, b):
+    return (b.year - a.year) * 12 + b.month - a.month
 
 
-def simulate(value, monthly, rate, start, months, is_fire, expenses, tax_rate, age=None, pension=0.0,
-             pension_age=None, stop_age=None):
-    """Simula mês a mês: junta `monthly` até à data FIRE (ou até `stop_age`), depois levanta.
+def monthly_rate(rate):
+    return (1 + rate) ** (1 / 12) - 1
 
-    `is_fire(m, v)` diz se, no mês `m` com o valor `v`, a carteira já chega. Devolve os pontos anuais, o mês
-    FIRE e o mês em que o dinheiro acaba (None se não acabar dentro de `months`).
+
+def income_at(incomes, m):
+    """Rendimentos fora da carteira (€ por mês) já ativos no mês `m`. `incomes`: [(€ por mês, mês de início)]."""
+    return sum(amount for amount, start in incomes if m >= start)
+
+
+def need_curve(income, withdrawal_rate, tax_rate, incomes=(), rate=0.05, months=MONTHS):
+    """O número FIRE de cada mês (0 = hoje): o capital que paga `income` por ano dali em diante, com os rendimentos
+    fora da carteira a abater a partir do mês em que começam (ver o início do módulo)."""
+    last = max([start for _, start in incomes if start > 0] or [0])
+    after = fire_number(max(income - 12 * income_at(incomes, last), 0.0), withdrawal_rate, tax_rate)
+    need = [after] * (max(months, last) + 1)
+    g = monthly_rate(rate)
+    for t in range(last - 1, -1, -1):
+        withdrawal = max(income / 12 - income_at(incomes, t), 0.0) / (1 - tax_rate)
+        need[t] = withdrawal + need[t + 1] / (1 + g)
+    return need[:months + 1]
+
+
+def project(value, monthly, rate, months=MONTHS, rates=None):
+    """Valor da carteira mês a mês (0 = hoje), a juntar `monthly` por mês. `rates`, se dada, é a taxa real anual de
+    cada ano (simulações com os anos verdadeiros); senão, `rate` todos os anos."""
+    out, v = [value], value
+    g = monthly_rate(rate)
+    for m in range(months):
+        if rates is not None:
+            g = monthly_rate(rates[m // 12])
+        v = v * (1 + g) + monthly
+        out.append(v)
+    return out
+
+
+def reach(values, target):
+    """Primeiro mês em que `values` chega a `target` (um número ou a curva mês a mês); None se não chega."""
+    for m, v in enumerate(values):
+        t = target[min(m, len(target) - 1)] if isinstance(target, list) else target
+        if v >= t - 0.005:
+            return m
+    return None
+
+
+def scenario(value, monthly, income, withdrawal_rate, tax_rate, incomes, rate, months=MONTHS):
+    """Um cenário: a curva da carteira, a do número FIRE, o mês FIRE e o número FIRE nesse mês."""
+    need = need_curve(income, withdrawal_rate, tax_rate, incomes, rate, months)
+    values = project(value, monthly, rate, months)
+    m = reach(values, need)
+    return {"rate": rate, "values": values, "need": need, "month": m,
+            "number": need[m] if m is not None else need[0]}
+
+
+def monthly_needed(value, income, withdrawal_rate, tax_rate, incomes, rate, target_month, high=100000.0):
+    """Depósito mensal que chega ao número FIRE até `target_month` (procura binária); None se nem `high` chega."""
+    need = need_curve(income, withdrawal_rate, tax_rate, incomes, rate, max(target_month, 1))
+
+    def ok(monthly):
+        m = reach(project(value, monthly, rate, target_month), need)
+        return m is not None and m <= target_month
+    if ok(0.0):
+        return 0.0
+    if not ok(high):
+        return None
+    lo, hi = 0.0, high
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        lo, hi = (lo, mid) if ok(mid) else (mid, hi)
+    return hi
+
+
+def milestones(history, values, start, step=100000.0, count=5, until=None):
+    """Quanto tempo leva cada `step` €: [(n.º, mês em que chegou ou chega, meses que levou)] até `count` marcos (ou
+    até ao primeiro acima de `until`).
+
+    `history`: [(data, valor)] real até hoje; `values`: projeção mês a mês desde `start` (o 1.º dia do mês de hoje).
     """
-    g = (1 + rate) ** (1 / 12) - 1
-    v, fire_m, empty_m = value, None, None
-    points = [(start, value)]
-    for m in range(months + 1):
-        age_t = None if age is None else age + m / 12
-        if fire_m is None and is_fire(m, v):
-            fire_m = m
-        if m == months:
+    out, prev = [], None
+    first = history[0][0] if history else start
+    first = date(first.year, first.month, 1)
+    for k in range(1, count + 1):
+        level = k * step
+        when = next((date(d.year, d.month, 1) for d, v in history if v >= level), None)
+        if when is None:
+            m = reach(values, level)
+            when = add_months(start, m) if m is not None else None
+        since = prev or first
+        out.append({"n": k, "level": level, "date": when,
+                    "months": months_between(since, when) if when else None, "since": since})
+        prev = when
+        if when is None or (until is not None and level >= until):
             break
-        if fire_m is None:
-            investing = stop_age is None or age_t is None or age_t < stop_age
-            v = v * (1 + g) + (monthly if investing else 0.0)
-        else:
-            v = v * (1 + g) - _withdrawal(expenses, tax_rate, age_t, pension, pension_age)
-            if v <= 0:
-                v = 0.0
-                if empty_m is None:
-                    empty_m = m + 1
-        if (m + 1) % 12 == 0:
-            points.append((_add_months(start, m + 1), v))
-    return points, fire_m, empty_m
+    return out
 
 
-def _summary(name, rate, start, points, fire_m, empty_m, age, number=None):
-    reached = None if fire_m is None else _add_months(start, fire_m)
-    return {"name": name, "rate": rate, "points": points, "date": reached, "number": number,
-            "age": None if age is None or fire_m is None else age + fire_m / 12,
-            "empty": None if empty_m is None else _add_months(start, empty_m),
-            "empty_age": None if age is None or empty_m is None else age + empty_m / 12}
+def coverage(items, values, withdrawal_rate, tax_rate, incomes, start):
+    """As despesas do mês que o rendimento sustentável paga, da mais barata para a mais cara.
 
-
-def plan(value, expenses, withdrawal_rate, tax_rate, monthly, start=None, age=None, pension=0.0, pension_age=None,
-         stop_age=None, horizon_age=None):
-    """Para sempre: a data FIRE é quando a carteira chega ao número FIRE (regra dos x%)."""
-    start = start or date.today().replace(day=1)
-    target = fire_number(expenses, withdrawal_rate, tax_rate)
-    months = int(round((horizon_age - age) * 12)) if age is not None and horizon_age else MAX_YEARS * 12
-    scenarios = []
-    for name, rate in SCENARIOS:
-        points, fire_m, empty_m = simulate(value, monthly, rate, start, months, lambda m, v: v >= target, expenses,
-                                           tax_rate, age, pension, pension_age, stop_age)
-        scenarios.append(_summary(name, rate, start, points, fire_m, empty_m, age, target))
-    base = next(s for s in scenarios if s["name"] == "base")
-    return {"number": target, "done": value / target if target > 0 else 0.0, "value": value,
-            "expenses": expenses, "withdrawal_rate": withdrawal_rate, "tax_rate": tax_rate, "monthly": monthly,
-            "scenarios": scenarios, "date": base["date"],
-            "earliest": next((s["date"] for s in reversed(scenarios) if s["date"]), None),
-            "latest": scenarios[0]["date"]}
-
-
-def required_by_month(rate, expenses, tax_rate, age, until_age, pension=0.0, pension_age=None):
-    """Capital necessário em cada mês a partir de hoje para pagar as despesas até `until_age` (e acabar a zero).
-
-    Para trás, desde o último mês: necessário(t) = levantamento(t) + necessário(t + 1) / (1 + g). O levantamento
-    é o que falta às despesas depois da pensão (a partir de `pension_age`), já com o imposto sobre a venda.
-    Devolve uma lista indexada pelo mês a contar de hoje (0 = hoje).
+    O rendimento sustentável de cada mês é o valor da carteira × taxa de levantamento, depois do IRS, mais os
+    rendimentos fora da carteira já ativos. Cada despesa fica paga quando esse rendimento chega à soma dela com as
+    mais baratas. Devolve as despesas com `paid` (hoje), `part` (o que já está pago, na primeira por pagar) e
+    `date` (quando fica paga).
     """
-    g = (1 + rate) ** (1 / 12) - 1
-    months = max(int(round((until_age - age) * 12)), 0)
-    need = [0.0] * (months + 1)
-    for t in range(months - 1, -1, -1):
-        need[t] = _withdrawal(expenses, tax_rate, age + t / 12, pension, pension_age) + need[t + 1] / (1 + g)
-    return need
+    def sustainable(m):
+        return values[m] * withdrawal_rate * (1 - tax_rate) / 12 + income_at(incomes, m)
+    today = sustainable(0)
+    out, total = [], 0.0
+    for name, amount in sorted(items, key=lambda x: x[1]):
+        before, total = total, total + amount
+        m = next((k for k in range(len(values)) if sustainable(k) >= total - 0.005), None)
+        out.append({"name": name, "amount": amount, "cum": total, "paid": today >= total - 0.005,
+                    "part": max(min(today - before, amount), 0.0),
+                    "date": add_months(start, m) if m is not None else None})
+    return {"today": today, "items": out}
 
 
-def lifetime_plan(value, expenses, tax_rate, monthly, age, until_age, pension=0.0, pension_age=None, start=None,
-                  stop_age=None):
-    """Até `until_age`: a data FIRE é o primeiro mês em que a carteira chega ao capital necessário para viver dela
-    desse mês até ao fim (o último ano não conta: "chegar" aos 89 para viver até aos 90 não é FIRE)."""
-    start = start or date.today().replace(day=1)
-    scenarios = []
-    for name, rate in SCENARIOS:
-        need = required_by_month(rate, expenses, tax_rate, age, until_age, pension, pension_age)
-        last = len(need) - 12
-        points, fire_m, empty_m = simulate(value, monthly, rate, start, len(need) - 1,
-                                           lambda m, v: m < last and v >= need[m], expenses, tax_rate, age,
-                                           pension, pension_age, stop_age)
-        s = _summary(name, rate, start, points, fire_m, empty_m, age, None if fire_m is None else need[fire_m])
-        s["now"] = need[0] if need else 0.0
-        s["curve"] = [(_add_months(start, m), need[m]) for m in range(0, len(need), 12)]
-        scenarios.append(s)
-    base = next(s for s in scenarios if s["name"] == "base")
-    return {"scenarios": scenarios, "date": base["date"], "number": base["number"], "now": base["now"],
-            "age_at": base["age"], "done": value / base["now"] if base["now"] else 0.0,
-            "earliest": next((s["date"] for s in reversed(scenarios) if s["date"]), None),
-            "latest": scenarios[0]["date"], "until_age": until_age, "pension": pension, "pension_age": pension_age}
+def historical_paths(value, monthly, need, real_returns, months=MONTHS):
+    """Uma simulação por cada ano de partida da tabela: os retornos reais anuais por ordem, a voltar ao início
+    quando a tabela acaba. Devolve, por simulação, o ano de partida, a curva anual e o mês FIRE (ou None)."""
+    years = sorted(real_returns)
+    seq = [real_returns[y] for y in years]
+    out = []
+    for i, y in enumerate(years):
+        rates = [seq[(i + k) % len(seq)] for k in range(months // 12 + 1)]
+        values = project(value, monthly, 0.0, months, rates=rates)
+        out.append({"from": y, "values": values[::12], "month": reach(values, need)})
+    return out
 
 
-def monthly_track(dates, values, target, months=12):
-    """Acompanhamento: valor no fim de cada mês (os últimos `months`), a parte do número FIRE e a variação."""
-    ends = {}
-    for d, v in zip(dates, values):
-        ends[(d.year, d.month)] = (d, v)
-    rows, prev = [], None
-    for key in sorted(ends)[-(months + 1):]:
-        d, v = ends[key]
-        if prev is not None:
-            rows.append({"month": key, "value": v, "done": v / target if target > 0 else 0.0, "change": v - prev})
-        prev = v
-    return list(reversed(rows))
-
-
-def required_with_pension(rate, expenses, withdrawal_rate, tax_rate, age, pension, pension_age, months):
-    """Capital necessário em cada mês para viver para sempre, contando com a pensão a partir de `pension_age`.
-
-    Duas partes: até à pensão, pagar as despesas todas (com o IRS dos levantamentos); a partir dela, o que a
-    pensão não cobre, pela regra da taxa de levantamento (para sempre). Calcula-se para trás desde o mês da pensão:
-    necessário(t) = levantamento(t) + necessário(t + 1) / (1 + g), e daí em diante fica o número da segunda parte.
-    """
-    g = (1 + rate) ** (1 / 12) - 1
-    after = fire_number(max(expenses - pension, 0.0), withdrawal_rate, tax_rate) if expenses > pension else 0.0
-    to_pension = max(int(round((pension_age - age) * 12)), 0)
-    need = [after] * (max(months, to_pension) + 1)
-    for t in range(to_pension - 1, -1, -1):
-        need[t] = _withdrawal(expenses, tax_rate, age + t / 12, 0.0, None) + need[t + 1] / (1 + g)
-    return need
-
-
-def pension_plan(value, expenses, withdrawal_rate, tax_rate, monthly, age, pension, pension_age, horizon_age,
-                 start=None, stop_age=None):
-    """Para sempre, com a pensão: a data FIRE é o primeiro mês em que a carteira chega ao capital necessário
-    (até à pensão as despesas todas; depois, o que a pensão não cobre, para sempre)."""
-    start = start or date.today().replace(day=1)
-    months = max(int(round((horizon_age - age) * 12)), 12)
-    scenarios = []
-    for name, rate in SCENARIOS:
-        need = required_with_pension(rate, expenses, withdrawal_rate, tax_rate, age, pension, pension_age, months)
-        points, fire_m, empty_m = simulate(value, monthly, rate, start, months, lambda m, v: v >= need[m],
-                                           expenses, tax_rate, age, pension, pension_age, stop_age)
-        s = _summary(name, rate, start, points, fire_m, empty_m, age, None if fire_m is None else need[fire_m])
-        s["now"] = need[0]
-        scenarios.append(s)
-    base = next(s for s in scenarios if s["name"] == "base")
-    return {"scenarios": scenarios, "date": base["date"], "number": base["number"], "now": base["now"],
-            "age_at": base["age"], "done": value / base["now"] if base["now"] else 0.0,
-            "earliest": next((s["date"] for s in reversed(scenarios) if s["date"]), None),
-            "latest": scenarios[0]["date"],
-            "after": fire_number(max(expenses - pension, 0.0), withdrawal_rate, tax_rate) if expenses > pension else 0.0}
+def probability(paths, month):
+    """Parte das simulações que chegam ao número FIRE até ao mês `month`."""
+    if not paths:
+        return 0.0
+    return sum(1 for p in paths if p["month"] is not None and p["month"] <= month) / len(paths)

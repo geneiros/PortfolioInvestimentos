@@ -288,3 +288,57 @@ span.pm-logo { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; f
 @media (hover: none), (pointer: coarse), (max-width: 767.98px) { #pmProgress { display: none; } }
 @media print { #pmProgress { display: none; } }
 @media (prefers-reduced-motion: reduce) { #pmProgress, #pmProgress.pm-done { transition: none; } }
+
+/* ---------------------------------------------------------------- Planeamento */
+.pm-plan-hero { background-image: linear-gradient(120deg, transparent 55%, rgba(var(--bs-primary-rgb), .08)); }
+.pm-plan-kicker { color: var(--pm-accent); font-weight: 600; font-size: .9rem; display: flex; align-items: center; gap: .5rem; }
+.pm-plan-kicker::before { content: ""; width: 1rem; border-top: 2px solid currentColor; }
+.pm-plan-goal { padding: .75rem 1rem; }
+.pm-timeline { position: relative; height: 2.6rem; margin: 1.6rem .5rem 0; }
+.pm-timeline-done, .pm-timeline-rest { position: absolute; top: .5rem; height: 0; }
+.pm-timeline-done { left: 0; border-top: 3px solid var(--pm-accent); }
+.pm-timeline-rest { right: 0; border-top: 2px dashed var(--pm-accent); opacity: .7; }
+.pm-timeline-since { position: absolute; left: 0; top: -1.2rem; }
+.pm-timeline-dot, .pm-timeline-flag { position: absolute; top: .5rem; transform: translate(-50%, -50%); }
+.pm-timeline-dot { width: .8rem; height: .8rem; border-radius: 50%; background: var(--pm-accent); border: 2px solid var(--pm-surface); }
+.pm-dot-half { background: var(--pm-surface); border: 2px solid var(--pm-accent); transform: translate(-50%, -50%) rotate(45deg); border-radius: 2px; }
+.pm-timeline-flag { color: var(--pm-accent); transform: translate(-20%, -85%); font-size: 1rem; }
+.pm-timeline-range { position: absolute; top: calc(.5rem - 5px); height: 10px; background: rgba(var(--bs-primary-rgb), .18); border-radius: 5px; }
+.pm-timeline-tick { position: absolute; top: 1.15rem; transform: translateX(-50%); font-size: .75rem; }
+.pm-timeline-tick::before { content: ""; position: absolute; left: 50%; top: -.45rem; height: .3rem; border-left: 1px solid var(--bs-border-color); }
+.pm-scale { position: relative; height: 6.5rem; margin: 0 1.5rem; }
+.pm-scale-line { position: absolute; left: 0; right: 0; top: 3.2rem; border-top: 1px solid var(--bs-border-color); }
+.pm-scale-mark, .pm-scale-you { position: absolute; transform: translateX(-50%); width: 8.5rem; }
+.pm-scale-mark { top: 3.2rem; }
+.pm-scale-mark > span { display: block; margin: -.45rem auto .3rem; width: 1px; height: .9rem; background: var(--bs-secondary-color); }
+.pm-scale-you { top: 0; }
+.pm-scale-you > span { display: block; margin: .2rem auto 0; width: .8rem; height: .8rem; border-radius: 50%; background: var(--pm-accent); border: 2px solid var(--pm-surface); }
+.pm-scale-end { position: absolute; top: 2.4rem; transform: translateX(-50%); }
+@media (max-width: 575.98px) { .pm-scale-mark { width: 3rem; } .pm-scale { margin: 0 1.2rem; height: 5.5rem; } .pm-tick-odd { display: none; } }
+.pm-stair-head { min-height: 2.4rem; }
+.pm-stair-label { position: absolute; bottom: -.2rem; transform: translateX(-50%); white-space: nowrap; color: var(--pm-accent); }
+.pm-stair-today { position: absolute; top: -.5rem; bottom: -.5rem; border-left: 1px dotted var(--pm-accent); }
+.pm-stair { display: grid; grid-template-columns: minmax(7rem, 11rem) 4rem 1fr 6.5rem; gap: .5rem; align-items: center; min-height: 1.9rem; }
+.pm-stair-track { position: relative; height: .9rem; }
+.pm-stair-bar, .pm-stair-fill { position: absolute; top: 0; height: 100%; border-radius: 2px; }
+.pm-stair-bar { border: 1px dashed rgba(var(--bs-primary-rgb), .55); }
+.pm-stair-fill { background: var(--pm-accent); }
+@media (max-width: 575.98px) {
+  .pm-stair { grid-template-columns: 1fr 3.5rem 4.5rem; }
+  .pm-stair-track { grid-column: 1 / -1; grid-row: 2; }
+  .pm-stair-head > div:nth-child(-n+2) { display: none; }
+  .pm-stair-head > div:last-child { grid-column: 3; grid-row: 1; }
+}
+.pm-progress-future { background: repeating-linear-gradient(90deg, var(--bs-secondary-bg) 0 6px, transparent 6px 9px); }
+.pm-progress > div.pm-irs-none { background: var(--bs-secondary-color); }
+.pm-progress > div.pm-irs-lots { background: var(--pm-accent); }
+.pm-progress > div.pm-irs-all { background: var(--bs-secondary-bg-subtle, var(--bs-tertiary-color)); background: var(--bs-tertiary-color); }
+.pm-lever { position: relative; height: 1rem; border-left: 1px solid var(--bs-border-color); border-right: 1px solid var(--bs-border-color); }
+.pm-lever-base { position: absolute; top: -.3rem; bottom: -.3rem; border-left: 2px solid var(--bs-secondary-color); }
+.pm-lever-bar { position: absolute; top: .4rem; height: .2rem; }
+.pm-lever-dot { position: absolute; top: .5rem; width: .7rem; height: .7rem; border-radius: 50%; transform: translate(-50%, -50%); }
+.pm-lever-good { background: var(--pm-up); }
+.pm-lever-bad { background: var(--pm-down); }
+.pm-ring { width: 9rem; height: 9rem; border-radius: 50%; display: grid; place-items: center;
+  background: conic-gradient(var(--pm-accent) var(--pm-ring, 0%), var(--bs-secondary-bg) 0); }
+.pm-ring > div { width: 7.6rem; height: 7.6rem; border-radius: 50%; background: var(--pm-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }

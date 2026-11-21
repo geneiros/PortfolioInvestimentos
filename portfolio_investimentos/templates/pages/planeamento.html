@@ -4,210 +4,359 @@
 {% if not p.transactions %}
   {{ empty("Sem dados para planear", "Importa as tuas transações para calcular quando a carteira pode pagar as tuas despesas.", "/importar", "Importar extrato") }}
 {% else %}
-<div class="mb-3">
-  <h5 class="fw-bold mb-1">Independência financeira (FIRE)</h5>
-  <p class="text-secondary mb-0">Quanto juntar para os rendimentos da carteira pagarem as despesas de cada ano, já depois do IRS
-    português, e quando lá chegas com o que tens hoje e o que investes por mês.</p>
+{% set tl = plan.timeline %}
+{# ------------------------------------------------------------------ topo: a linha do tempo #}
+<div class="pm-card mb-3 pm-plan-hero" id="planHero">
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <h5 class="fw-bold mb-0 me-auto">Planeamento</h5>
+    <span class="badge rounded-pill text-bg-primary px-3 py-2">Independência financeira</span>
+  </div>
+  <div class="d-flex flex-wrap gap-4 justify-content-between mb-2">
+    <div>
+      <div class="pm-label">Hoje</div>
+      <div><span class="pm-mid money">{{ plan.value|money }}</span> <span class="small text-secondary">ao fecho de {{ plan.as_of.strftime('%d/%m') }}</span></div>
+    </div>
+    {% if plan.number is defined %}
+    <div>
+      <div class="pm-label">Metade do caminho</div>
+      <div><span class="pm-mid">{{ plan.half.date.year if plan.half.date else "—" }}</span> <span class="small text-secondary money">{{ plan.half.value|money }}</span></div>
+    </div>
+    <div class="text-sm-end">
+      <div class="pm-label">Data FIRE</div>
+      <div><span class="pm-mid">{{ plan.cur.date.year if plan.cur.date else "—" }}</span>
+        {% if plan.scenarios.otimista.date and plan.scenarios.prudente.date %}<span class="small text-secondary">entre {{ plan.scenarios.otimista.date.year }} e {{ plan.scenarios.prudente.date.year }}</span>{% endif %}</div>
+    </div>
+    {% else %}
+    <div class="text-sm-end">
+      <div class="pm-label">O teu objetivo</div>
+      <div><span class="pm-mid">Por definir</span> <span class="small text-secondary">escolhe um rendimento para começar</span></div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="pm-timeline" aria-hidden="true">
+    <div class="pm-timeline-done" style="width: {{ tl.today }}%"></div>
+    <div class="pm-timeline-rest" style="left: {{ tl.today }}%"></div>
+    <span class="pm-timeline-since small text-secondary">desde {{ plan.first.strftime('%m/%Y') }}</span>
+    <span class="pm-timeline-dot pm-dot-today" style="left: {{ tl.today }}%" title="Hoje"></span>
+    {% if tl.marks.get('low') is not none and tl.marks.get('high') is not none %}<span class="pm-timeline-range" style="left: {{ tl.marks.get('low') }}%; width: {{ tl.marks.get('high') - tl.marks.get('low') }}%"></span>{% endif %}
+    {% if tl.marks.get('half') is not none %}<span class="pm-timeline-dot pm-dot-half" style="left: {{ tl.marks.get('half') }}%" title="Metade do caminho"></span>{% endif %}
+    {% if tl.marks.get('fire') is not none %}<span class="pm-timeline-flag" style="left: {{ tl.marks.get('fire') }}%" title="Data FIRE"><i class="bi bi-flag-fill"></i></span>
+    {% elif plan.number is not defined %}<span class="pm-timeline-flag pm-flag-empty" style="left: 100%"><i class="bi bi-flag"></i></span>{% endif %}
+    {% for t in tl.ticks %}<span class="pm-timeline-tick small text-secondary {{ 'pm-tick-odd' if loop.index is even }}" style="left: {{ t.pos }}%">{{ t.year }}</span>{% endfor %}
+  </div>
 </div>
 
-<div class="pm-label mb-2 d-flex align-items-center gap-2 flex-wrap" style="color: #f59e0b"><span class="pm-fire-line" style="border-top: 2px dashed #f59e0b"></span>Para sempre (regra dos {{ plan.withdrawal_rate|pct(1, sign=False) }}){% if with_pension %}, sem contar com a pensão{% endif %}</div>
+{% if plan.number is not defined %}
+{# ------------------------------------------------------------------ ecrã inicial: «Para começar» #}
+<div class="row g-3" id="planStart">
+  <div class="col-lg-8"><div class="pm-card h-100">
+    <div class="pm-plan-kicker mb-2">Para começar</div>
+    <h3 class="fw-bold mb-2">Quanto queres receber<br>por ano, em euros de hoje?</h3>
+    <p class="text-secondary">Hoje os dividendos da carteira dão <b class="text-body money">{{ plan.dividends|money }} por ano</b>, já depois do IRS.</p>
+    <div class="row g-2 mb-3">
+      {% for g in plan.goals %}
+      <div class="col-6 col-md-3"><button type="button" class="btn btn-outline-primary w-100 text-start pm-plan-goal" data-plan-goal="{{ g }}">
+        <span class="d-block fw-bold fs-5 money">{{ g|money }}</span><span class="small money">{{ (g / 12)|money }} por mês</span></button></div>
+      {% endfor %}
+      <div class="col-6 col-md-3"><button type="button" class="btn btn-outline-primary w-100 text-start pm-plan-goal" data-bs-toggle="collapse" data-bs-target="#planOther" aria-expanded="false">
+        <span class="d-block fw-bold fs-5">Outro valor</span><span class="small">escreve-o</span></button></div>
+    </div>
+    <div class="collapse mb-3" id="planOther">
+      <form class="d-flex gap-2 align-items-center" id="planOtherForm">
+        <div class="input-group" style="max-width: 16rem"><span class="input-group-text">€</span>
+          <input class="form-control" name="income" inputmode="decimal" placeholder="ex.: 15000" aria-label="Rendimento por ano" required></div>
+        <span class="small text-secondary">por ano</span>
+        <button class="btn btn-primary" type="submit">Continuar</button>
+      </form>
+    </div>
+    <p class="text-secondary mb-0">Escolhe um valor e aparecem o número FIRE e a data.</p>
+  </div></div>
+  <div class="col-lg-4"><div class="pm-card h-100">
+    <div class="pm-label mb-3">Já preenchido</div>
+    <div class="pm-label">Depósito por mês</div>
+    <div class="pm-mid money">{{ cfg.average|money }}</div>
+    <p class="small text-secondary">A média do dinheiro que entrou nas corretoras (depósitos menos levantamentos) nos últimos 12 meses.</p>
+    <div class="pm-label">Levantamento por ano</div>
+    <div class="pm-mid">{{ cfg.swr|replace('.', ',') }}% por ano</div>
+    <p class="small text-secondary mb-0">O que se tira da carteira por ano. Muda-se depois de escolher o rendimento.</p>
+  </div></div>
+</div>
+
+{% else %}
+{% set cur = plan.cur %}
+{# ------------------------------------------------------------------ cenário #}
+<div class="d-flex justify-content-end align-items-center gap-2 mb-3 flex-wrap">
+  <span class="pm-label">Cenário {{ help("Retornos por ano acima da inflação (em euros de hoje). O «Ritmo da carteira» usa a rentabilidade anual da tua carteira desde o início, menos a inflação que indicaste.") }}</span>
+  <div class="btn-group btn-group-sm" role="group" aria-label="Cenário" id="planScenario">
+    {% for k, sc in plan.scenarios.items() %}
+    <a class="btn btn-outline-primary {{ 'active' if k == plan.chosen }}" href="{{ q(cenario=k) }}" data-plan-nav>{{ sc.label }}{% if k == 'ritmo' %} <small>{{ sc.rate|pct(1, sign=False) }}</small>{% endif %}</a>
+    {% endfor %}
+  </div>
+</div>
+
 <div class="row g-3 mb-3">
-  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">O número FIRE {{ help("Despesas anuais ÷ (1 − imposto efetivo sobre os levantamentos) ÷ taxa de levantamento. Ex.: 12 000 € ÷ (1 − 14%) ÷ 4% ≈ 349 000 €.") }}</div>
-    <div class="pm-mid money">{{ plan.number|money }}</div>
-    <div class="small text-secondary">para <span class="money">{{ plan.expenses|money }}</span> de despesas por ano, a {{ plan.withdrawal_rate|pct(1, sign=False) }} ao ano</div>
+  {# ---------------------------------------------------------------- cartão principal #}
+  <div class="col-xl-8"><div class="pm-card h-100" id="planMain">
+    <div class="pm-plan-kicker mb-2">Quando podes viver dos teus investimentos?</div>
+    {% if cur.month == 0 %}
+    <h3 class="fw-bold mb-2">Já chegaste, no cenário {{ cur.label|lower }}.</h3>
+    {% elif cur.date %}
+    <h3 class="fw-bold mb-2">A partir de <span class="text-primary">{{ cur.date.year }}</span>, no cenário {{ cur.label|lower }}.</h3>
+    {% else %}
+    <h3 class="fw-bold mb-2">Não chega em {{ 60 }} anos, no cenário {{ cur.label|lower }}.</h3>
+    {% endif %}
+    <p class="text-secondary mb-1">Para receber <b class="text-body money">{{ plan.income|money }} por ano</b> já depois do IRS, são precisos <b class="text-body money">{{ plan.number|money }}</b>.
+      Hoje tens <b class="text-body">{{ plan.done|pct(0, sign=False) }}</b> do caminho e os dividendos já pagam <b class="text-body">{{ plan.div_share|pct(0, sign=False) }}</b> do rendimento.</p>
+    {% if plan.others %}<p class="small text-secondary mb-1" id="fireExtra">Inclui <span class="money">{{ plan.others|money }}</span> de outros ativos marcados para o FIRE · <a href="/patrimonio">Património</a></p>{% endif %}
+    {% if cfg.swr == 'div' and not plan.dividends %}<div class="alert alert-warning small py-2">Sem dividendos nos últimos 12 meses: só com os dividendos, a carteira não paga o rendimento.</div>{% endif %}
+    <a class="small" data-bs-toggle="collapse" href="#planPick" role="button" aria-expanded="{{ 'true' if plan.pick else 'false' }}"><i class="bi bi-calendar-event"></i> Escolher o ano</a>
+    <div class="collapse {{ 'show' if plan.pick }}" id="planPick">
+      <form class="d-flex flex-wrap gap-2 align-items-center mt-2" method="get" action="/planeamento" id="planPickForm">
+        {% for k, v in request.args.items() if k != 'ano' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        <label class="small text-secondary" for="planPickYear">Quero chegar até</label>
+        <input class="form-control form-control-sm" style="width: 6rem" type="number" id="planPickYear" name="ano" min="{{ plan.as_of.year + 1 }}" max="{{ plan.as_of.year + 60 }}" value="{{ plan.pick.year if plan.pick else (cur.date.year - 5 if cur.date else plan.as_of.year + 20) }}">
+        <button class="btn btn-sm btn-outline-primary" type="submit">Ver</button>
+        {% if plan.pick %}<span class="small" id="planPickResult">{% if plan.pick.monthly is none %}Nem com €100 000 por mês lá chegas.{% elif plan.pick.monthly == 0 %}Chegas lá sem depositar mais nada.{% else %}Precisas de depositar <b class="money">{{ plan.pick.monthly|money }}</b> por mês · <a href="{{ q(dep=(plan.pick.monthly / 10)|round(0, 'ceil') * 10) }}" data-plan-nav>Experimentar</a>{% endif %}</span>{% endif %}
+      </form>
+    </div>
+    <div class="mt-3" style="height: 320px"><canvas id="planChart" aria-label="Evolução e projeção da carteira" role="img"></canvas></div>
+    <p class="small text-secondary mt-2 mb-0">Retornos acima da inflação, em euros de hoje, a juntar o depósito de cada mês, com o IRS dos levantamentos já contado no número FIRE. A faixa vai do cenário prudente ao otimista. Simulação, não promessa.</p>
   </div></div>
-  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">Já feito {{ help("Valor atual da carteira (posições + caixa), mais os outros ativos marcados para o FIRE em Património, a dividir pelo número FIRE.") }}</div>
-    <div class="pm-mid">{{ plan.done|pct(2, sign=False) }}</div>
-    <div class="pm-progress mt-2"><div style="width: {{ [[plan.done * 100, 0]|max, 100]|min }}%"></div></div>
-    <div class="small text-secondary mt-1"><span class="money">{{ plan.value|money }}</span> de <span class="money">{{ plan.number|money }}</span></div>
-    {% if fire_extra %}<div class="small text-secondary" id="fireExtra">Inclui <span class="money">{{ fire_extra|money }}</span> de outros ativos · <a href="/patrimonio">Património</a></div>{% endif %}
-  </div></div>
-  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">A data FIRE {{ help("Mês em que a carteira chega ao número FIRE no cenário base (5% ao ano, real), a investir o valor mensal indicado. O intervalo é o dos cenários otimista (7%) e pessimista (3%).") }}</div>
-    <div class="pm-mid">{{ plan.date.year if plan.date else "—" }}</div>
-    <div class="small text-secondary">
-      {% if plan.done >= 1 %}Já chegaste ao número FIRE.
-      {% elif plan.earliest and plan.latest %}Entre {{ plan.earliest.year }} e {{ plan.latest.year }}
-      {% elif plan.earliest %}A partir de {{ plan.earliest.year }}; com 3% ao ano, não em 60 anos
-      {% else %}Não chega em 60 anos com estes valores{% endif %}
+
+  {# ---------------------------------------------------------------- as tuas hipóteses #}
+  <div class="col-xl-4"><div class="pm-card h-100" id="planInputs" data-query="{{ q() }}">
+    <div class="pm-label mb-3">As tuas hipóteses</div>
+    <div class="pm-label">Rendimento por ano</div>
+    <div class="input-group input-group-sm mb-1">
+      <span class="input-group-text">€</span>
+      <input class="form-control" data-plan-field="rend" inputmode="decimal" value="{{ plan.income|round|int }}" aria-label="Rendimento por ano">
+      <button class="btn btn-outline-secondary" type="button" data-plan-step="rend" data-step="-1000" aria-label="Menos €1 000">−</button>
+      <button class="btn btn-outline-secondary" type="button" data-plan-step="rend" data-step="1000" aria-label="Mais €1 000">+</button>
+    </div>
+    <p class="small text-secondary">Em euros de hoje, já depois do IRS.</p>
+
+    <div class="pm-label">Depósito por mês</div>
+    <div class="input-group input-group-sm mb-1">
+      <span class="input-group-text">€</span>
+      <input class="form-control" data-plan-field="dep" inputmode="decimal" value="{{ cfg.monthly|round|int }}" aria-label="Depósito por mês">
+      <button class="btn btn-outline-secondary" type="button" data-plan-step="dep" data-step="-50" aria-label="Menos €50">−</button>
+      <button class="btn btn-outline-secondary" type="button" data-plan-step="dep" data-step="50" aria-label="Mais €50">+</button>
+    </div>
+    <p class="small text-secondary mb-1">{% if cfg.monthly|round == cfg.average|round %}A média dos últimos 12 meses.{% else %}O valor que escolheste.{% endif %}</p>
+    {% if cfg.monthly|round != cfg.average|round %}<a class="small d-inline-block mb-3" href="{{ q(dep=cfg.average|float) }}" data-plan-nav id="planAverage">Voltar à média (<span class="money">{{ cfg.average|money }}</span>)</a>{% else %}<div class="mb-3"></div>{% endif %}
+
+    <div class="pm-label mb-1">Levantamento por ano {{ help("A parte da carteira que se tira por ano. 4% é a regra mais conhecida; 3–3,5% aguenta mais anos maus. Com «Dividendos», vive-se só dos dividendos e não se vende nada.") }}</div>
+    <div class="btn-group btn-group-sm w-100 mb-1" role="group" aria-label="Levantamento por ano">
+      {% for lv in levels %}<a class="btn btn-outline-primary {{ 'active' if cfg.swr == lv }}" href="{{ q(lev=lv) }}" data-plan-nav>{{ 'Dividendos' if lv == 'div' else lv|replace('.', ',') ~ '%' }}</a>{% endfor %}
+    </div>
+    <p class="small text-secondary">{% if cfg.swr == 'div' %}Só os dividendos ({{ plan.rate_w|pct(1, sign=False) }} ao ano, já líquidos): não se vende nada.{% else %}Tirar menos aguenta mais anos maus. Com «Dividendos», não se vende nada.{% endif %}</p>
+
+    <div class="pm-label">Inflação por ano</div>
+    <div class="input-group input-group-sm mb-1">
+      <input class="form-control" data-plan-field="inf" inputmode="decimal" value="{{ '%g'|format(cfg.inflation)|replace('.', ',') }}" aria-label="Inflação por ano">
+      <span class="input-group-text">%</span>
+      <button class="btn btn-outline-secondary" type="button" data-plan-step="inf" data-step="-0.5" aria-label="Menos 0,5%">−</button>
+      <button class="btn btn-outline-secondary" type="button" data-plan-step="inf" data-step="0.5" aria-label="Mais 0,5%">+</button>
+    </div>
+    <p class="small text-secondary">Tudo fica em euros de hoje. Serve para o «Ritmo da carteira».</p>
+
+    <div class="d-flex justify-content-between align-items-center"><span class="pm-label">Rendimentos fora da carteira</span>
+      <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#planIncomeModal">Juntar</button></div>
+    {% if plan.incomes %}
+    <ul class="list-unstyled small my-1" id="planIncomeList">{% for r in plan.incomes %}<li><b>{{ r.name }}</b> · <span class="money">{{ r.monthly|money }}</span>/mês desde {{ r.year }}</li>{% endfor %}</ul>
+    {% else %}<p class="small mb-1">Nenhum ainda.</p>{% endif %}
+    <p class="small text-secondary">A reforma, rendas ou outro dinheiro que entra. Em euros de hoje, depois do IRS.</p>
+
+    <div class="d-flex justify-content-between align-items-center"><span class="pm-label">Despesas do mês</span>
+      <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#planItemsModal">Mudar</button></div>
+    <p class="small mb-1"><b class="money">{{ plan.items_total|money }}</b> em {{ plan.items_count }} despesas</p>
+    <p class="small text-secondary">{% if plan.items_custom %}As tuas despesas, na escala do rendimento escolhido.{% else %}Valores de partida. Mudam-se em «O que já está pago».{% endif %}</p>
+
+    <p class="small mb-2 {{ 'text-warning' if cfg.dirty else 'text-secondary' }}" id="planDirty">{{ "Hipóteses por gravar." if cfg.dirty else "Hipóteses gravadas." }}</p>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-primary" type="button" id="planSave"
+              data-args='{{ {"income": plan.income, "monthly": cfg.monthly, "swr": cfg.swr, "inflation": cfg.inflation}|tojson }}'>Guardar o objetivo</button>
+      <button class="btn btn-sm btn-outline-secondary" type="button" id="planReset">Recomeçar</button>
     </div>
   </div></div>
 </div>
 
-{% if with_pension %}
-<div class="pm-label mb-2 d-flex align-items-center gap-2 flex-wrap" style="color: #a855f7"><span class="pm-fire-line" style="border-top: 2px dotted #a855f7"></span>Para sempre, com a pensão a partir dos {{ life.pension_age|int }}
-  {{ help("Duas partes: até à pensão, a carteira paga as despesas todas; a partir dela, só o que a pensão não cobre, pela regra da taxa de levantamento (para sempre). O capital depende da idade em que chegas lá: quanto mais cedo, mais anos até à pensão.") }}</div>
-<div class="row g-3 mb-3">
-  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">O número FIRE com a pensão {{ help("O capital necessário na data FIRE do cenário base. Desce com a idade: quanto mais tarde te reformas, menos anos tens de pagar até à pensão (e até ao fim), por isso reformar mais tarde pede menos capital, mas demora mais a lá chegar. Por isso, investir menos tempo (Investir até aos) pode mostrar um valor mais baixo: não precisas de menos, só chegas lá mais tarde.") }}</div>
-    <div class="pm-mid money">{{ with_pension.number|money if with_pension.number is not none else "—" }}</div>
-    <div class="small text-secondary">{% if with_pension.age_at %}<b class="text-body">aos {{ with_pension.age_at|round|int }} anos ({{ with_pension.date.year }})</b>, na data FIRE do cenário base{% else %}não chega antes dos {{ cfg.until|int }} anos{% endif %};
-      depois da pensão: <span class="money">{{ with_pension.after|money }}</span></div>
-  </div></div>
-  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">Se te reformasses hoje</div>
-    <div class="pm-mid">{{ with_pension.done|pct(2, sign=False) }}</div>
-    <div class="pm-progress mt-2"><div style="width: {{ [[with_pension.done * 100, 0]|max, 100]|min }}%"></div></div>
-    <div class="small text-secondary mt-1"><span class="money">{{ plan.value|money }}</span> de <span class="money">{{ with_pension.now|money }}</span></div>
-  </div></div>
-  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">A data FIRE</div>
-    <div class="pm-mid">{{ with_pension.date.year if with_pension.date else "—" }}</div>
-    <div class="small text-secondary">{% if with_pension.earliest and with_pension.latest %}Entre {{ with_pension.earliest.year }} e {{ with_pension.latest.year }}{% elif with_pension.earliest %}A partir de {{ with_pension.earliest.year }}{% else %}Não chega com estes valores{% endif %}</div>
-  </div></div>
+{# ------------------------------------------------------------------ os cenários e a carteira #}
+<div class="pm-card mb-3" id="planCagr">
+  <div class="pm-label mb-2">Os cenários e a carteira {{ help("A rentabilidade anual da carteira (TWR, como no Desempenho) desde o início, e a mesma descontada da inflação em Portugal (INE), comparada com os retornos reais dos cenários.") }}</div>
+  {% if plan.cagr %}
+  <h5 class="fw-bold">Desde {{ plan.cagr.since.strftime('%m/%Y') }}, a carteira rendeu <span class="{{ plan.cagr.real|tone }}">{{ plan.cagr.real|pct(1, sign=False) }}</span> por ano acima da inflação em Portugal.</h5>
+  <p class="small text-secondary">Sem descontar a inflação, foram <span class="{{ plan.cagr.nominal|tone }}">{{ plan.cagr.nominal|pct(1) }} por ano</span>, o CAGR do Desempenho.</p>
+  {% set rp = [[plan.cagr.real * 1000, 0]|max, 100]|min %}
+  <div class="pm-scale my-4">
+    <div class="pm-scale-line"></div>
+    {% for k in ("prudente", "central", "otimista") %}{% set sc = plan.scenarios[k] %}
+    <div class="pm-scale-mark" style="left: {{ sc.rate * 1000 }}%"><span></span><div class="small text-center"><b><span class="d-none d-sm-inline">{{ sc.label }} </span>{{ sc.rate|pct(0, sign=False) }}</b><span class="d-none d-sm-inline"><br><span class="text-secondary">{{ plan.notes[k] }}</span></span></div></div>
+    {% endfor %}
+    <div class="pm-scale-you" style="left: {{ rp }}%"><div class="small text-center"><span class="pm-label">A carteira</span><br><b class="{{ plan.cagr.real|tone }}">{{ plan.cagr.real|pct(1) }}</b></div><span></span></div>
+    <span class="pm-scale-end small text-secondary" style="left: 0">0%</span><span class="pm-scale-end small text-secondary" style="left: 100%">10%</span>
+  </div>
+  {% else %}
+  <p class="small text-secondary mb-0">Com menos de um ano de histórico ainda não há uma rentabilidade anual para comparar com os cenários: Prudente 3% ({{ plan.notes.prudente|lower }}), Central 5% ({{ plan.notes.central|lower }}) e Otimista 7% ({{ plan.notes.otimista }}).</p>
+  {% endif %}
 </div>
-{% if with_pension.after == 0 %}
-<div class="alert alert-info small d-flex gap-2 align-items-start mb-3" id="pensionCovers"><i class="bi bi-info-circle"></i>
-  <div>A pensão (<span class="money">{{ (cfg.pension * 14)|money }}</span>/ano, 14 meses) cobre as despesas (<span class="money">{{ cfg.expenses|money }}</span>/ano):
-    a partir dos {{ life.pension_age|int }} anos não precisas de levantar nada. Por isso, o capital só tem de pagar a ponte até à pensão{% if life %} e os números «para sempre, com a pensão» e «até aos {{ life.until_age|int }} anos» são iguais{% endif %}.</div>
-</div>
-{% endif %}
-{% endif %}
-{% if life %}
-<div class="pm-label mb-2 d-flex align-items-center gap-2 flex-wrap" style="color: #ec4899"><span class="pm-fire-line" style="border-top: 2px dashed #ec4899"></span>Até aos {{ life.until_age|int }} anos{% if life.pension %}, com a pensão a partir dos {{ life.pension_age|int }}{% endif %}
-  {{ help("Capital que paga as despesas (já com o IRS dos levantamentos) desde a data FIRE até à idade indicada, a render a taxa real do cenário, e acaba perto de zero. A pensão, se indicada, abate às despesas. É menos do que o número FIRE «para sempre», sobretudo para quem se reforma tarde.") }}</div>
-<div class="row g-3 mb-3">
-  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">Capital necessário {{ help("O capital necessário na data FIRE do cenário base. Desce com a idade: quanto mais tarde te reformas, menos anos tens de pagar até à pensão (e até ao fim), por isso reformar mais tarde pede menos capital, mas demora mais a lá chegar. Por isso, investir menos tempo (Investir até aos) pode mostrar um valor mais baixo: não precisas de menos, só chegas lá mais tarde.") }}</div>
-    <div class="pm-mid money">{{ life.number|money if life.number else "—" }}</div>
-    <div class="small text-secondary">{% if life.age_at %}<b class="text-body">aos {{ life.age_at|round|int }} anos ({{ life.date.year }})</b>, na data FIRE do cenário base{% else %}não chega antes dos {{ (life.until_age - 1)|int }} anos{% endif %}</div>
-  </div></div>
-  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">Se te reformasses hoje {{ help("Capital necessário para viver desde hoje até à idade indicada, e a parte que já tens.") }}</div>
-    <div class="pm-mid">{{ life.done|pct(2, sign=False) }}</div>
-    <div class="pm-progress mt-2"><div style="width: {{ [[life.done * 100, 0]|max, 100]|min }}%"></div></div>
-    <div class="small text-secondary mt-1"><span class="money">{{ plan.value|money }}</span> de <span class="money">{{ life.now|money }}</span></div>
-  </div></div>
-  <div class="col-md-4"><div class="pm-card pm-card-sm h-100">
-    <div class="pm-label">A data FIRE</div>
-    <div class="pm-mid">{{ life.date.year if life.date else "—" }}</div>
-    <div class="small text-secondary">{% if life.earliest and life.latest %}Entre {{ life.earliest.year }} e {{ life.latest.year }}{% elif life.earliest %}A partir de {{ life.earliest.year }}{% else %}Não chega com estes valores{% endif %}</div>
-  </div></div>
-</div>
-{% if cfg.stop_age and life.age_at %}
-<div class="alert alert-secondary small d-flex gap-2 align-items-start mb-3" id="stopAgeNote"><i class="bi bi-info-circle"></i>
-  <div>Deixas de investir aos {{ cfg.stop_age|int }}: a data FIRE (cenário base) é aos <b>{{ life.age_at|round|int }} anos ({{ life.date.year }})</b>.
-    Investir menos tempo não reduz o que precisas, adia a data; o capital pedido é menor só porque, reformando-te mais tarde, faltam menos anos{% if life.pension %} até à pensão{% endif %}.</div>
-</div>
-{% endif %}
-{% elif not cfg.age %}
-<p class="small text-secondary">Indica a tua idade em «O teu plano» para ver também o capital necessário até uma certa idade (por exemplo, até aos 90 anos), com a pensão, em vez de um capital que dura para sempre.</p>
-{% endif %}
 
 <div class="row g-3 mb-3">
-  <div class="col-xl-8"><div class="pm-card h-100">
-    <div class="pm-label mb-2">Evolução e projeção</div>
-    <div style="height: 320px"><canvas id="fireChart"></canvas></div>
-    <p class="small text-secondary mt-2 mb-0">Até hoje, o valor real da carteira; daqui em diante, simulações com retornos de 3%, 5% e 7% ao ano
-      acima da inflação (em euros de hoje), não uma promessa. Cada cenário junta o investimento mensal até à data FIRE
-      {%- if cfg.stop_age %} ou até aos {{ cfg.stop_age|int }} anos{% endif %} e depois levanta o que as despesas pedem{% if life and life.pension %}, menos a pensão{% endif %}.
-      {% if life %}O gráfico vai até aos {{ life.until_age|int }} anos.{% endif %} As linhas tracejadas são os números FIRE: laranja «para sempre»{% if with_pension %}, roxa «para sempre, com a pensão»{% endif %}{% if life %}, rosa «até aos {{ life.until_age|int }} anos»{% endif %} (os que dependem da idade, na data FIRE do cenário base). Os pontos marcam quando cada cenário chega a cada número FIRE; o pontilhado é a curva se continuasses a investir.</p>
-  </div></div>
-  <div class="col-xl-4"><div class="pm-card h-100">
-    <div class="pm-label mb-2">O teu plano</div>
-    <form class="d-flex flex-column gap-2 small" data-pm-method="save_fire" data-pm-success="Plano guardado.">
-      <label>Despesas por ano (€) {{ help("O que gastas num ano, em euros de hoje.") }}
-        <input name="expenses" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.expenses|round|int }}"></label>
-      <label>Investimento por mês (€) {{ help("O que juntas à carteira todos os meses. Por omissão, a média dos depósitos líquidos dos últimos 12 meses.") }}
-        <input name="monthly" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.monthly|round|int }}"></label>
-      <label>Taxa de levantamento anual (%) {{ help("Quanto levantas por ano face ao património. 4% é a regra mais usada (estudo Trinity); 3–3,5% é mais prudente para reformas longas.") }}
-        <input name="swr" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.swr }}"></label>
-      <label>Imposto efetivo sobre os levantamentos (%) {{ help("Em Portugal, as mais-valias pagam 28%, mas só sobre a parte de ganho de cada venda. Por omissão: 28% × a parte de ganho da carteira (pelo menos metade).") }}
-        <input name="tax" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.tax }}"></label>
-      <div class="pm-label mt-2">Até quando tem de durar {{ help("Opcional. Com a tua idade, calcula também o capital que paga as despesas até à idade indicada e pode acabar perto de zero (em vez de durar para sempre).") }}</div>
-      <div class="row g-2">
-        <label class="col-6">A tua idade<input name="age" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.age|int if cfg.age else '' }}" placeholder="ex.: 45"></label>
-        <label class="col-6">Durar até aos<input name="until" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.until|int }}"></label>
-        <label class="col-6">Pensão líquida/mês (€) {{ help("A pensão da Segurança Social que esperas, líquida, por mês (paga 14 vezes por ano). Abate às despesas a partir da idade indicada.") }}<input name="pension" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.pension|round|int }}"></label>
-        <label class="col-6">A partir dos<input name="pension_age" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.pension_age|int }}"></label>
-        <label class="col-12">Investir até aos (anos, opcional) {{ help("Deixas de juntar o investimento mensal a partir desta idade, mesmo antes da data FIRE. Sem valor, investes até à data FIRE.") }}<input name="stop_age" class="form-control form-control-sm" inputmode="decimal" value="{{ cfg.stop_age|int if cfg.stop_age else '' }}" placeholder="até à data FIRE"></label>
+  {# ---------------------------------------------------------------- o que já está pago #}
+  {% set cov = plan.coverage %}
+  {% set paid = cov["items"]|selectattr("paid")|list|length %}
+  <div class="col-xl-8"><div class="pm-card h-100" id="planPaid">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+      <div class="pm-label">O que já está pago {{ help("O rendimento sustentável de hoje (a carteira × levantamento, depois do IRS, mais os rendimentos fora da carteira que já recebes) paga as despesas da mais barata para a mais cara. O ano de cada uma é o do cenário escolhido.") }}</div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#planItemsModal">Mudar as despesas</button>
+        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#planIncomeModal">Mudar os rendimentos</button>
       </div>
-      <button class="btn btn-sm btn-primary align-self-start mt-1" type="submit">Recalcular</button>
-      {% if not cfg.custom %}<span class="text-secondary">Valores sugeridos a partir da carteira; ajusta-os aos teus.</span>{% endif %}
-    </form>
+    </div>
+    <h5 class="fw-bold">{% if paid == cov["items"]|length %}Já dá para todas as despesas do mês.{% elif paid %}Já dá para {{ paid }} das tuas {{ cov["items"]|length }} despesas do mês.{% else %}Ainda não dá para nenhuma despesa do mês.{% endif %}</h5>
+    <p class="small text-secondary">Hoje sustenta <b class="text-body money">{{ cov.today|money }} por mês</b>, já depois do IRS. Só os dividendos dão cerca de <b class="text-body money">{{ (plan.dividends / 12)|money }} por mês</b>.
+      {% set nxt = cov["items"]|rejectattr("paid")|first %}{% if nxt %}A seguir: {{ nxt.name|lower }}.{% endif %}</p>
+    {% set total = plan.items_total or 1 %}
+    <div class="pm-stairs mt-3" id="planStairs">
+      {% set tp = [cov.today / total * 100, 100]|min %}
+      <div class="pm-stair pm-stair-head"><div></div><div></div><div class="pm-stair-track"><span class="pm-stair-label small" style="left: {{ tp }}%">Hoje · <span class="money">{{ cov.today|money }}</span></span></div><div class="small text-end text-secondary">Objetivo<br><span class="money">{{ total|money }}</span></div></div>
+      {% for it in cov["items"]|reverse %}
+      <div class="pm-stair">
+        <div class="pm-stair-name small">{{ it.name }}</div>
+        <div class="pm-stair-amount small money">{{ it.amount|money }}</div>
+        <div class="pm-stair-track">
+          <span class="pm-stair-bar" style="left: {{ (it.cum - it.amount) / total * 100 }}%; width: {{ it.amount / total * 100 }}%"></span>
+          <span class="pm-stair-today" style="left: {{ tp }}%"></span>
+          {% if it.part %}<span class="pm-stair-fill" style="left: {{ (it.cum - it.amount) / total * 100 }}%; width: {{ it.part / total * 100 }}%"></span>{% endif %}
+        </div>
+        <div class="pm-stair-when small text-end">
+          {% if it.paid %}<span class="text-primary"><i class="bi bi-check-circle-fill"></i> Paga</span>
+          {% elif it.part %}<span class="text-primary money">{{ it.part|money }} de {{ it.amount|money }}</span>{% if it.date %}<br><b>{{ it.date.year }}</b>{% endif %}
+          {% else %}<b>{{ it.date.year if it.date else "—" }}</b>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="small text-secondary mt-3 mb-0">As despesas são hipóteses tuas e vêm com valores de partida. Somam o rendimento do objetivo a dividir por 12. O ano de cada uma é o do cenário {{ cur.label|lower }}.</p>
+  </div></div>
+
+  {# ---------------------------------------------------------------- quanto demora cada 100 000 #}
+  <div class="col-xl-4"><div class="pm-card h-100" id="planMilestones">
+    <div class="pm-label mb-2">Quanto demora cada €100 000 {{ help("O tempo entre cada €100 000 da carteira: até hoje, o que aconteceu; daqui em diante, o cenário escolhido com os depósitos de hoje.") }}</div>
+    {% set ms = plan.milestones %}
+    {% if ms|length >= 2 and ms[0].months and ms[-1].months %}
+    <h5 class="fw-bold">O primeiro demora{{ 'u' if not ms[0].future }} cerca de {{ duration(ms[0].months) }}. O {{ ms|length }}.º, cerca de {{ duration(ms[-1].months) }}.</h5>
+    {% endif %}
+    {% set top = (ms|map(attribute='months')|reject('none')|max) or 1 %}
+    {% for m in ms %}
+    <div class="mt-3">
+      <div class="d-flex justify-content-between small"><span>O {{ m.n }}.º <span class="money">{{ m.level|money }}</span></span><b>{{ duration(m.months) if m.months is not none else "não chega" }}{% if loop.first and m.months %} no total{% endif %}</b></div>
+      <div class="pm-progress mt-1 {{ 'pm-progress-future' if m.future }}"><div style="width: {% if not m.future %}100{% elif m.so_far is defined and m.months %}{{ [m.so_far / m.months * 100, 100]|min }}{% else %}0{% endif %}%"></div></div>
+      {% if m.so_far is defined %}<div class="small text-secondary mt-1">{{ duration(m.so_far) }} até hoje · <span class="text-primary">faltam <span class="money">{{ m.missing|money }}</span>{% if m.left is not none %}, cerca de {{ duration(m.left) }}{% endif %}</span></div>{% endif %}
+    </div>
+    {% endfor %}
+    <p class="small text-secondary mt-3 mb-0">Desde {{ plan.first.strftime('%m/%Y') }}. Cenário {{ cur.label|lower }}, com os depósitos de hoje.</p>
   </div></div>
 </div>
 
-{% if reach and reach|length > 1 %}
-<div class="pm-card mb-3">
-  <div class="pm-label mb-2">Quando chegas a cada número FIRE {{ help("Para cada número FIRE e cada cenário: o mês em que a carteira chega lá, se continuares a investir até essa data (ou até à idade «Investir até aos»), e o capital necessário nessa data. No gráfico, é o ponto da cor do número FIRE em cima da curva do cenário.") }}</div>
-  <div class="table-responsive"><table class="table pm-table mb-0" id="fireReach">
-    <thead><tr><th>Número FIRE</th>{% for cell in reach[0].cells %}<th class="text-end text-capitalize">{{ cell.name }}</th>{% endfor %}</tr></thead>
-    <tbody>{% for r in reach %}
-      <tr><td><span class="pm-fire-line me-2" style="border-top: 2px dashed {{ r.color }}"></span>{{ r.label }}</td>
-        {% for cell in r.cells %}<td class="text-end">{% if cell.date %}{{ cell.date.strftime('%m/%Y') }}{% if cell.age %} <span class="text-secondary">({{ cell.age|int }} anos)</span>{% endif %}<br><small class="text-secondary money">{{ cell.number|money }}</small>{% else %}<span class="text-secondary">não chega</span>{% endif %}</td>{% endfor %}</tr>
-    {% endfor %}</tbody>
-  </table></div>
+{# ------------------------------------------------------------------ o que mexe na data #}
+{% set lv_years = plan.levers|map(attribute='date')|reject('none')|map(attribute='year')|list + ([cur.date.year] if cur.date else []) %}
+<div class="pm-card mb-3" id="planLevers">
+  <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+    <div class="pm-label">O que mexe na data {{ help("Cada linha muda uma hipótese de cada vez, no cenário escolhido. «Experimentar» mostra a página com essa mudança, sem gravar.") }}</div>
+    <div class="small text-secondary">No cenário {{ cur.label|lower }}, hoje em {{ cur.date.year if cur.date else "—" }}. «Experimentar» mostra a data com uma mudança de cada vez, sem gravar.</div>
+  </div>
+  {% if lv_years %}{% set lo = lv_years|min - 1 %}{% set hi = lv_years|max + 1 %}{% set span = hi - lo %}{% endif %}
+  {% for lv in plan.levers %}
+  <div class="row g-2 align-items-center py-2 border-top">
+    <div class="col-md-4"><b>{{ lv.title }}</b><div class="small text-secondary">{{ lv.text }}</div></div>
+    <div class="col-md-4">
+      {% if lv_years and lv.date and cur.date %}
+      {% set a = (cur.date.year - lo) / span * 100 %}{% set b = (lv.date.year - lo) / span * 100 %}
+      <div class="pm-lever" aria-hidden="true"><span class="pm-lever-base" style="left: {{ a }}%"></span>
+        <span class="pm-lever-bar {{ 'pm-lever-good' if (lv.delta or 0) > 0 else 'pm-lever-bad' }}" style="left: {{ [a, b]|min }}%; width: {{ (a - b)|abs }}%"></span>
+        <span class="pm-lever-dot {{ 'pm-lever-good' if (lv.delta or 0) > 0 else 'pm-lever-bad' }}" style="left: {{ b }}%"></span></div>
+      {% endif %}
+    </div>
+    <div class="col-8 col-md-2"><b>{{ lv.date.year if lv.date else "não chega" }}</b>
+      {% if lv.delta %}<div class="small {{ 'text-up' if lv.delta > 0 else 'text-down' }}">{{ duration(lv.delta|abs) }} mais {{ 'cedo' if lv.delta > 0 else 'tarde' }}</div>{% elif lv.delta == 0 %}<div class="small text-secondary">a mesma data</div>{% endif %}</div>
+    <div class="col-4 col-md-2 text-end">
+      {% if lv.key == 'pension' %}<button class="btn btn-sm btn-link" type="button" data-plan-pension="{{ lv.year }}">Juntar</button>
+      {% elif lv.href %}<a class="btn btn-sm btn-link" href="{{ lv.href }}" data-plan-nav>Experimentar</a>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# ------------------------------------------------------------------ o número FIRE e o IRS #}
+<div class="pm-card mb-3" id="planIrs">
+  <div class="pm-label mb-2">O número FIRE e o IRS dos teus lotes {{ help("Cada levantamento vende primeiro os lotes mais antigos e só paga IRS (28%) sobre a parte de ganho. O imposto efetivo é calculado com os teus lotes abertos, aos preços de hoje.") }}</div>
+  {% if plan.irs %}
+  {% set mx = plan.irs.all %}
+  <div class="row g-3 align-items-center">
+    <div class="col-lg-7">
+      {% for label, v, cls in (("Sem IRS", plan.irs.none, "pm-irs-none"), ("Com o IRS dos teus lotes", plan.irs.lots, "pm-irs-lots"), ("Com 28% sobre tudo", plan.irs.all, "pm-irs-all")) %}
+      <div class="d-flex justify-content-between small mt-2"><span>{{ label }}</span><b class="money">{{ v|money }}</b></div>
+      <div class="pm-progress mt-1"><div class="{{ cls }}" style="width: {{ v / mx * 100 }}%"></div></div>
+      {% endfor %}
+    </div>
+    <div class="col-lg-5 small text-secondary">Cada levantamento vende primeiro os lotes mais antigos e só paga IRS sobre a parte de ganho: com os teus lotes, a taxa efetiva é de <b class="text-body">{{ plan.tax|pct(1, sign=False) }}</b>. Face a 28% sobre tudo, são <b class="text-body money">{{ (plan.irs.all - plan.irs.lots)|money }} a menos</b>.</div>
+  </div>
+  {% else %}
+  <p class="small text-secondary mb-0">Só com os dividendos não se vende nada: o IRS (28%) já está descontado nos dividendos líquidos, e o número FIRE é o rendimento a dividir pelo rendimento dos dividendos ({{ plan.rate_w|pct(2, sign=False) }} ao ano).</p>
+  {% endif %}
+</div>
+
+{# ------------------------------------------------------------------ a probabilidade de chegar lá #}
+{% set pr = plan.prob %}
+<div class="pm-card mb-3" id="planProb">
+  <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+    <div class="pm-label">A probabilidade de chegar lá {{ help("Uma simulação por cada ano de partida desde " ~ pr.first ~ ": aplica os retornos reais das ações do mundo (MSCI World em euros, menos a inflação portuguesa) pela ordem em que aconteceram, e volta ao início quando a tabela acaba.") }}</div>
+    <div class="form-check form-switch small mb-0"><input class="form-check-input" type="checkbox" id="planProbBad"><label class="form-check-label" for="planProbBad">O que corre mal nas <span data-prob-miss>{{ ((1 - pr.share) * 10)|round|int }}</span> em 10</label></div>
+  </div>
+  <div class="row g-3 align-items-center">
+    <div class="col-md-4 text-center">
+      <div class="mb-2">Chegas ao objetivo até <b class="text-primary" data-prob-year>{{ pr.year }}</b></div>
+      <div class="pm-ring mx-auto" style="--pm-ring: {{ (pr.share * 100)|round(1) }}%" id="planRing"><div><span class="fs-2 fw-bold" data-prob-k>{{ (pr.share * 10)|round|int }}</span> <span>em 10</span><div class="small text-secondary">simulações</div></div></div>
+      <p class="small text-secondary mt-2 mb-0">Com os anos bons e maus da bolsa desde {{ pr.first }}.</p>
+    </div>
+    <div class="col-md-8">
+      <div style="height: 260px"><canvas id="planProbChart" aria-label="Simulações com os anos verdadeiros da bolsa" role="img"></canvas></div>
+      <label class="small text-secondary d-flex align-items-center gap-2 mt-2" for="planProbYear">Ano <input type="range" class="form-range" id="planProbYear" min="{{ plan.as_of.year }}" max="{{ plan.as_of.year + 60 }}" value="{{ pr.year }}"> <b data-prob-year>{{ pr.year }}</b></label>
+      {% if pr.miss_at_date is defined and cur.date %}<p class="small text-secondary mb-0">Em {{ (pr.miss_at_date * 10)|round|int }} de cada 10 simulações não chegas até {{ cur.date.year }} (a data do cenário {{ cur.label|lower }}).</p>{% endif %}
+    </div>
+  </div>
+  <p class="small text-secondary mt-3 mb-0">Não depende do cenário escolhido em cima: em vez de um ritmo fixo, usa os anos verdadeiros da bolsa.</p>
+</div>
+
+{# ------------------------------------------------------------------ modais #}
+<div class="modal fade" id="planIncomeModal" tabindex="-1" aria-labelledby="planIncomeTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="planIncomeTitle">Rendimentos fora da carteira</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+    <div class="modal-body">
+      <p class="small text-secondary">A reforma, rendas ou outro dinheiro que entra todos os meses, em euros de hoje e depois do IRS. A partir do ano em que começa, a carteira só paga a diferença.</p>
+      <div data-plan-rows="income" data-rows='{{ plan.incomes|tojson }}'></div>
+      <button class="btn btn-sm btn-outline-primary mt-2" type="button" data-plan-add="income"><i class="bi bi-plus"></i> Juntar outro</button>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" type="button" data-plan-save="income">Guardar</button></div>
+  </div></div>
+</div>
+<div class="modal fade" id="planItemsModal" tabindex="-1" aria-labelledby="planItemsTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="planItemsTitle">Despesas do mês</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+    <div class="modal-body">
+      <p class="small text-secondary">Ao guardar, o rendimento por ano passa a ser a soma × 12. Sem despesas, voltam as de partida.</p>
+      <div data-plan-rows="items" data-rows='{{ plan.items_rows|tojson }}'></div>
+      <button class="btn btn-sm btn-outline-primary mt-2" type="button" data-plan-add="items"><i class="bi bi-plus"></i> Juntar outra</button>
+    </div>
+    <div class="modal-footer"><span class="me-auto small">Total: <b data-plan-total>—</b> por mês</span><button class="btn btn-primary" type="button" data-plan-save="items">Guardar</button></div>
+  </div></div>
 </div>
 {% endif %}
-
-<div class="row g-3">
-  <div class="col-xl-5"><div class="pm-card h-100">
-    <div class="pm-label mb-2">Os três cenários</div>
-    <div class="table-responsive"><table class="table pm-table mb-0">
-      {% set rows = (life or plan).scenarios %}
-      <thead><tr><th>Cenário</th><th class="text-end">Retorno real</th><th class="text-end">Data FIRE</th><th class="text-end">Anos</th>
-        <th class="text-end">O dinheiro dura {{ help("Depois da data FIRE deixas de investir e levantas o que as despesas pedem (menos a pensão). Diz até quando chega o dinheiro, nesse cenário.") }}</th></tr></thead>
-      <tbody>{% for sc in rows %}
-        <tr><td class="text-capitalize">{{ sc.name }}</td><td class="text-end">{{ sc.rate|pct(0, sign=False) }}</td>
-          <td class="text-end">{{ sc.date.strftime('%m/%Y') if sc.date else "não chega" }}{% if sc.age %} <span class="text-secondary">({{ sc.age|int }} anos)</span>{% endif %}</td>
-          <td class="text-end">{{ ((sc.date - sc.points[0][0]).days / 365.25)|round(1) if sc.date else "—" }}</td>
-          <td class="text-end">{% if not sc.date %}—{% elif sc.empty %}<span class="text-down">até {{ sc.empty.year }}{% if sc.empty_age %} ({{ sc.empty_age|int }} anos){% endif %}</span>{% elif life %}até aos {{ life.until_age|int }} anos{% else %}para sempre{% endif %}</td></tr>
-      {% endfor %}</tbody>
-    </table></div>
-  </div></div>
-  <div class="col-xl-7"><div class="pm-card h-100">
-    <div class="pm-label mb-2">Acompanhamento mês a mês {{ help("Valor da carteira no fim de cada mês e a parte do número FIRE (com o número FIRE de hoje). A variação inclui o que investiste nesse mês.") }}</div>
-    <div class="table-responsive" style="max-height: 320px"><table class="table pm-table mb-0">
-      <thead><tr><th>Mês</th><th class="text-end">Valor</th><th class="text-end">Variação</th><th class="text-end">Já feito</th></tr></thead>
-      <tbody>{% for r in track %}
-        <tr><td>{{ MONTHS[r.month[1] - 1] }} {{ r.month[0] }}</td><td class="text-end money">{{ r.value|money }}</td>
-          <td class="text-end money {{ r.change|tone }}">{{ r.change|money(sign=True) }}</td><td class="text-end">{{ r.done|pct(2, sign=False) }}</td></tr>
-      {% endfor %}</tbody>
-    </table></div>
-  </div></div>
-</div>
 {% endif %}
 {% endautoescape %}{% endblock %}
 
 {% block scripts %}
-{% if chart %}
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const d = {{ chart|safe }};
-  const draw = () => {
-    const accent = pm.css("--pm-accent"), up = pm.css("--pm-up");
-    const colors = { pessimista: "#94a3b8", base: accent, otimista: up };
-    const datasets = [
-      { label: "Carteira (real)", data: d.history, borderColor: pm.css("--pm-text"), borderWidth: 2, pointRadius: 0, tension: .2 },
-      ...d.scenarios.map((s) => ({ label: `${s.name} (${Math.round(s.rate * 100)}%)`, data: s.data, borderColor: colors[s.name],
-        borderWidth: s.name === "base" ? 2.5 : 1.5, tension: .2, fill: false, backgroundColor: colors[s.name], pointRadius: 0 })),
-      // se continuasses a investir depois da data FIRE desenhada: até ao último número FIRE que o cenário alcança
-      ...d.scenarios.filter((s) => s.more).map((s) => ({ label: `${s.name}, a continuar a investir`, data: s.more, borderColor: colors[s.name],
-        borderWidth: 1.2, borderDash: [2, 3], tension: .2, pointRadius: 0, isExtra: true })),
-      // quando cada cenário chega a cada número FIRE: um ponto da cor do número
-      ...(d.markers || []).map((mk) => ({ type: "scatter", label: mk.label, data: mk.data, isMarker: true,
-        backgroundColor: mk.color, borderColor: pm.css("--pm-surface"), borderWidth: 1.5, pointRadius: 5, pointHoverRadius: 7 })),
-      // números FIRE: linhas horizontais tracejadas, uma cor por cálculo
-      ...d.targets.map((tg, k) => ({ label: `${tg.label}: ${pm.money(tg.value, 0)}`, data: [{ x: d.start, y: tg.value }, { x: d.end, y: tg.value }],
-        borderColor: tg.color, borderDash: [[6, 5], [2, 4], [10, 4, 2, 4]][k % 3], borderWidth: 1.5, pointRadius: 0, isTarget: true })),
-    ];
-    pm.chart("fireChart", { type: "line", data: { datasets },
-      options: { maintainAspectRatio: false, parsing: true, interaction: { mode: "nearest", intersect: false },
-        plugins: { legend: { position: "bottom", labels: { filter: (item, data) => { const ds = data.datasets[item.datasetIndex]; return !ds.isMarker && !ds.isExtra; } } },
-          tooltip: { callbacks: { title: (it) => String(Math.floor(it[0].parsed.x)),
-            label: (it) => {
-              if (it.dataset.isTarget) return it.dataset.label;
-              if (it.dataset.isMarker) { const r = it.raw; return `${it.dataset.label} · ${r.s}: ${Math.floor(r.x)}${r.age ? ` (${r.age} anos)` : ""}, ${pm.money(r.y, 0)}`; }
-              return `${it.dataset.label}: ${pm.money(it.parsed.y, 0)}`;
-            } } } },
-        scales: { x: { type: "linear", min: d.start, max: d.end, ticks: { callback: (v) => Math.floor(v), maxTicksLimit: 12, maxRotation: 0 }, grid: { display: false } },
-                  y: { position: "right", ticks: { callback: (v) => pm.money(v, 0) } } } } });
-  };
-  draw(); document.addEventListener("pm:theme", draw);
-});
-</script>
-{% endif %}
+{% if plan and plan.chart %}<script>window.pmPlan = {{ plan.chart|safe }};</script>{% endif %}
+<script src="{{ url_for('static', filename='js/planeamento.js') }}"></script>
 {% endblock %}

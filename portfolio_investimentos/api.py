@@ -897,35 +897,97 @@ def set_risk_free(rate):
     return f"Taxa sem risco: {value:g}%."
 
 
+PLAN_KEYS = ("fire_expenses", "fire_monthly", "fire_swr", "fire_inflation", "fire_income", "fire_items")
+
+
+def _plan_income(value):
+    v = _float(value)
+    if not 1000 <= v <= 10_000_000:
+        raise ApiError("Indica um rendimento por ano entre €1 000 e €10 000 000.")
+    return v
+
+
 @action
-def save_fire(expenses, swr, tax, monthly, age="", until="90", pension="0", pension_age="67", stop_age=""):
-    values = {"fire_expenses": _float(expenses), "fire_swr": _float(swr), "fire_tax": _float(tax),
-              "fire_monthly": _float(monthly)}
-    age_v = _float(age) if str(age).strip() else None
-    if age_v is not None and not 15 <= age_v <= 100:
-        raise ApiError("Indica uma idade entre 15 e 100 anos.")
-    until_v, pension_v, pension_age_v = _float(until), _float(pension), _float(pension_age)
-    if age_v is not None and not age_v < until_v <= 120:
-        raise ApiError("A idade até quando o dinheiro tem de durar tem de ser maior do que a tua idade.")
-    if pension_v < 0 or not 40 <= pension_age_v <= 80:
-        raise ApiError("Indica uma pensão positiva e uma idade de reforma entre 40 e 80 anos.")
-    stop_v = _float(stop_age) if str(stop_age).strip() else None
-    if stop_v is not None and (age_v is None or not age_v < stop_v <= until_v):
-        raise ApiError("A idade em que deixas de investir tem de estar entre a tua idade e a idade até quando dura.")
-    if values["fire_expenses"] <= 0:
-        raise ApiError("Indica as despesas anuais.")
-    if not 0.5 <= values["fire_swr"] <= 10:
-        raise ApiError("A taxa de levantamento deve estar entre 0,5% e 10%.")
-    if not 0 <= values["fire_tax"] < 60:
-        raise ApiError("O imposto deve estar entre 0% e 60%.")
-    if values["fire_monthly"] < 0:
-        raise ApiError("O investimento mensal não pode ser negativo.")
-    values.update(fire_age=age_v, fire_until=until_v, fire_pension=pension_v, fire_pension_age=pension_age_v,
-                  fire_stop_age=stop_v)
-    for key, value in values.items():
+def set_plan_goal(income):
+    """Planeamento, «Para começar»: o rendimento por ano que queres receber (abre o plano completo)."""
+    Setting.set("fire_expenses", _plan_income(income))
+    Setting.set("demo_fire_expenses", None)  # passa a ser teu (não se apaga com a demonstração)
+    return "Objetivo escolhido."
+
+
+@action
+def save_plan(income, monthly, swr, inflation):
+    """Guarda as hipóteses do Planeamento (as que estavam «por gravar»)."""
+    from .services.planning import level_key
+    level = level_key(swr)
+    if level is None:
+        raise ApiError("Escolhe o levantamento: 3%, 3,5%, 4% ou Dividendos.")
+    m, infl = _float(monthly), _float(inflation)
+    if not 0 <= m <= 1_000_000:
+        raise ApiError("O depósito por mês tem de estar entre €0 e €1 000 000.")
+    if not -5 <= infl <= 20:
+        raise ApiError("A inflação tem de estar entre -5% e 20%.")
+    for key, value in (("fire_expenses", _plan_income(income)), ("fire_monthly", m), ("fire_swr", level),
+                       ("fire_inflation", infl)):
         Setting.set(key, value)
-    Setting.set("demo_fire_expenses", None)  # as despesas passam a ser tuas (não se apagam com a demonstração)
-    return "Plano guardado."
+    Setting.set("demo_fire_expenses", None)
+    return "Objetivo guardado."
+
+
+@action
+def reset_plan():
+    """Planeamento: apaga o objetivo e as hipóteses (volta ao ecrã «Para começar»)."""
+    for key in PLAN_KEYS + ("demo_fire_expenses",):
+        Setting.set(key, None)
+    return "Planeamento recomeçado."
+
+
+def _json_rows(rows):
+    try:
+        data = json.loads(rows) if isinstance(rows, str) else rows
+    except ValueError as exc:
+        raise ApiError("Lista inválida.") from exc
+    if not isinstance(data, list) or len(data) > 30:
+        raise ApiError("Lista inválida.")
+    return data
+
+
+@action
+def save_plan_income(rows):
+    """Rendimentos fora da carteira (pensão, rendas): [{"name", "monthly", "year"}]."""
+    out = []
+    for r in _json_rows(rows):
+        name = str(r.get("name", "")).strip()[:60]
+        monthly, year = _float(r.get("monthly")), _float(r.get("year"))
+        if not name and not monthly:
+            continue
+        if not name or monthly <= 0:
+            raise ApiError("Indica o nome e o valor por mês de cada rendimento.")
+        if not 1990 <= year <= date.today().year + 70:
+            raise ApiError(f"Indica o ano em que começa «{name}».")
+        out.append({"name": name, "monthly": monthly, "year": int(year)})
+    Setting.set("fire_income", json.dumps(out, ensure_ascii=False) if out else None)
+    return "Rendimentos guardados."
+
+
+@action
+def save_plan_items(rows):
+    """Despesas do mês: [{"name", "amount"}]. O rendimento por ano passa a ser a soma × 12."""
+    out = []
+    for r in _json_rows(rows):
+        name, amount = str(r.get("name", "")).strip()[:60], _float(r.get("amount"))
+        if not name and not amount:
+            continue
+        if not name or amount <= 0:
+            raise ApiError("Indica o nome e o valor de cada despesa.")
+        out.append({"name": name, "amount": amount})
+    if not out:
+        Setting.set("fire_items", None)
+        return "Voltaram as despesas de partida."
+    Setting.set("fire_items", json.dumps(out, ensure_ascii=False))
+    Setting.set("fire_expenses", _plan_income(sum(r["amount"] for r in out) * 12))
+    Setting.set("demo_fire_expenses", None)
+    return "Despesas guardadas."
 
 
 @action
