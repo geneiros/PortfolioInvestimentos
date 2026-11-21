@@ -12,7 +12,7 @@ from flask import Blueprint, Response, abort, current_app, jsonify, request, sen
 
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, FxRate, ImportBatch, Instrument,
                      OtherAsset, OtherAssetValue, PortfolioAlert, Price, Setting, Transaction, WatchItem, WatchList, WatchRule,
-                     db)
+                     WatchState, db)
 from . import auth
 from .engine.formatting import parse_number
 from .engine.portfolio import ASSET_TYPES
@@ -447,13 +447,16 @@ def add_watch(instrument, target_price=None, note=None, currency="EUR", instrume
               list_id=None):
     """Junta uma ação a uma lista de acompanhamento (a primeira, se não se indicar). Da triagem vem a lente onde a
     ação entrou, e começa com os parâmetros dessa lente e do moat."""
-    from .services import lenses, moat, tracking
+    from .services import lenses, moat, tracking, triage
     ticker = _ensure_instrument(instrument, instrument_name, currency)
     lists = tracking.watch_lists()
     wl = _get(WatchList, list_id) if list_id not in (None, "") else lists[0]
     if WatchItem.query.filter_by(instrument=ticker, list_id=wl.id).first():
         raise ApiError(f"{ticker} já está em «{wl.title}».")
-    w = WatchItem(instrument=ticker, target_price=_float(target_price) or None, note=note or None, list_id=wl.id)
+    first = tracking.states(wl.id)[0]
+    w = WatchItem(instrument=ticker, target_price=_float(target_price) or None, notes=note or None, list_id=wl.id,
+                  state_id=first.id, position=tracking.next_position(first.id), priority="media",
+                  reason=triage.reason(ticker))
     if method in lenses.REAL:
         w.method = method
     db.session.add(w)
@@ -463,7 +466,7 @@ def add_watch(instrument, target_price=None, note=None, currency="EUR", instrume
     if w.target_price:
         db.session.add(WatchRule(watch_id=w.id, kind="price_below", threshold=w.target_price, alert=False))
     db.session.commit()
-    return f"{ticker} guardada em «{wl.title}»."
+    return {"message": f"{ticker} entrou em «{wl.title}».", "list_id": wl.id, "title": wl.title}
 
 
 @action
@@ -494,6 +497,136 @@ def rename_watch_list(name, title):
 
 
 @action
+def update_watch(name, priority=None, reason=None, notes=None, state_id=None):
+    """Os campos de um cartão (cada um grava-se ao mudar): prioridade, estado, «porque entrou» e notas da leitura."""
+    from .services import tracking
+    w = _get(WatchItem, name)
+    if priority is not None:
+        if priority not in tracking.PRIORITIES:
+            raise ApiError("Prioridade desconhecida.")
+        w.priority = priority
+    if reason is not None:
+        w.reason = str(reason).strip()[:2000] or None
+    if notes is not None:
+        w.notes = str(notes).strip()[:5000] or None
+    if state_id not in (None, ""):
+        st = _get(WatchState, state_id)
+        if st.list_id != w.list_id:
+            raise ApiError("Esse estado é de outra lista.")
+        if st.id != w.state_id:
+            w.state_id, w.position = st.id, tracking.next_position(st.id)
+    db.session.commit()
+    return "Guardado."
+
+
+@action
+def move_watch(name, state_id, position=0):
+    """Arrastar um cartão: passa para o estado `state_id`, na posição `position` (0 = o primeiro da coluna)."""
+    w = _get(WatchItem, name)
+    st = _get(WatchState, state_id)
+    if st.list_id != w.list_id:
+        raise ApiError("Esse estado é de outra lista.")
+    others = [x for x in WatchItem.query.filter_by(state_id=st.id).order_by(WatchItem.position, WatchItem.id).all()
+              if x.id != w.id]
+    pos = max(0, min(_int_arg(position), len(others)))
+    others.insert(pos, w)
+    w.state_id = st.id
+    for i, x in enumerate(others):
+        x.position = i
+    db.session.commit()
+    return "Movido."
+
+
+def _int_arg(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _state_title(title):
+    title = (title or "").strip()[:40]
+    if not title:
+        raise ApiError("Dá um nome ao estado.")
+    return title
+
+
+@action
+def create_watch_state(list_id, title):
+    from .services import tracking
+    wl = _get(WatchList, list_id)
+    sts = tracking.states(wl.id)
+    title = _state_title(title)
+    if any(st.title.lower() == title.lower() for st in sts):
+        raise ApiError(f"Já há um estado «{title}».")
+    db.session.add(WatchState(list_id=wl.id, title=title, position=(sts[-1].position or 0) + 1))
+    db.session.commit()
+    return "Estado criado."
+
+
+@action
+def rename_watch_state(name, title):
+    st = _get(WatchState, name)
+    title = _state_title(title)
+    if WatchState.query.filter(WatchState.list_id == st.list_id, WatchState.id != st.id,
+                               db.func.lower(WatchState.title) == title.lower()).first():
+        raise ApiError(f"Já há um estado «{title}».")
+    st.title = title
+    db.session.commit()
+    return "Estado renomeado."
+
+
+@action
+def move_watch_state(name, direction):
+    """Muda a ordem das colunas: `direction` é -1 (para a esquerda) ou 1 (para a direita)."""
+    from .services import tracking
+    st = _get(WatchState, name)
+    sts = tracking.states(st.list_id)
+    i = next(k for k, x in enumerate(sts) if x.id == st.id)
+    j = i + (1 if str(direction) in ("1", "+1", "right") else -1)
+    if 0 <= j < len(sts):
+        sts[i], sts[j] = sts[j], sts[i]
+    for k, x in enumerate(sts):
+        x.position = k
+    db.session.commit()
+    return "Ordem mudada."
+
+
+@action
+def delete_watch_state(name):
+    """Apaga um estado; os cartões dele passam para o primeiro estado da lista. O último estado não se apaga."""
+    from .services import tracking
+    st = _get(WatchState, name)
+    sts = tracking.states(st.list_id)
+    if len(sts) <= 1:
+        raise ApiError("Tem de ficar pelo menos um estado.")
+    dest = next(x for x in sts if x.id != st.id)
+    for w in WatchItem.query.filter_by(state_id=st.id).order_by(WatchItem.position).all():
+        w.state_id, w.position = dest.id, tracking.next_position(dest.id)
+        db.session.flush()
+    db.session.delete(st)
+    db.session.commit()
+    return f"Estado «{st.title}» apagado."
+
+
+@action
+def import_watch_list(file=None):
+    """Importa uma lista exportada (ficheiro JSON) para uma lista nova. Devolve {"id", "title", "n"}."""
+    from .services import tracking
+    upload = request.files.get("file")
+    if upload is None:
+        raise ApiError("Escolhe o ficheiro da lista.")
+    try:
+        data = json.loads(upload.read(5_000_000).decode("utf-8-sig"))
+        wl = tracking.import_list(data, _ensure_instrument)
+    except (ValueError, UnicodeDecodeError) as exc:
+        db.session.rollback()
+        raise ApiError(str(exc) if isinstance(exc, ValueError) and "lista" in str(exc)
+                       else "O ficheiro não é uma lista exportada da aplicação.") from exc
+    return {"id": wl.id, "title": wl.title, "n": WatchItem.query.filter_by(list_id=wl.id).count()}
+
+
+@action
 def delete_watch_list(name):
     """Apaga uma lista e as ações dela (com os parâmetros). A última lista não se apaga."""
     wl = _get(WatchList, name)
@@ -502,6 +635,7 @@ def delete_watch_list(name):
     for w in WatchItem.query.filter_by(list_id=wl.id).all():
         WatchRule.query.filter_by(watch_id=w.id).delete()
         db.session.delete(w)
+    WatchState.query.filter_by(list_id=wl.id).delete()
     db.session.delete(wl)
     db.session.commit()
     return f"Lista «{wl.title}» apagada."
@@ -546,7 +680,7 @@ def save_watch_rules(name, rules="[]", note=None):
         db.session.delete(r)
     db.session.add_all(keep)
     if note is not None:
-        w.note = str(note).strip()[:255] or None
+        w.notes = str(note).strip()[:5000] or None
     db.session.commit()
     tracking.check()
     return "Parâmetros guardados."

@@ -232,7 +232,8 @@ SLIM_KEYS = ("regularMarketPrice", "currentPrice", "currency", "marketCap", "tra
              "trailingAnnualDividendYield", "dividendRate", "payoutRatio", "trailingEps", "forwardEps", "bookValue",
              "freeCashflow", "beta", "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "netIncomeToCommon", "sector", "industry",
              "country", "longName", "shortName", "longBusinessSummary", "_yfinance", "fullTimeEmployees", "website",
-             "fiftyDayAverage", "twoHundredDayAverage", "numberOfAnalystOpinions", "targetMeanPrice")
+             "fiftyDayAverage", "twoHundredDayAverage", "numberOfAnalystOpinions", "targetMeanPrice",
+             "financialCurrency", "sharesOutstanding")
 
 
 def _slim(info):
@@ -303,8 +304,31 @@ QUESTIONS = (
     ("fosso", "O que a protege da concorrência?", "Marca, custos de mudança, rede, custos baixos, escala. Dura 10 anos?"),
     ("gestao", "Confio na gestão?", "Alocação do capital, recompras e dívida, quanto dos donos está na empresa."),
     ("risco", "O que pode correr mal?", "Dívida, um cliente ou país de que depende, regulação, tecnologia."),
+    ("catalisador", "O que pode fazer o preço mexer?", "Resultados, um produto novo, recompras, o fim de um problema."),
     ("preco", "A que preço compraria, e quanto?", "O preço máximo (Graham, Bazin, DCF) e o peso que teria na carteira."),
 )
+
+
+def row(ticker):
+    """A linha da tabela da triagem de uma ação (None se não estiver no universo)."""
+    tab = table() or {"rows": []}
+    return next((x for x in tab["rows"] if x["t"] == ticker), None)
+
+
+def reason(ticker, rows=None):
+    """O «porque entrou» de uma ação guardada a partir da triagem, ex.: «Entra em Buffett e Bazin. P/L 3,9.»."""
+    r = rows.get(ticker) if rows is not None else row(ticker)
+    if not r:
+        return None
+    names = [lenses.LENSES[k]["name"] for k in lenses.REAL if r["st"].get(k) == "entra"]
+    parts = []
+    if names:
+        parts.append("Entra em " + (", ".join(names[:-1]) + " e " + names[-1] if len(names) > 1 else names[0]) + ".")
+    if r.get("pe"):
+        parts.append(f"P/L {r['pe']:.1f}.".replace(".", ",", 1))
+    if r.get("dv"):
+        parts.append(f"Dividendo {r['dv'] * 100:.1f}%.".replace(".", ",", 1))
+    return " ".join(parts) or None
 
 
 def answers(ticker):
@@ -315,6 +339,52 @@ def save_answers(ticker, values):
     clean = {k: str(values.get(k) or "").strip()[:1000] for k, _, _ in QUESTIONS if str(values.get(k) or "").strip()}
     Setting.set(f"triage_notes:{ticker}", json.dumps(clean, ensure_ascii=False) if clean else None)
     return clean
+
+
+def valuation_of(ticker, m, info):
+    """O valor da ação pelos vários métodos (os mesmos de «O valor de cada ação», na Carteira). Com os dados
+    fundamentais da Carteira (e as correções que lá fizeste) quando a ação é tua; senão, pelos dados do Yahoo,
+    tudo por ação e na moeda da cotação."""
+    from ..engine import valuation
+    from ..models import Fundamental, db
+    price = m.get("price")
+    if not price:
+        return None
+    f = db.session.get(Fundamental, ticker)
+
+    def pick(name):
+        manual = getattr(f, "manual_" + name, None) if f else None
+        return manual if manual is not None else (getattr(f, name, None) if f else None)
+    major = lenses.MAJOR.get(m.get("currency"), m.get("currency"))
+    k = 100 if m.get("currency") in lenses.MAJOR else 1
+    shares = (info or {}).get("sharesOutstanding")
+
+    def per_share(total):  # total na moeda das contas → por ação, na moeda da cotação (câmbio aproximado)
+        fin, quote = lenses.USD_RATE.get(m.get("fin_currency")), lenses.USD_RATE.get(major)
+        if total is None or not shares or not fin or not quote:
+            return None
+        return total / shares * fin / quote * k
+    growth = None
+    if m.get("pe") and m.get("peg") and m["peg"] > 0:
+        growth = m["pe"] / m["peg"] / 100  # o crescimento que os analistas esperam (5 anos), implícito no PEG
+    elif m.get("eps_growth") is not None:
+        growth = m["eps_growth"]
+    cash, debt = (info or {}).get("totalCash"), (info or {}).get("totalDebt")
+    inputs = {"eps": pick("eps") if f else m.get("eps"), "bvps": pick("bvps") if f else m.get("bvps"),
+              "fcf": pick("fcf") if f else per_share(m.get("fcf")),
+              "growth": pick("growth") if f and pick("growth") is not None else growth,
+              "owner": pick("owner") if f else None, "nopat": pick("nopat") if f else None,
+              "net_cash": pick("net_cash") if f else (per_share((cash or 0) - debt) if debt is not None else None)}
+    try:
+        aaa = float(Setting.get("aaa_yield")) / 100
+    except (TypeError, ValueError):
+        aaa = valuation.AAA_YIELD
+    v = valuation.value_stock(price, eps=inputs["eps"], eps_forward=(f.eps_forward if f else m.get("fwd_eps")),
+                              bvps=inputs["bvps"], fcf=inputs["fcf"], growth=inputs["growth"],
+                              dividends=m.get("dps"), owner_earnings=inputs["owner"], nopat=inputs["nopat"],
+                              net_cash=inputs["net_cash"], aaa_yield=aaa)
+    v.update(currency=m.get("currency"), from_portfolio=f is not None)
+    return v
 
 
 def detail(ticker):
@@ -340,4 +410,5 @@ def detail(ticker):
     return {"ticker": ticker, "name": row.get("name") or ticker, "m": m, "info": info, "evals": evals,
             "enters": [k for k, (s, _) in evals.items() if s == "entra"], "tags": lenses.tags(m),
             "blurb": lenses.blurb(m), "graham": lenses.graham_number(m), "bazin": lenses.bazin_ceiling(m),
-            "row": row, "in_universe": me is not None, "questions": QUESTIONS, "answers": answers(ticker)}
+            "row": row, "in_universe": me is not None, "questions": QUESTIONS, "answers": answers(ticker),
+            "val": valuation_of(ticker, m, info)}

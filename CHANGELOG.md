@@ -4,6 +4,12 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **Prospeção: as listas em quadro e o valor da ação na ficha**  
+  Cada lista passa a um quadro: os estados são colunas (Por abrir, A ler relatórios, Em tese, Parqueada e Descartada, que se criam, mudam de nome, de ordem e se apagam) e cada ação é um cartão que se arrasta entre eles. No cartão:
+  - os dados (país, setor, P/L, dividendo, capitalização), as lentes onde entra e a ficha completa ao lado;
+  - a prioridade, o estado, «Porque entrou» (preenchido a partir da triagem), as notas da leitura, as 7 perguntas e os parâmetros e alertas de antes. Tudo se grava ao mudar.
+
+  No topo, Apagar, Copiar texto, Exportar e Importar (JSON). Ao guardar na triagem aparece «… entrou em <lista>» com «Ver lista». A ficha da ação passa a ter «O valor da ação», com os métodos da Carteira (DCF, Graham, Graham g, Gordon, Owner Earnings, EPV, Bazin e PEG). O lucro, o valor contabilístico e o dividendo por ação passam a vir dos rácios do Yahoo, na moeda da cotação (antes, as ações cotadas em pence ou com as contas noutra moeda davam números de Graham e de Bazin errados).
 - **Prospeção: triagem pelas lentes e várias listas**  
   O separador Oportunidades dá lugar a **Ações**, uma triagem das ações de todas as bolsas principais do mundo (mais de 2 mil milhões de dólares, uma linha por empresa) por onze lentes: Várias lentes, Graham defensivo, Número de Graham, Buffett, Lynch, Greenblatt, Bazin, Fisher, Templeton, O'Neil e Resumo.
   - À esquerda, as lentes com o número de ações que entram; um clique mostra logo as ações dessa lente.

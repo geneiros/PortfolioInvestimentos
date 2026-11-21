@@ -5,15 +5,19 @@
 {% include "pages/_portfolio_fired.html" %}
 {% for r in fired_now %}<div class="alert alert-warning d-flex gap-2"><i class="bi bi-bell-fill"></i> Alerta: {{ r.message }}.</div>{% endfor %}
 
-<div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
   <div class="me-auto">
-    <h5 class="fw-bold mb-1 d-flex align-items-center gap-2">{{ current_list.title }}
-      <button class="btn btn-sm btn-link p-0 text-secondary" type="button" title="Mudar o nome" id="listRename" data-list="{{ current_list.id }}" data-title="{{ current_list.title }}"><i class="bi bi-pencil"></i></button>
-      {% if lists|length > 1 %}<button class="btn btn-sm btn-link p-0 text-secondary" type="button" title="Apagar a lista" data-pm-action="delete_watch_list" data-args='{{ {"name": current_list.id|string}|tojson }}' data-confirm="Apagar a lista «{{ current_list.title }}» e as {{ rows|length }} ações dela?" data-pm-redirect="/radar/acompanhamento"><i class="bi bi-trash"></i></button>{% endif %}</h5>
-    <p class="text-secondary mb-0">As ações que guardaste nesta lista (da triagem ou à mão), os parâmetros que acompanhas em cada uma e se queres ser avisado. Os alertas verificam-se ao abrir a aplicação e depois de cada atualização.</p>
+    <span class="text-secondary">{{ count }} {{ 'ação' if count == 1 else 'ações' }} em <b class="text-body">{{ current_list.title }}</b>.</span>
+    <button class="btn btn-sm btn-link p-0 ms-1 text-secondary" type="button" title="Mudar o nome da lista" id="listRename" data-list="{{ current_list.id }}" data-title="{{ current_list.title }}"><i class="bi bi-pencil"></i></button>
   </div>
-  <button class="btn btn-sm btn-outline-primary" type="button" id="trackRefresh" data-tickers='{{ rows|map(attribute="w.instrument")|list|tojson }}' {{ 'disabled' if not rows }}><i class="bi bi-arrow-repeat"></i> Atualizar indicadores</button>
-  <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#trackAdd"><i class="bi bi-plus"></i> Juntar à mão</button>
+  <button class="btn btn-sm btn-outline-primary" type="button" id="trackRefresh" data-tickers='{{ cards.values()|sum(start=[])|map(attribute="w.instrument")|list|tojson }}' {{ 'disabled' if not count }}><i class="bi bi-arrow-repeat"></i> Atualizar indicadores</button>
+  <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#trackAdd"><i class="bi bi-plus"></i> Juntar à mão</button>
+  <span class="vr mx-1 d-none d-md-block"></span>
+  {% if lists|length > 1 %}<button class="btn btn-sm btn-outline-danger" type="button" data-pm-action="delete_watch_list" data-args='{{ {"name": current_list.id|string}|tojson }}' data-confirm="Apagar a lista «{{ current_list.title }}» e as {{ count }} ações dela?"><i class="bi bi-trash"></i> Apagar</button>
+  {% else %}<button class="btn btn-sm btn-outline-secondary" type="button" disabled title="Tem de ficar pelo menos uma lista"><i class="bi bi-trash"></i> Apagar</button>{% endif %}
+  <button class="btn btn-sm btn-pm" type="button" id="listCopy" {{ 'disabled' if not count }}><i class="bi bi-clipboard"></i> Copiar texto</button>
+  <a class="btn btn-sm btn-pm" href="/radar/lista/{{ current_list.id }}.json" download><i class="bi bi-download"></i> Exportar</a>
+  <label class="btn btn-sm btn-pm mb-0"><i class="bi bi-upload"></i> Importar<input type="file" accept=".json,application/json" id="listImport" hidden></label>
 </div>
 <p class="small text-secondary" id="trackProgress"></p>
 
@@ -29,53 +33,89 @@
   </form>
 </div></div>
 
-<div class="pm-card mb-3" id="trackList">
-  {% if not rows %}
-  <div class="text-center text-secondary py-5"><i class="bi bi-binoculars fs-1"></i>
-    <p class="mt-2 mb-0">Esta lista ainda não tem ações. Em <a href="/radar">Ações</a>, carrega no <i class="bi bi-bookmark"></i> de uma ação (ou em «Guardar na lista», na ficha) para a guardares aqui.</p></div>
-  {% else %}
-  <div class="table-responsive"><table class="table pm-table align-middle mb-0">
-    <thead><tr><th>Ação</th><th class="text-end">Preço</th><th class="text-end">Dia</th><th class="text-end">Do máximo</th><th class="text-end">P/L</th><th class="text-end">P/VP</th><th class="text-end">Dividendo</th><th>Moat</th><th>Parâmetros {{ help("O sino aceso diz que há alerta. Verde: a condição verifica-se agora; cinzento: não se verifica; tracejado: falta o valor (atualiza os indicadores).") }}</th><th></th></tr></thead>
-    <tbody>
-    {% for r in rows %}{% set v = r.v %}
-    <tr>
-      <td><b>{{ r.w.instrument }}</b>
-        <div class="small text-secondary text-truncate" style="max-width: 15rem">{{ r.inst.instrument_name if r.inst else '' }}</div>
-        {% if r.method %}<span class="badge bg-body-secondary text-body border">{{ r.method.name }}</span>{% endif %}
-        {% if r.w.note %}<div class="small text-secondary">{{ r.w.note }}</div>{% endif %}</td>
-      <td class="text-end">{{ v.price|number(2) if v.price else "—" }} <small class="text-secondary">{{ r.currency }}</small></td>
-      <td class="text-end {{ v.change|tone if v.change is not none }}">{{ v.change|pct(1) if v.change is not none else "—" }}</td>
-      <td class="text-end {{ v.from_high|tone if v.from_high is not none }}">{{ v.from_high|pct(0) if v.from_high is not none else "—" }}</td>
-      <td class="text-end">{{ v.pe|number(1) if v.pe else "—" }}</td>
-      <td class="text-end">{{ v.pb|number(1) if v.pb else "—" }}</td>
-      <td class="text-end">{{ v.div|pct(1, sign=False) if v.div is not none else "—" }}</td>
-      <td>{% if v.moat %}<span class="badge {{ 'text-bg-success' if v.moat.verdict == 'Largo' else 'text-bg-warning' if v.moat.verdict == 'Estreito' else 'text-bg-secondary' }}">{{ v.moat.verdict }}{% if v.moat.score is not none %} · {{ v.moat.score }}{% endif %}</span>
-          {% else %}<button class="btn btn-sm btn-outline-secondary py-0" type="button" data-moat="{{ r.w.instrument }}">Analisar</button>{% endif %}</td>
-      <td style="min-width: 14rem; white-space: normal">
-        {% for rule in r.rules %}{% set met = evaluate(rule, v)[0] %}
-        <span class="badge rounded-pill pm-rule {{ 'pm-rule-met' if met else 'pm-rule-unknown' if met is none else '' }}" title="{{ 'Verifica-se' if met else 'Falta o valor' if met is none else 'Não se verifica' }}{% if rule.triggered_on %} · disparou a {{ rule.triggered_on.strftime('%d/%m %H:%M') }}{% endif %}">
-          <i class="bi {{ 'bi-bell-fill' if rule.alert else 'bi-bell-slash' }}"></i>
-          {% if rule.kind == 'method' %}{{ 'Entra em' if met else 'Fora de' if met is not none else 'Lente' }} {{ method_short.get(r.w.method, '') }}
-          {% elif rule.kind == 'moat' %}Moat {{ rule.state or '' }}
-          {% else %}{{ chip(rule, r.currency) }}{% endif %}
-        </span>
-        {% else %}<span class="small text-secondary">Sem parâmetros.</span>{% endfor %}
-        {% if v.method_details %}<details class="small mt-1"><summary class="text-secondary">Critérios da lente</summary>
-          {% for label, val, st in v.method_details %}<div>{% if st == 'pass' %}<i class="bi bi-check-lg text-success"></i>{% elif st == 'near' %}<i class="bi bi-exclamation text-warning"></i>{% elif st == 'fail' %}<i class="bi bi-x-lg text-danger"></i>{% else %}<i class="bi bi-dash text-secondary"></i>{% endif %} {{ label }}{% if val is not none %}: {{ val }}{% endif %}</div>{% endfor %}
-        </details>{% endif %}
-      </td>
-      <td class="text-end text-nowrap">
-        <button class="btn btn-sm btn-pm" type="button" title="Parâmetros e alertas" data-track-edit="{{ r.w.name }}" data-ticker="{{ r.w.instrument }}" data-currency="{{ r.currency }}" data-note="{{ r.w.note or '' }}" data-method="{{ r.w.method or '' }}"
-                data-rules='{{ rules_json(r.rules)|tojson }}'><i class="bi bi-sliders"></i></button>
-        <button class="btn btn-sm btn-outline-danger" type="button" data-pm-action="delete_watch" data-args='{"name": "{{ r.w.name }}"}' data-confirm="Tirar {{ r.w.instrument }} da lista «{{ current_list.title }}»?"><i class="bi bi-x"></i></button>
-      </td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table></div>
-  <p class="small text-secondary mt-2 mb-0">Preço, variação e máximo vêm das cotações guardadas (atualizadas em Definições). P/L, P/VP, dividendo e critérios da lente vêm do Yahoo com «Atualizar indicadores»{% if rows and rows[0].v.snap_at %}; o moat reanalisa-se sozinho quando tem mais de 30 dias{% endif %}.</p>
-  {% endif %}
+{# ------------------------------------------------------------------ o quadro #}
+<div class="pm-board mb-3" id="board" data-list="{{ current_list.id }}">
+  {% for st in states %}{% set items = cards.get(st.id, []) %}
+  <section class="pm-board-col" data-state="{{ st.id }}" data-title="{{ st.title }}">
+    <header class="d-flex align-items-center gap-1 mb-2">
+      <span class="fw-semibold me-auto text-truncate" title="{{ st.title }}">{{ st.title }}</span>
+      <span class="text-secondary small me-1" data-col-count>{{ items|length }}</span>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-link p-0 text-secondary" type="button" data-bs-toggle="dropdown" aria-label="Opções do estado {{ st.title }}"><i class="bi bi-three-dots"></i></button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="#" data-state-rename="{{ st.id }}"><i class="bi bi-pencil"></i> Mudar o nome</a></li>
+          {% if not loop.first %}<li><a class="dropdown-item" href="#" data-state-move="{{ st.id }}" data-dir="-1"><i class="bi bi-arrow-left"></i> Mover para a esquerda</a></li>{% endif %}
+          {% if not loop.last %}<li><a class="dropdown-item" href="#" data-state-move="{{ st.id }}" data-dir="1"><i class="bi bi-arrow-right"></i> Mover para a direita</a></li>{% endif %}
+          {% if states|length > 1 %}<li><hr class="dropdown-divider"></li><li><a class="dropdown-item text-danger" href="#" data-state-delete="{{ st.id }}"><i class="bi bi-trash"></i> Apagar{% if items %} (os cartões passam para «{{ (states|rejectattr('id', 'equalto', st.id)|first).title }}»){% endif %}</a></li>{% endif %}
+        </ul>
+      </div>
+    </header>
+    <div class="pm-board-cards" data-drop="{{ st.id }}">
+      {% for c in items %}{% set w = c.w %}{% set v = c.v %}{% set t = c.t %}
+      <article class="pm-card pm-card-sm pm-board-card" data-card="{{ w.id }}" data-ticker="{{ w.instrument }}">
+        <div class="d-flex align-items-start gap-2">
+          <div class="me-auto">
+            <div class="fw-bold lh-sm">{{ c.name }}</div>
+            <div class="small text-secondary">{{ w.instrument }}</div>
+          </div>
+          <a href="#" class="small text-nowrap" data-ficha="{{ w.instrument }}">Ficha</a>
+        </div>
+        <div class="small text-secondary mt-1">
+          {%- set bits = [] -%}
+          {%- if t and t.c %}{% set _ = bits.append(t.c) %}{% endif -%}
+          {%- if t and t.s %}{% set _ = bits.append(t.s) %}{% endif -%}
+          {%- set pe = (t.pe if t else None) or v.pe -%}
+          {%- if pe %}{% set _ = bits.append('P/L ' ~ pe|number(1)) %}{% endif -%}
+          {%- set dv = (t.dv if t else None) or v.div -%}
+          {%- if dv %}{% set _ = bits.append('div. ' ~ dv|pct(1, sign=False)) %}{% endif -%}
+          {%- if t and t.cap %}{% set _ = bits.append((t.cap / 1e9)|number(0 if t.cap >= 1e10 else 1) ~ ' mM$') %}{% endif -%}
+          {%- if v.price %}{% set _ = bits.append(v.price|number(2) ~ ' ' ~ c.currency) %}{% endif -%}
+          {{ bits|join(' · ') }}
+        </div>
+        {% if c.enters %}<div class="small text-success mt-1">{{ c.enters|join(' · ') }}</div>{% endif %}
+        <div class="d-flex flex-wrap gap-1 mt-2" role="group" aria-label="Prioridade">
+          {% for k, label in priorities.items() %}<button type="button" class="btn btn-sm pm-prio {{ 'pm-prio-on' if (w.priority or 'media') == k }}" data-prio="{{ k }}">{{ label }}</button>{% endfor %}
+        </div>
+        <label class="small text-secondary d-block mt-2">Estado
+          <select class="form-select form-select-sm mt-1" data-field="state_id">{% for s2 in states %}<option value="{{ s2.id }}" {{ 'selected' if s2.id == st.id }}>{{ s2.title }}</option>{% endfor %}</select></label>
+        <label class="small text-secondary d-block mt-2">Porque entrou
+          <textarea class="form-control form-control-sm mt-1" rows="2" data-field="reason" placeholder="Porque te chamou a atenção?">{{ w.reason or '' }}</textarea></label>
+        <label class="small text-secondary d-block mt-2">Notas da leitura
+          <textarea class="form-control form-control-sm mt-1" rows="2" data-field="notes" placeholder="O que viste no relatório, o que ainda falta.">{{ w.notes or '' }}</textarea></label>
+        <details class="small mt-2" data-questions>
+          <summary>Perguntas (<span data-answered>{{ c.answered }}</span>/{{ questions|length }})</summary>
+          {% for key, q, hint in questions %}
+          <label class="d-block mt-2"><span class="fw-semibold">{{ q }}</span>
+            <textarea class="form-control form-control-sm mt-1" rows="2" data-answer="{{ key }}" placeholder="{{ hint }}">{{ c.answers.get(key, '') }}</textarea></label>
+          {% endfor %}
+        </details>
+        <div class="mt-2">
+          {% for rule in c.rules %}{% set met = evaluate(rule, v)[0] %}
+          <span class="badge rounded-pill pm-rule {{ 'pm-rule-met' if met else 'pm-rule-unknown' if met is none else '' }}" title="{{ 'Verifica-se' if met else 'Falta o valor' if met is none else 'Não se verifica' }}{% if rule.triggered_on %} · disparou a {{ rule.triggered_on.strftime('%d/%m %H:%M') }}{% endif %}">
+            <i class="bi {{ 'bi-bell-fill' if rule.alert else 'bi-bell-slash' }}"></i>
+            {% if rule.kind == 'method' %}{{ 'Entra em' if met else 'Fora de' if met is not none else 'Lente' }} {{ method_short.get(w.method, '') }}
+            {% elif rule.kind == 'moat' %}Moat {{ rule.state or '' }}
+            {% else %}{{ chip(rule, c.currency) }}{% endif %}
+          </span>{% endfor %}
+          {% if v.moat %}<span class="badge {{ 'text-bg-success' if v.moat.verdict == 'Largo' else 'text-bg-warning' if v.moat.verdict == 'Estreito' else 'text-bg-secondary' }}">Moat {{ v.moat.verdict }}{% if v.moat.score is not none %} · {{ v.moat.score }}{% endif %}</span>{% endif %}
+        </div>
+        <div class="d-flex align-items-center gap-2 mt-2 small">
+          <a href="#" data-track-edit="{{ w.name }}" data-ticker="{{ w.instrument }}" data-currency="{{ c.currency }}" data-note="{{ w.notes or '' }}" data-method="{{ w.method or '' }}" data-rules='{{ rules_json(c.rules)|tojson }}'><i class="bi bi-sliders"></i> Parâmetros e alertas</a>
+          <a href="#" class="ms-auto text-danger" data-pm-action="delete_watch" data-args='{"name": "{{ w.name }}"}' data-confirm="Tirar {{ w.instrument }} da lista «{{ current_list.title }}»?">Tirar da lista</a>
+        </div>
+      </article>
+      {% endfor %}
+      <div class="pm-board-empty {{ 'd-none' if items }}">Vazio</div>
+    </div>
+  </section>
+  {% endfor %}
+  <section class="pm-board-col pm-board-new">
+    <form id="stateNew" class="d-flex gap-2"><input class="form-control form-control-sm" name="title" maxlength="40" placeholder="Novo estado" aria-label="Novo estado"><button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-plus-lg"></i></button></form>
+  </section>
 </div>
+{% if not count %}<p class="text-secondary small">Esta lista ainda não tem ações. Em <a href="/radar">Ações</a>, carrega no <i class="bi bi-bookmark"></i> de uma ação (ou em «Guardar na lista», na ficha) para a guardares aqui.</p>{% endif %}
+
+<aside class="pm-side-panel" id="triagePanel" aria-label="Ficha da ação"><div class="pm-card h-100" id="triagePanelBody"></div></aside>
 
 {% if recent %}
 <div class="pm-card mb-3" id="trackRecent">
@@ -118,7 +158,6 @@
           {% for k in keys %}<li><a class="dropdown-item" href="#" data-track-add="{{ k }}">{{ kinds[k][0] }}</a></li>{% endfor %}{% endfor %}
         </ul>
       </div>
-      <label class="small text-secondary d-block mt-3">Nota<input class="form-control form-control-sm" id="trackNote" maxlength="255"></label>
     </div>
     <div class="modal-footer"><button class="btn btn-primary" type="button" id="trackSave">Guardar</button></div>
   </div></div>

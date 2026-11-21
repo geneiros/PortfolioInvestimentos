@@ -3622,8 +3622,14 @@ def test_screener_listings_and_lenses():
                                   "debtToEquity": 30.0, "currentRatio": 2.5, "marketCap": 5e10, "currency": "USD",
                                   "netIncomeToCommon": 1e9, "dividendRate": 2.0})
     assert m["div"] == pytest.approx(0.04) and m["de"] == pytest.approx(0.3) and m["profit"] is True
-    assert lenses.graham_number(m) == pytest.approx((22.5 * 5 * 40) ** 0.5)
-    assert lenses.bazin_ceiling(m) == pytest.approx(2.0 / 0.06)
+    # por ação, pelos rácios do Yahoo (lucro = preço ÷ P/L, valor contabilístico = preço ÷ P/VP, dividendo = rendimento)
+    assert lenses.graham_number(m) == pytest.approx((22.5 * 5 * 50 / 1.2) ** 0.5)
+    assert lenses.bazin_ceiling(m) == pytest.approx(0.04 * 50 / 0.06)
+    # Shell em Londres: cotação em pence, contas em dólares; o número de Graham fica em pence, como a cotação
+    shel = lenses.metrics_from_info({"currency": "GBp", "financialCurrency": "USD", "regularMarketPrice": 3574.5,
+                                     "trailingPE": 8.14, "priceToBook": 1.38, "trailingEps": 4.39, "bookValue": 25.9,
+                                     "dividendYield": 3.0, "_yfinance": True})
+    assert shel["eps"] == pytest.approx(3574.5 / 8.14) and 3000 < lenses.graham_number(shel) < 6000  # ≈ 5 060 pence
     status, rows = lenses.evaluate("graham_def", m)
     assert status == "entra" and all(st == "pass" for _, _, _, st in rows)
     assert lenses.evaluate("graham_def", {**m, "current": 1.8})[0] == "quase"  # a menos de 15% do limite
@@ -3744,7 +3750,8 @@ def test_triage_universe_page_and_profile(app, client, monkeypatch):
     for text in ("The Coca-Cola Company", "Número de Graham", "Tecto de Bazin", "Várias lentes", "Graham defensivo",
                  "Passa", "Avaliação", "Resultados", "Crescimento", "Balanço", "Acionista", "52 semanas",
                  "O negócio", "Sells drinks.", "Analisar o moat", "Se entrar na lista", "Guardar na lista",
-                 'data-save-lens="buffett"'):
+                 'data-save-lens="buffett"', "O valor da ação", 'data-method="dcf"', 'data-method="gordon"',
+                 "Mais métodos", "PEG de Peter Lynch"):
         assert text in html, text
     r = post(client, "save_triage_notes", token, ticker="KO", answers=json.dumps({"negocio": "Bebidas"}))
     assert r.status_code == 200 and "Bebidas" in client.get("/radar/acao/KO").get_data(as_text=True)
@@ -3803,7 +3810,7 @@ def test_tracking_rules_and_alerts(app, client, monkeypatch):
         db.session.commit()
     # da triagem: com a lente onde entrou e os parâmetros dela
     r = post(client, "add_watch", token, instrument="KO", currency="USD", method="buffett")
-    assert r.status_code == 200 and "A minha lista" in r.get_json()["message"]
+    assert r.status_code == 200 and r.get_json()["message"]["title"] == "A minha lista"
     assert post(client, "add_watch", token, instrument="KO", currency="USD").status_code == 400  # já está
     with app.app_context():
         w = WatchItem.query.filter_by(instrument="KO").one()
@@ -3842,7 +3849,7 @@ def test_tracking_rules_and_alerts(app, client, monkeypatch):
         assert tracking.recent(now=datetime.now())
     html = client.get("/radar/acompanhamento").get_data(as_text=True)
     for text in ("A minha lista", "Buffett", "Alertas dos últimos dias", "Preço ≤ 80", "Fora de Buffett",
-                 'id="portfolioAlerts"', 'id="trackModal"', "deixou de entrar", "Critérios da lente"):
+                 'id="portfolioAlerts"', 'id="trackModal"', "deixou de entrar", "Por abrir"):
         assert text in html, text
     # a Visão Geral avisa quando dispara (aqui já tinha disparado: sem aviso novo)
     assert "Ver em Acompanhamento" not in client.get("/").get_data(as_text=True)
@@ -3865,7 +3872,7 @@ def test_watch_lists(app, client):
     # a mesma ação pode estar em duas listas, mas não duas vezes na mesma
     assert post(client, "add_watch", token, instrument="KO", currency="USD").status_code == 200
     r = post(client, "add_watch", token, instrument="KO", currency="USD", method="bazin", list_id=str(lid))
-    assert r.status_code == 200 and "Dividendos" in r.get_json()["message"]
+    assert r.status_code == 200 and r.get_json()["message"]["title"] == "Dividendos"
     assert post(client, "add_watch", token, instrument="KO", list_id=str(lid)).status_code == 400
     with app.app_context():
         assert WatchItem.query.filter_by(instrument="KO").count() == 2
@@ -3901,3 +3908,104 @@ def test_migration_watch_lists(tmp_path, monkeypatch):
         wl = WatchList.query.one()
         assert w.list_id == wl.id and wl.title == "A minha lista" and w.method == "graham_def"
 
+
+def test_watch_board_states_cards_export_import(app, client, monkeypatch):
+    import io
+    from portfolio_investimentos.models import WatchItem, WatchList, WatchRule, WatchState
+    from portfolio_investimentos.services import triage
+    token = csrf(client)
+    monkeypatch.setattr(triage, "row", lambda t: {"t": t, "pe": 3.9, "dv": 0.086, "st": {"buffett": "entra",
+                                                                                         "bazin": "entra"}})
+    out = post(client, "add_watch", token, instrument="PETR4.SA", currency="BRL", method="bazin").get_json()["message"]
+    post(client, "add_watch", token, instrument="KO", currency="USD")
+    lid = out["list_id"]
+    with app.app_context():
+        sts = WatchState.query.filter_by(list_id=lid).order_by(WatchState.position).all()
+        assert [s.title for s in sts] == ["Por abrir", "A ler relatórios", "Em tese", "Parqueada", "Descartada"]
+        petr = WatchItem.query.filter_by(instrument="PETR4.SA").one()
+        ko = WatchItem.query.filter_by(instrument="KO").one()
+        assert petr.state_id == sts[0].id and petr.priority == "media" and petr.position < ko.position
+        assert petr.reason == "Entra em Buffett e Bazin. P/L 3,9. Dividendo 8,6%."
+        s_ids = [s.id for s in sts]
+        pid, kid = petr.id, ko.id
+    html = client.get(f"/radar/acompanhamento?lista={lid}").get_data(as_text=True)
+    for text in ("Por abrir", "A ler relatórios", "Descartada", "Vazio", "2 ações em", "Porque entrou",
+                 "Notas da leitura", "data-answered>0</span>/7)", "Tirar da lista", "Copiar texto", "Exportar", "Importar",
+                 "Apagar", "Novo estado", "Parâmetros e alertas", 'data-ficha="PETR4.SA"'):
+        assert text in html, text
+    # os campos do cartão e arrastar
+    assert post(client, "update_watch", token, name=str(pid), priority="alta", notes="Ler o 20-F").status_code == 200
+    assert post(client, "update_watch", token, name=str(pid), priority="urgente").status_code == 400
+    assert post(client, "move_watch", token, name=str(kid), state_id=str(s_ids[2]), position="0").status_code == 200
+    assert post(client, "move_watch", token, name=str(pid), state_id=str(s_ids[2]), position="0").status_code == 200
+    with app.app_context():
+        order = [w.instrument for w in WatchItem.query.filter_by(state_id=s_ids[2]).order_by(WatchItem.position)]
+        assert order == ["PETR4.SA", "KO"]
+        assert db.session.get(WatchItem, pid).priority == "alta" and db.session.get(WatchItem, pid).notes == "Ler o 20-F"
+    assert post(client, "update_watch", token, name=str(kid), state_id=str(s_ids[4])).status_code == 200
+    # os estados: criar, mudar o nome, mover, apagar (os cartões passam para o primeiro)
+    assert post(client, "create_watch_state", token, list_id=str(lid), title="Comprada").status_code == 200
+    assert post(client, "create_watch_state", token, list_id=str(lid), title="comprada").status_code == 400
+    assert post(client, "rename_watch_state", token, name=str(s_ids[3]), title="Em espera").status_code == 200
+    assert post(client, "move_watch_state", token, name=str(s_ids[4]), direction="-1").status_code == 200
+    assert post(client, "delete_watch_state", token, name=str(s_ids[2])).status_code == 200
+    with app.app_context():
+        titles = [s.title for s in WatchState.query.filter_by(list_id=lid).order_by(WatchState.position)]
+        assert titles == ["Por abrir", "A ler relatórios", "Descartada", "Em espera", "Comprada"]
+        assert db.session.get(WatchItem, pid).state_id == s_ids[0]
+    # exportar e importar (ida e volta)
+    post(client, "save_triage_notes", token, ticker="PETR4.SA", answers=json.dumps({"negocio": "Petróleo"}))
+    r = client.get(f"/radar/lista/{lid}.json")
+    data = json.loads(r.get_data(as_text=True))
+    assert "attachment" in r.headers["Content-Disposition"] and data["titulo"] == "A minha lista"
+    petr_x = next(a for a in data["acoes"] if a["ticker"] == "PETR4.SA")
+    assert petr_x["prioridade"] == "alta" and petr_x["estado"] == "Por abrir" and petr_x["respostas"]["negocio"] == "Petróleo"
+    assert any(p["kind"] == "method" for p in petr_x["parametros"])
+    r = client.post("/api/import_watch_list", data={"file": (io.BytesIO(json.dumps(data).encode()), "l.json")},
+                    headers={"X-CSRF-Token": token}, content_type="multipart/form-data")
+    new = r.get_json()["message"]
+    assert r.status_code == 200 and new["title"] == "A minha lista (importada)" and new["n"] == 2
+    with app.app_context():
+        assert tracking_export(new["id"]) == {**data, "titulo": "A minha lista (importada)"}
+        assert WatchRule.query.count() >= 2 and WatchList.query.count() == 2
+    bad = client.post("/api/import_watch_list", data={"file": (io.BytesIO(b"[1, 2]"), "x.json")},
+                      headers={"X-CSRF-Token": token}, content_type="multipart/form-data")
+    assert bad.status_code == 400
+    assert post(client, "delete_watch_list", token, name=str(new["id"])).status_code == 200
+    with app.app_context():
+        assert WatchState.query.filter_by(list_id=new["id"]).count() == 0
+    with app.app_context():
+        st = WatchState.query.filter_by(list_id=lid).all()
+    for s_ in st[:-1]:
+        post(client, "delete_watch_state", token, name=str(s_.id))
+    assert post(client, "delete_watch_state", token, name=str(st[-1].id)).status_code == 400  # fica um
+
+
+def tracking_export(list_id):
+    from portfolio_investimentos.models import WatchList
+    from portfolio_investimentos.services import tracking
+    return tracking.export_list(db.session.get(WatchList, list_id))
+
+
+def test_migration_watch_board(tmp_path, monkeypatch):
+    import sqlite3
+    from portfolio_investimentos.models import WatchItem, WatchState
+    from portfolio_investimentos.services import tracking
+    _legacy_db(tmp_path, monkeypatch)
+    conn = sqlite3.connect(tmp_path / "portfolio.db")
+    conn.execute("DROP TABLE watch_rule")
+    conn.execute("DROP TABLE watch_item")
+    conn.execute("DROP TABLE watch_state")
+    conn.execute("CREATE TABLE watch_item (id INTEGER PRIMARY KEY, instrument VARCHAR(32) NOT NULL, "
+                 "target_price FLOAT, note VARCHAR(255), creation DATETIME, method VARCHAR(16), criteria TEXT)")
+    conn.execute("INSERT INTO instrument (ticker, currency) VALUES ('AAA', 'EUR')")
+    conn.execute("INSERT INTO watch_item (instrument, note) VALUES ('AAA', 'ler o relatório')")
+    conn.commit()
+    conn.close()
+    app = create_app({"TESTING": True})
+    with app.app_context():
+        w = WatchItem.query.one()
+        assert w.notes == "ler o relatório" and w.priority == "media"
+        sts = tracking.states(w.list_id)
+        assert sts[0].title == "Por abrir" and WatchItem.query.one().state_id == sts[0].id
+        assert WatchState.query.count() == 5
