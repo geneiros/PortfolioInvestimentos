@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **README: capturas e funcionalidades atualizadas**  
+  Todas as capturas refeitas com os mesmos dados (demonstração, uma pesquisa real nas Oportunidades e ações em Acompanhamento com um alerta disparado). A descrição passa a incluir o Acompanhamento na introdução, nas páginas disponíveis offline e no aviso da Visão Geral. O aviso de um alerta mantém as siglas em maiúsculas («P/L abaixo de 30»).
 - **Radar e alertas: Oportunidades primeiro e Acompanhamento**  
   O separador Oportunidades passa a ser o primeiro e abre por omissão. «Alertas e radar» passa a Acompanhamento: as ações juntadas a partir das Oportunidades (com o método e os limites usados) ou à mão. Em cada uma escolhes os parâmetros a acompanhar e, em cada um, se queres ser avisado:
   - preço abaixo/acima de um valor, variação do dia e queda desde o máximo de 52 semanas;
