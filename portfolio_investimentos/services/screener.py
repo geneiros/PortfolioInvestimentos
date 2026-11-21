@@ -1,4 +1,4 @@
-"""Oportunidades (Radar e alertas): ações de todo o mundo que cumprem os critérios dos grandes investidores.
+"""Oportunidades (Prospeção): ações de todo o mundo que cumprem os critérios dos grandes investidores.
 
 1.º passo: o filtro de ações do Yahoo aplica os critérios de cada método (P/L, P/VP, ROE, dívida, liquidez,
 crescimento...) e devolve as empresas que os cumprem; alguns critérios que o Yahoo não filtra (P/L × P/VP do

@@ -1,4 +1,4 @@
-/* Radar e alertas → Acompanhamento: os parâmetros de cada ação, os alertas e a atualização dos indicadores. */
+/* Prospeção → Acompanhamento: os parâmetros de cada ação, os alertas e a atualização dos indicadores. */
 (() => {
   const KINDS = window.pmTrackKinds || {};
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

@@ -1,4 +1,4 @@
-/* Radar e alertas → Oportunidades: procurar (1.º passo), analisar o moat (2.º passo) e guardar o checklist. */
+/* Prospeção → Oportunidades: procurar (1.º passo), analisar o moat (2.º passo) e guardar o checklist. */
 (() => {
   const form = document.getElementById("screenForm");
   if (form) form.addEventListener("submit", async (e) => {

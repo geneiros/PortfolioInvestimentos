@@ -512,9 +512,9 @@ def fiscal_simulation_csv():
 
 @bp.route("/radar/acompanhamento")
 def acompanhamento():
-    """Radar e alertas → Acompanhamento: as ações que juntaste, os parâmetros e os alertas de cada uma."""
+    """Prospeção → Acompanhamento: as ações que juntaste, os parâmetros e os alertas de cada uma."""
     from .services import moat, screener, tracking
-    c = ctx.build("radar", "Radar e alertas")
+    c = ctx.build("radar", "Prospeção")
     fired = tracking.check()
     currencies = {i.ticker: i for i in Instrument.query.all()}
     rows = []
@@ -535,7 +535,7 @@ def acompanhamento():
 
 @bp.route("/oportunidades")
 def oportunidades_antiga():
-    """O endereço antigo das Oportunidades (agora o primeiro separador de Radar e alertas)."""
+    """O endereço antigo das Oportunidades (agora o primeiro separador de Prospeção)."""
     from flask import redirect
     q = request.query_string.decode()
     return redirect("/radar" + (f"?{q}" if q else ""))
@@ -543,10 +543,10 @@ def oportunidades_antiga():
 
 @bp.route("/radar")
 def oportunidades():
-    """Radar e alertas → Oportunidades (o primeiro separador): as ações que cumprem os critérios dos grandes
+    """Prospeção → Oportunidades (o primeiro separador): as ações que cumprem os critérios dos grandes
     investidores e o moat."""
     from .services import moat, screener
-    c = ctx.build("radar", "Radar e alertas")
+    c = ctx.build("radar", "Prospeção")
     res = screener.last()
     method = request.args.get("metodo") or (res or {}).get("method") or "buffett"
     if method not in screener.METHODS:
@@ -570,7 +570,7 @@ def oportunidades():
 
 
 def radar_instruments():
-    """Os ativos seguidos em Radar e alertas, do mais recente para o mais antigo, sem repetir."""
+    """Os ativos seguidos em Prospeção, do mais recente para o mais antigo, sem repetir."""
     out = {}
     for w in WatchItem.query.order_by(WatchItem.creation.desc()).all():
         inst = db.session.get(Instrument, w.instrument)

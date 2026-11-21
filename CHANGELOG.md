@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **«Radar e alertas» passa a «Prospeção»**  
+  O menu muda de nome e passa para a seguir à Carteira, antes do Desempenho.
 - **Versão 0.5.0**  
   Executáveis e APK novos com o Planeamento novo, as Oportunidades (grandes investidores e moat) e o Acompanhamento com parâmetros e alertas. Ao abrir, os alertas de preço e o preço-alvo passam sozinhos para o Acompanhamento, com uma cópia da base de dados guardada antes. Quem tem uma versão anterior vê a faixa «Há uma versão nova».
 - **README: capturas e funcionalidades atualizadas**  

@@ -1169,7 +1169,7 @@ def logout():
     session.clear()
 
 
-# ---------------------------------------------------------------- Oportunidades (Radar e alertas)
+# ---------------------------------------------------------------- Oportunidades (Prospeção)
 @action
 def run_screen(method, region="mundo", min_cap="1e9", **values):
     """Procura ações com os critérios de um grande investidor (filtro de ações do Yahoo)."""

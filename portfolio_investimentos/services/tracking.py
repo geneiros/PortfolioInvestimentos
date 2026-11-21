@@ -1,4 +1,4 @@
-"""Acompanhamento (Radar e alertas): as ações que juntaste (das Oportunidades ou à mão), os parâmetros que
+"""Acompanhamento (Prospeção): as ações que juntaste (das Oportunidades ou à mão), os parâmetros que
 acompanhas em cada uma e os alertas.
 
 Cada parâmetro é uma `WatchRule`:
@@ -7,7 +7,7 @@ Cada parâmetro é uma `WatchRule`:
 - P/L abaixo de x, P/VP abaixo de x, dividendo acima de x% (indicadores do Yahoo, «Atualizar indicadores»);
 - critérios do método onde a ação foi encontrada (avisa quando deixa de os cumprir ou volta a cumprir);
 - moat (avisa quando a leitura muda, ex.: de Largo para Estreito, ao reanalisar).
-Os alertas verificam-se ao abrir a aplicação (Visão Geral, Carteira, Radar e alertas) e depois de cada atualização;
+Os alertas verificam-se ao abrir a aplicação (Visão Geral, Carteira, Prospeção) e depois de cada atualização;
 disparam quando a condição passa a verificar-se e voltam a ficar prontos quando deixa de se verificar.
 """
 import json

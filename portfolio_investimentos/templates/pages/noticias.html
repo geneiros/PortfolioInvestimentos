@@ -73,7 +73,7 @@
       {{ news_list(radar_rows) }}
       {% if radar_missing %}<div class="small text-secondary mt-2">Sem notícias: {% for t, why in radar_missing %}<b>{{ t }}</b> ({{ why }}){{ "; " if not loop.last }}{% endfor %}.</div>{% endif %}
       {% else %}
-      <p class="text-secondary small mb-0">Ainda não acompanhas ativos. Junta-os em <a href="/radar/acompanhamento">Radar e alertas → Acompanhamento</a> para veres aqui as notícias deles.</p>
+      <p class="text-secondary small mb-0">Ainda não acompanhas ativos. Junta-os em <a href="/radar/acompanhamento">Prospeção → Acompanhamento</a> para veres aqui as notícias deles.</p>
       {% endif %}
     </div>
   </div>

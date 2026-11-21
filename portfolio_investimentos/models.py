@@ -112,7 +112,7 @@ class ImportBatch(NameMixin, db.Model):
 
 
 class WatchItem(NameMixin, db.Model):
-    """Uma ação em Acompanhamento (Radar e alertas): vem das Oportunidades (com o método e os limites usados) ou é
+    """Uma ação em Acompanhamento (Prospeção): vem das Oportunidades (com o método e os limites usados) ou é
     juntada à mão. Os parâmetros a acompanhar e os alertas são as `WatchRule`."""
     id = db.Column(db.Integer, primary_key=True)
     instrument = db.Column(db.String(32), db.ForeignKey("instrument.ticker"), nullable=False)
