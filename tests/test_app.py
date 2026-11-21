@@ -766,51 +766,69 @@ def test_overview_scores_profiles_and_insights(app, client):
     assert "Perfil (Todas as corretoras): Active Trader · mudar" in client.get("/").get_data(as_text=True)
 
 
-def test_planning_fire_page_and_settings(app, client):
+def test_planning_start_goal_and_hypotheses(app, client):
     token = csrf(client)
     assert client.get("/planeamento").status_code == 200  # sem dados
     post(client, "load_demo", token)
+    # a demonstração traz um objetivo: o plano completo
     html = client.get("/planeamento").get_data(as_text=True)
-    assert "O número FIRE" in html and "A data FIRE" in html and 'id="fireChart"' in html and "Planeamento" in html
-    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500").status_code == 200
-    html = client.get("/planeamento").get_data(as_text=True)
-    assert "600" in html.replace("\u202f", "").replace(" ", "")  # 24 000 / 4% = 600 000 €
-    assert "Indica a tua idade" in html
-    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45", until="90",
-                pension="800", pension_age="67").status_code == 200
-    html = client.get("/planeamento").get_data(as_text=True)
-    assert "Até aos 90 anos, com a pensão a partir dos 67" in html and "Se te reformasses hoje" in html
-    assert "Para sempre, com a pensão a partir dos 67" in html and "sem contar com a pensão" in html
+    for text in ("A partir de", "As tuas hipóteses", "Os cenários e a carteira", "O que já está pago",
+                 "Quanto demora cada €100 000", "O que mexe na data", "o IRS dos teus lotes",
+                 "A probabilidade de chegar lá", 'id="planChart"', 'id="planProbChart"', "Hipóteses gravadas"):
+        assert text in html, text
     import json
-    chart = json.loads(re.search(r"const d = (\{.*?\});\n", html).group(1))
-    assert [tg["label"] for tg in chart["targets"]] == ["Para sempre", "Para sempre, com a pensão aos 67",
-                                                        "Até aos 90 anos, com a pensão aos 67"]
-    assert len({tg["color"] for tg in chart["targets"]}) == 3
-    assert 'id="stopAgeNote"' not in html  # sem «Investir até aos», sem nota
-    # quando cada cenário chega a cada número FIRE: tabela e pontos no gráfico
-    assert 'id="fireReach"' in html and "Quando chegas a cada número FIRE" in html
-    assert [mk["label"] for mk in chart["markers"]] == [tg["label"] for tg in chart["targets"]]
-    assert all(set(m) == {"x", "y", "s", "age"} for mk in chart["markers"] for m in mk["data"])
-    more = [s for s in chart["scenarios"] if s.get("more")]
-    assert more and all(a["x"] <= b["x"] for s in more for a, b in zip(s["more"], s["more"][1:]))
-    assert 'id="pensionCovers"' not in html
-    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45", until="90",
-                pension="2000", pension_age="67").status_code == 200
+    chart = json.loads(re.search(r"window.pmPlan = (\{.*?\});</script>", html).group(1))
+    assert chart["projection"] and chart["history"] and chart["paths"] and chart["number"] > 0
+    # recomeçar: o ecrã «Para começar»
+    assert post(client, "reset_plan", token).status_code == 200
     html = client.get("/planeamento").get_data(as_text=True)
-    assert 'id="pensionCovers"' in html and "são iguais" in html  # 2 000 € × 14 cobre os 24 000 €
-    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="0", age="95",
-                until="90").status_code == 400
-    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45",
-                until="90", stop_age="55").status_code == 200
+    assert "Quanto queres receber" in html and "Por definir" in html and "Já preenchido" in html
+    assert "A partir de" not in html
+    assert post(client, "set_plan_goal", token, income="500").status_code == 400
+    assert post(client, "set_plan_goal", token, income="18000").status_code == 200
     html = client.get("/planeamento").get_data(as_text=True)
-    assert "ou até aos 55 anos" in html and "O dinheiro dura" in html
-    # a nota explica que investir menos tempo adia a data FIRE (o capital pedido é o dessa data)
-    assert 'id="stopAgeNote"' in html and "Investir menos tempo não reduz o que precisas" in html
-    assert "na data FIRE do cenário base" in html
-    assert post(client, "save_fire", token, expenses="24000", swr="4", tax="0", monthly="500", age="45",
-                until="90", stop_age="40").status_code == 400
-    assert post(client, "save_fire", token, expenses="0", swr="4", tax="0", monthly="0").status_code == 400
-    assert post(client, "save_fire", token, expenses="1000", swr="50", tax="0", monthly="0").status_code == 400
+    assert "18 000" in html.replace("\u202f", " ").replace("\xa0", " ") and "As tuas hipóteses" in html
+    # hipóteses na URL: por gravar até se guardarem
+    html = client.get("/planeamento?rend=20000&lev=4&cenario=otimista").get_data(as_text=True)
+    assert "Hipóteses por gravar" in html and "no cenário otimista" in html
+    assert post(client, "save_plan", token, income="20000", monthly="700", swr="4", inflation="2").status_code == 200
+    html = client.get("/planeamento").get_data(as_text=True)
+    assert "Hipóteses gravadas" in html and "Voltar à média" in html  # 700 € não é a média
+    assert post(client, "save_plan", token, income="20000", monthly="700", swr="9", inflation="2").status_code == 400
+    # «Dividendos»: nunca se vende, por isso sem a secção do IRS dos lotes
+    html = client.get("/planeamento?lev=div").get_data(as_text=True)
+    assert "Só com os dividendos não se vende nada" in html
+    # escolher o ano: o depósito que lá chega
+    html = client.get("/planeamento?ano=2045").get_data(as_text=True)
+    assert 'id="planPickResult"' in html
+    # rendimentos fora da carteira e despesas
+    assert post(client, "save_plan_income", token,
+                rows=json.dumps([{"name": "Reforma", "monthly": "600", "year": "2055"}])).status_code == 200
+    assert post(client, "save_plan_income", token, rows=json.dumps([{"name": "", "monthly": "600"}])).status_code == 400
+    assert post(client, "save_plan_items", token,
+                rows=json.dumps([{"name": "Casa", "amount": "900"}, {"name": "Comida", "amount": "300"}])).status_code == 200
+    html = client.get("/planeamento").get_data(as_text=True)
+    assert "Reforma" in html and "em 2 despesas" in html
+    from portfolio_investimentos.models import Setting
+    with app.app_context():
+        assert float(Setting.get("fire_expenses")) == 14400  # (900 + 300) × 12
+    assert post(client, "save_plan_items", token, rows="[]").status_code == 200  # voltam as de partida
+    assert "em 9 despesas" in client.get("/planeamento").get_data(as_text=True)
+
+
+def test_planning_lot_tax_and_average_deposit(app, client):
+    from portfolio_investimentos.services import data, planning
+    post(client, "load_demo", csrf(client))
+    with app.test_request_context():
+        p = data.load_portfolio(None)
+        tax = planning.lot_tax(p, 10000)
+        assert 0 <= tax <= 0.28
+        assert planning.lot_tax(p, 10 ** 9) <= 0.28  # mais do que a carteira: vende tudo
+        assert planning.average_deposit(p) >= 0
+        assert planning.duration(43) == "3 anos e 7 meses" and planning.duration(24) == "2 anos"
+        assert planning.duration(1) == "1 mês" and planning.duration(None) == "—"
+        cfg = planning.settings(p, {"rend": "30000"})
+        assert cfg["dirty"] and planning.query(cfg, cenario="prudente") == "/planeamento?rend=30000&cenario=prudente"
 
 
 def test_merge_instruments_manually(app, client):

@@ -6,6 +6,17 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 - **Radar e alertas: Oportunidades**  
   Novo separador com as ações de todo o mundo que cumprem os critérios dos grandes investidores (Graham, Buffett e Munger, Lynch, Greenblatt, O'Neil, Templeton e o resumo dos métodos), com os limites editáveis, pelo filtro de ações do Yahoo Finance; uma linha por empresa na bolsa principal. 2.º passo: o moat de cada empresa, com a prova nos números (pontuação de 0 a 100), a fonte provável sugerida pela indústria e o checklist dos 5 pilares e dos 3 testes de Buffett; filtro «Só com moat» e «Juntar ao Radar».
+- **Planeamento novo**  
+  O Planeamento passa a começar por «Para começar» (o rendimento por ano que queres receber, com o depósito por mês já preenchido pela média do que entrou nas corretoras nos últimos 12 meses) e, com o objetivo escolhido, mostra:
+  - a linha do tempo (hoje, metade do caminho, data FIRE com o intervalo prudente–otimista);
+  - os cenários Prudente, Central, Otimista e Ritmo da carteira, e o gráfico com a projeção e o número FIRE;
+  - as hipóteses com −/+ (rendimento, depósito, levantamento 3% / 3,5% / 4% / Dividendos, inflação), por gravar até «Guardar o objetivo», com «Recomeçar»;
+  - rendimentos fora da carteira e despesas do mês;
+  - a carteira face à inflação portuguesa, o que já está pago, quanto demora cada €100 000 e o que mexe na data;
+  - o número FIRE com o IRS dos teus lotes;
+  - a probabilidade de chegar lá com os anos verdadeiros da bolsa desde 2000.
+
+  Saem a idade, o «durar até aos», a pensão por idade e as tabelas dos três cenários e do mês a mês. A pensão passa para os rendimentos fora da carteira.
 - **Versão 0.4.8**  
   A app Android passa a instalar também em telemóveis de 32 bits (ex.: Galaxy A13). Quem tem uma versão anterior vê a faixa «Há uma versão nova».
 - **App Android: também para telemóveis de 32 bits**  

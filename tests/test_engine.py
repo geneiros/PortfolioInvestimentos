@@ -202,78 +202,83 @@ def test_scores_metrics_and_profiles():
     assert tier(85) == ("A", "Excelente") and tier(20) == ("D", "Em construção") and tier(None)[0] is None
 
 
-def test_fire_number_dates_and_tracking():
+def test_fire_number_projection_and_date():
     from portfolio_investimentos.engine import fire
     # 12 000 €/ano, 4%, 14% de imposto efetivo: 12 000 / 0,86 / 0,04
     assert fire.fire_number(12000, 0.04, 0.14) == pytest.approx(348837.2, rel=1e-6)
-    plan = fire.plan(100000, 12000, 0.04, 0.0, 1000, start=date(2026, 11, 1))
-    assert plan["number"] == pytest.approx(300000) and plan["done"] == pytest.approx(1 / 3)
-    by = {s["name"]: s["date"] for s in plan["scenarios"]}
-    assert by["otimista"] < by["base"] < by["pessimista"]  # mais retorno, mais cedo
-    assert plan["earliest"] == by["otimista"] and plan["latest"] == by["pessimista"]
-    # conferir o cenário base à mão: o mês em que passa os 300 000 €
+    sc = fire.scenario(100000, 1000, 12000, 0.04, 0.0, [], 0.05)
+    assert sc["number"] == pytest.approx(300000)
+    # conferir à mão: o mês em que passa os 300 000 €
     g, v, m = 1.05 ** (1 / 12) - 1, 100000.0, 0
     while v < 300000:
         v, m = v * (1 + g) + 1000, m + 1
-    assert by["base"] == fire._add_months(date(2026, 11, 1), m)
-    assert fire.plan(400000, 12000, 0.04, 0.0, 0, start=date(2026, 11, 1))["date"] == date(2026, 11, 1)  # já lá está
-    track = fire.monthly_track([date(2026, 8, 31), date(2026, 9, 30), date(2026, 10, 30)], [100.0, 110.0, 99.0], 1000)
-    assert [(r["month"], r["change"]) for r in track] == [((2026, 10), -11.0), ((2026, 9), 10.0)]
+    assert sc["month"] == m
+    by = {k: fire.scenario(100000, 1000, 12000, 0.04, 0.0, [], r)["month"] for k, _, r in fire.SCENARIOS}
+    assert by["otimista"] < by["central"] < by["prudente"]  # mais retorno, mais cedo
+    assert fire.scenario(400000, 0, 12000, 0.04, 0.0, [], 0.05)["month"] == 0  # já lá está
+    assert fire.add_months(date(2026, 11, 1), 14) == date(2028, 1, 1)
+    assert fire.months_between(date(2026, 11, 1), date(2028, 1, 1)) == 14
 
 
-def test_fire_lifetime_needs_less_than_forever_and_counts_the_pension():
+def test_fire_income_outside_the_portfolio_bridges_until_it_starts():
     from portfolio_investimentos.engine import fire
-    start = date(2026, 11, 1)
-    # sem retorno: 30 anos de 12 000 € = 360 000 € (contas fáceis)
-    need = fire.required_by_month(0.0, 12000, 0.0, 60, 90)
-    assert need[0] == pytest.approx(360000) and need[-1] == 0
-    # pensão de 600 €/mês × 14 a partir dos 67: menos 8 400 € por ano durante 23 anos
-    with_pension = fire.required_by_month(0.0, 12000, 0.0, 60, 90, pension=8400, pension_age=67)
-    assert with_pension[0] == pytest.approx(360000 - 8400 * 23)
-    life = fire.lifetime_plan(100000, 12000, 0.14, 1000, 45, 90, start=start)
-    forever = fire.plan(100000, 12000, 0.04, 0.14, 1000, start=start)
-    assert life["date"] < forever["date"] and life["number"] < forever["number"]
-    assert 45 < life["age_at"] < 90
-    # se já tem o suficiente, é hoje
-    rich = fire.lifetime_plan(10_000_000, 12000, 0.0, 0, 45, 90, start=start)
-    assert rich["date"] == start and rich["done"] > 1
-
-
-def test_fire_stops_investing_and_withdraws_after_fire():
-    from portfolio_investimentos.engine import fire
-    start = date(2026, 11, 1)
-    # vida inteira sem retorno: depois da data FIRE, o capital desce até perto de zero aos 90
-    life = fire.lifetime_plan(100000, 12000, 0.0, 2000, 45, 90, start=start)
-    pess = next(s for s in life["scenarios"] if s["name"] == "pessimista")
-    assert pess["date"] and pess["empty"] is None  # chega até aos 90 (acaba perto de zero, mas chega)
-    last_value = pess["points"][-1][1]
-    assert 0 <= last_value < pess["number"]
-    # para sempre, sem idade: depois do número FIRE, a regra dos 4% com 5% de retorno real quase não gasta o capital
-    forever = fire.plan(100000, 12000, 0.04, 0.0, 2000, start=start)
-    base = next(s for s in forever["scenarios"] if s["name"] == "base")
-    after = [v for d, v in base["points"] if d > base["date"]]
-    assert after and min(after) >= base["number"] * 0.95 and base["empty"] is None
-    # a 3% real e levantamento de 4% do número FIRE, o dinheiro acaba (≈ 47 anos depois)
-    pess = next(s for s in forever["scenarios"] if s["name"] == "pessimista")
-    assert pess["empty"] is not None and pess["empty"] > pess["date"]
-    # deixar de investir aos 46 (antes da data FIRE): chega mais tarde (ou não chega)
-    stop = fire.lifetime_plan(100000, 12000, 0.0, 2000, 45, 90, start=start, stop_age=46)
-    assert stop["date"] is None or stop["date"] > life["date"]
-
-
-def test_fire_forever_with_pension():
-    from portfolio_investimentos.engine import fire
-    # sem retorno: dos 60 aos 67 todas as despesas (7 × 12 000); depois (12 000 − 8 400) / 4% = 90 000
-    need = fire.required_with_pension(0.0, 12000, 0.04, 0.0, 60, 8400, 67, months=40 * 12)
+    # sem retorno: 7 anos a pagar tudo (7 × 12 000) e depois (12 000 − 8 400) / 4% = 90 000
+    need = fire.need_curve(12000, 0.04, 0.0, [(700.0, 7 * 12)], rate=0.0, months=40 * 12)
     assert need[0] == pytest.approx(7 * 12000 + 90000)
     assert need[7 * 12] == pytest.approx(90000) and need[-1] == pytest.approx(90000)
-    # a pensão paga tudo: só é preciso chegar à idade da pensão
-    assert fire.required_with_pension(0.0, 12000, 0.04, 0.0, 60, 12600, 67, months=480)[0] == pytest.approx(84000)
+    # o rendimento de fora paga tudo: só é preciso chegar ao ano em que começa
+    assert fire.need_curve(12000, 0.04, 0.0, [(1000.0, 84)], rate=0.0)[0] == pytest.approx(84000)
+    # já ativo hoje: abate logo
+    assert fire.need_curve(12000, 0.04, 0.0, [(500.0, 0)])[0] == pytest.approx(fire.fire_number(6000, 0.04, 0.0))
+    base = fire.scenario(100000, 1000, 24000, 0.035, 0.1, [], 0.05)
+    pension = fire.scenario(100000, 1000, 24000, 0.035, 0.1, [(500.0, 25 * 12)], 0.05)
+    assert pension["month"] < base["month"] and pension["number"] < base["number"]
+
+
+def test_fire_monthly_needed_and_milestones():
+    from portfolio_investimentos.engine import fire
+    need_m = fire.monthly_needed(100000, 12000, 0.04, 0.0, [], 0.05, 10 * 12)
+    sc = fire.scenario(100000, need_m, 12000, 0.04, 0.0, [], 0.05)
+    assert sc["month"] <= 120 and fire.scenario(100000, need_m - 20, 12000, 0.04, 0.0, [], 0.05)["month"] > 120
+    assert fire.monthly_needed(400000, 12000, 0.04, 0.0, [], 0.05, 12) == 0.0
     start = date(2026, 11, 1)
-    wp = fire.pension_plan(100000, 12000, 0.04, 0.14, 1000, 45, 8400, 67, 90, start=start)
-    forever = fire.plan(100000, 12000, 0.04, 0.14, 1000, start=start)
-    assert wp["date"] < forever["date"] and wp["number"] < forever["number"]
-    assert wp["after"] == pytest.approx(fire.fire_number(3600, 0.04, 0.14))
+    history = [(date(2020, 1, 15), 10000.0), (date(2023, 6, 30), 100500.0), (date(2026, 10, 30), 150000.0)]
+    values = fire.project(150000, 2000, 0.05, 30 * 12)
+    ms = fire.milestones(history, values, start, until=400000)
+    assert ms[0]["date"] == date(2023, 6, 1) and ms[0]["months"] == 41  # desde jan/2020
+    assert ms[1]["date"] > start and ms[-1]["level"] == 400000 and len(ms) == 4
+    assert all(m["months"] > 0 for m in ms)
+
+
+def test_fire_coverage_pays_the_cheapest_first():
+    from portfolio_investimentos.engine import fire
+    start = date(2026, 11, 1)
+    items = [("Casa", 800.0), ("Streaming", 20.0), ("Comida", 400.0)]
+    # 120 000 € × 4% / 12 = 400 €/mês: paga o streaming e 380 € da comida
+    cov = fire.coverage(items, fire.project(120000, 1000, 0.05, 40 * 12), 0.04, 0.0, [], start)
+    assert cov["today"] == pytest.approx(400)
+    names = [(i["name"], i["paid"]) for i in cov["items"]]
+    assert names == [("Streaming", True), ("Comida", False), ("Casa", False)]
+    assert cov["items"][1]["part"] == pytest.approx(380) and cov["items"][2]["part"] == 0
+    assert cov["items"][1]["date"] < cov["items"][2]["date"]
+    # um rendimento de fora já ativo conta logo
+    assert fire.coverage(items, [0.0] * 10, 0.04, 0.0, [(1220.0, 0)], start)["items"][-1]["paid"]
+
+
+def test_fire_historical_probability():
+    from portfolio_investimentos.engine import fire
+    from portfolio_investimentos.services import history_data
+    real = history_data.real_returns()
+    assert len(real) >= 25 and real[2008] < -0.3 and real[2019] > 0.2
+    need = fire.need_curve(12000, 0.04, 0.0)
+    paths = fire.historical_paths(100000, 1000, need, real)
+    assert len(paths) == len(real) and paths[0]["from"] == min(real)
+    early, late = fire.probability(paths, 12 * 5), fire.probability(paths, 12 * 50)
+    assert 0 <= early <= late <= 1 and late > 0.9
+    # a ordem dos anos conta: começar em 2000 (três anos maus) chega mais tarde do que começar em 2003
+    by = {p["from"]: p["month"] for p in paths}
+    assert by[2000] > by[2003]
+    assert history_data.inflation_between(date(2022, 1, 1), date(2023, 1, 1)) == pytest.approx(0.078, abs=0.002)
 
 
 def test_fiscal_dividend_credit_is_limited_per_dividend():
