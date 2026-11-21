@@ -11,7 +11,8 @@ from datetime import date
 from flask import Blueprint, Response, abort, current_app, jsonify, request, send_file, session
 
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, FxRate, ImportBatch, Instrument,
-                     OtherAsset, OtherAssetValue, PortfolioAlert, Price, Setting, Transaction, WatchItem, WatchRule, db)
+                     OtherAsset, OtherAssetValue, PortfolioAlert, Price, Setting, Transaction, WatchItem, WatchList, WatchRule,
+                     db)
 from . import auth
 from .engine.formatting import parse_number
 from .engine.portfolio import ASSET_TYPES
@@ -442,18 +443,19 @@ def set_market_indices(tickers=""):
 
 
 @action
-def add_watch(instrument, target_price=None, note=None, currency="EUR", instrument_name=None, method=None):
-    """Junta uma ação ao Acompanhamento. Das Oportunidades vem o método (e os limites da última pesquisa), e começa
-    com os parâmetros desse método e do moat."""
-    from .services import moat, screener, tracking
+def add_watch(instrument, target_price=None, note=None, currency="EUR", instrument_name=None, method=None,
+              list_id=None):
+    """Junta uma ação a uma lista de acompanhamento (a primeira, se não se indicar). Da triagem vem a lente onde a
+    ação entrou, e começa com os parâmetros dessa lente e do moat."""
+    from .services import lenses, moat, tracking
     ticker = _ensure_instrument(instrument, instrument_name, currency)
-    if WatchItem.query.filter_by(instrument=ticker).first():
-        raise ApiError(f"{ticker} já está em Acompanhamento.")
-    w = WatchItem(instrument=ticker, target_price=_float(target_price) or None, note=note or None)
-    if method in screener.METHODS:
-        last = screener.last() or {}
+    lists = tracking.watch_lists()
+    wl = _get(WatchList, list_id) if list_id not in (None, "") else lists[0]
+    if WatchItem.query.filter_by(instrument=ticker, list_id=wl.id).first():
+        raise ApiError(f"{ticker} já está em «{wl.title}».")
+    w = WatchItem(instrument=ticker, target_price=_float(target_price) or None, note=note or None, list_id=wl.id)
+    if method in lenses.REAL:
         w.method = method
-        w.criteria = json.dumps(last.get("values") or {} if last.get("method") == method else {})
     db.session.add(w)
     db.session.flush()
     if w.method:
@@ -461,7 +463,48 @@ def add_watch(instrument, target_price=None, note=None, currency="EUR", instrume
     if w.target_price:
         db.session.add(WatchRule(watch_id=w.id, kind="price_below", threshold=w.target_price, alert=False))
     db.session.commit()
-    return f"{ticker} juntada ao Acompanhamento."
+    return f"{ticker} guardada em «{wl.title}»."
+
+
+@action
+def create_watch_list(title):
+    """Uma lista de acompanhamento nova. Devolve {"id", "title"}."""
+    from .services import tracking
+    title = (title or "").strip()[:60]
+    if not title:
+        raise ApiError("Dá um nome à lista.")
+    tracking.watch_lists()
+    if WatchList.query.filter(db.func.lower(WatchList.title) == title.lower()).first():
+        raise ApiError(f"Já há uma lista «{title}».")
+    wl = WatchList(title=title)
+    db.session.add(wl)
+    db.session.commit()
+    return {"id": wl.id, "title": wl.title}
+
+
+@action
+def rename_watch_list(name, title):
+    wl = _get(WatchList, name)
+    title = (title or "").strip()[:60]
+    if not title:
+        raise ApiError("Dá um nome à lista.")
+    wl.title = title
+    db.session.commit()
+    return "Lista renomeada."
+
+
+@action
+def delete_watch_list(name):
+    """Apaga uma lista e as ações dela (com os parâmetros). A última lista não se apaga."""
+    wl = _get(WatchList, name)
+    if WatchList.query.count() <= 1:
+        raise ApiError("Tem de ficar pelo menos uma lista.")
+    for w in WatchItem.query.filter_by(list_id=wl.id).all():
+        WatchRule.query.filter_by(watch_id=w.id).delete()
+        db.session.delete(w)
+    db.session.delete(wl)
+    db.session.commit()
+    return f"Lista «{wl.title}» apagada."
 
 
 @action
@@ -511,7 +554,7 @@ def save_watch_rules(name, rules="[]", note=None):
 
 @action
 def refresh_tracking(ticker):
-    """Atualiza os indicadores do Yahoo de uma ação em Acompanhamento (P/L, P/VP, dividendo, critérios do método)."""
+    """Atualiza os indicadores do Yahoo de uma ação em acompanhamento (P/L, P/VP, dividendo, critérios das lentes)."""
     from .services import tracking, yahoo
     ticker = (ticker or "").strip().upper()
     if not WatchItem.query.filter_by(instrument=ticker).first():
@@ -1169,20 +1212,39 @@ def logout():
     session.clear()
 
 
-# ---------------------------------------------------------------- Oportunidades (Prospeção)
+# ---------------------------------------------------------------- Triagem (Prospeção → Ações)
 @action
-def run_screen(method, region="mundo", min_cap="1e9", **values):
-    """Procura ações com os critérios de um grande investidor (filtro de ações do Yahoo)."""
-    from .services import screener, yahoo
-    limits = {k: v for k, v in values.items() if k[:1] in ("c", "p") and k[1:2].isdigit()}
+def triage_refresh():
+    """Um passo da recolha do universo da triagem (as pesquisas de cada lente ao Yahoo). A página chama-o até
+    `done`."""
+    from .services import triage, yahoo
     try:
-        out = screener.run(method, region, min_cap, limits)
-    except screener.ScreenError as exc:
-        raise ApiError(str(exc)) from exc
+        return triage.refresh_step()
     except yahoo.YahooError as exc:
         raise ApiError(f"Não foi possível procurar no Yahoo: {exc}") from exc
-    n = len(out["rows"])
-    return f"{n} ações encontradas." if n != 1 else "1 ação encontrada."
+
+
+@action
+def triage_enrich():
+    """Um passo do completar dos dados das ações da triagem (ROE, margens, dívida...). A página chama-o até `done`
+    (e espera `wait` segundos quando o Yahoo limita os pedidos)."""
+    from .services import triage
+    return triage.enrich_step()
+
+
+@action
+def save_triage_notes(ticker, answers="{}"):
+    """As respostas às perguntas «Se entrar na lista» de uma ação."""
+    from .services import triage
+    ticker = (ticker or "").strip().upper()
+    try:
+        data = json.loads(answers) if isinstance(answers, str) else answers
+    except ValueError as exc:
+        raise ApiError("Respostas inválidas.") from exc
+    if not ticker or not isinstance(data, dict):
+        raise ApiError("Respostas inválidas.")
+    triage.save_answers(ticker, data)
+    return "Respostas guardadas."
 
 
 @action

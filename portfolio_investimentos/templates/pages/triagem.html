@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help %}
+{% include "pages/_radar_tabs.html" %}
+
+<div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+  <div class="me-auto">
+    <h5 class="fw-bold mb-1">Triagem</h5>
+    <p class="text-secondary mb-0">Ações de todo o mundo vistas pelas lentes dos grandes investidores. Escolhe uma lente à esquerda, filtra a lista e clica numa ação para veres a ficha completa. É um filtro para encontrar ideias, não uma recomendação.</p>
+  </div>
+  <div class="text-end small">
+    {% if tab %}<div class="text-secondary">{{ tab.rows|length }} ações · {{ tab.at.replace('T', ' ') }}{% if tab.stale %} <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> com mais de um dia</span>{% endif %}</div>{% endif %}
+    <div id="triageProgress" class="text-secondary"></div>
+  </div>
+  <button class="btn btn-sm {{ 'btn-primary' if not tab or tab.stale else 'btn-outline-primary' }}" type="button" id="triageRefresh"><i class="bi bi-arrow-repeat"></i> Atualizar</button>
+</div>
+
+{% if not tab %}
+<div class="pm-card text-center text-secondary py-5" id="triageEmpty">
+  <i class="bi bi-globe2 fs-1"></i>
+  <p class="mt-2 mb-1">Ainda não há ações na triagem.</p>
+  <p class="small mb-3">Carrega em <b>Atualizar</b>: cada lente procura no Yahoo Finance as ações de todas as bolsas principais (empresas com mais de 2 mil milhões de dólares) e depois completam-se os dados de cada uma. Demora uns minutos; podes ir vendo a lista enquanto se completa.</p>
+  <button class="btn btn-primary" type="button" data-triage-start><i class="bi bi-arrow-repeat"></i> Atualizar agora</button>
+</div>
+{% else %}
+<div class="pm-triage" id="triage" data-missing="{{ tab.missing }}">
+  {# ---------------------------------------------------------------- as lentes #}
+  <aside class="pm-triage-lenses" id="triageLenses" aria-label="Lentes">
+    <div class="pm-label mb-2">Lentes {{ help("Uma ação entra numa lente quando passa em todos os critérios com dados; fica «quase» quando o que falta está perto do limite. «Várias lentes» junta as que entram em pelo menos duas.") }}</div>
+    <div class="list-group list-group-flush">
+      {% for l in lens_list %}
+      <button type="button" class="list-group-item list-group-item-action pm-lens {{ 'active' if loop.first }}" data-lens="{{ l.key }}">
+        <div class="d-flex align-items-center gap-2"><span class="fw-semibold me-auto">{{ l.name }}</span><span class="badge rounded-pill pm-lens-count" data-count="{{ l.key }}">0</span></div>
+        <div class="small pm-lens-sub">{{ l.sub }}</div>
+      </button>
+      {% endfor %}
+    </div>
+  </aside>
+
+  {# ---------------------------------------------------------------- a lista #}
+  <section class="pm-triage-main" aria-label="Ações">
+    <div class="pm-card pm-card-sm mb-2">
+      <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
+        <h6 class="fw-bold mb-0" id="lensName"></h6>
+        <span class="small text-secondary" id="lensText"></span>
+        <span class="small ms-auto" id="lensSummary"></span>
+      </div>
+      <div class="row g-2 align-items-center small">
+        <div class="col-12 col-md"><div class="input-group input-group-sm"><span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input class="form-control" id="fSearch" type="search" placeholder="Empresa, ticker ou país" aria-label="Procurar"></div></div>
+        <div class="col-6 col-md-auto"><select class="form-select form-select-sm" id="fRegion" aria-label="Região"><option value="">Todas as regiões</option>{% for r in regions %}<option>{{ r }}</option>{% endfor %}</select></div>
+        <div class="col-6 col-md-auto"><select class="form-select form-select-sm" id="fSector" aria-label="Setor"><option value="">Todos os setores</option>{% for s in sectors %}<option>{{ s }}</option>{% endfor %}</select></div>
+        <div class="col-6 col-md-auto"><select class="form-select form-select-sm" id="fSort" aria-label="Ordenação">
+          <option value="best">Melhor nesta lente</option><option value="cap">Maior capitalização</option><option value="pe">P/L mais baixo</option>
+          <option value="roe">ROE mais alto</option><option value="rg">Vendas a crescer mais</option><option value="dv">Dividendo mais alto</option><option value="name">Nome</option></select></div>
+        <div class="col-6 col-md-auto"><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" id="fOnly" checked><label class="form-check-label" for="fOnly">Só as que entram</label></div></div>
+      </div>
+    </div>
+    <div class="pm-card pm-card-sm p-0">
+      <div class="table-responsive"><table class="table pm-table pm-triage-table align-middle mb-0" id="triageTable">
+        <thead><tr>
+          <th>Empresa</th>
+          <th>Lentes {{ help("Um ponto por lente, pela ordem da lista à esquerda: cheio = entra, meio = quase, vazio = falha, tracejado = sem dados.") }}</th>
+          <th>Nesta</th>
+          <th class="text-end">P/L</th><th class="text-end">P/VP</th><th class="text-end">ROE</th>
+          <th class="text-end">Vendas {{ help("Crescimento das vendas no último ano.") }}</th><th class="text-end">Div.</th>
+          <th class="text-end">D/E {{ help("Dívida ÷ capital próprio.") }}</th><th class="text-end">Cap. {{ help("Capitalização em milhares de milhões de dólares (aproximado).") }}</th>
+          <th class="text-center">Guardar</th>
+        </tr></thead>
+        <tbody id="triageBody"></tbody>
+      </table></div>
+      <div class="text-center p-2 small text-secondary" id="triageMore"></div>
+    </div>
+    {% if tab.errors %}<p class="small text-warning mt-2"><i class="bi bi-exclamation-triangle"></i> Algumas pesquisas falharam: {{ tab.errors|join("; ") }}</p>{% endif %}
+  </section>
+
+  {# ---------------------------------------------------------------- a ficha #}
+  <aside class="pm-triage-panel" id="triagePanel" aria-label="Ficha da ação">
+    <div class="pm-card h-100" id="triagePanelBody">
+      <div class="text-center text-secondary py-5"><i class="bi bi-hand-index fs-1"></i><p class="mt-2 mb-0">Clica numa ação da lista para veres a ficha completa.</p></div>
+    </div>
+  </aside>
+</div>
+<script>window.pmTriage = {{ triage_json|safe }}; window.pmLenses = {{ lens_list|tojson }};</script>
+{% endif %}
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/prospecao.js') }}"></script>
+<script src="{{ url_for('static', filename='js/triagem.js') }}"></script>
+{% endblock %}

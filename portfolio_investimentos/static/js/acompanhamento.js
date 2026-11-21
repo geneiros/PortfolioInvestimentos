@@ -1,5 +1,13 @@
-/* Prospeção → Acompanhamento: os parâmetros de cada ação, os alertas e a atualização dos indicadores. */
+/* Prospeção → uma lista de acompanhamento: os parâmetros de cada ação, os alertas e a atualização dos indicadores. */
 (() => {
+  const rename = document.getElementById("listRename");
+  if (rename) rename.addEventListener("click", async () => {
+    const title = prompt("Novo nome da lista:", rename.dataset.title);
+    if (!title || title === rename.dataset.title) return;
+    await pm.call("rename_watch_list", { name: rename.dataset.list, title });
+    location.reload();
+  });
+
   const KINDS = window.pmTrackKinds || {};
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const box = document.getElementById("trackRules");
@@ -38,7 +46,7 @@
     if (add && current) {
       e.preventDefault();
       const kind = add.dataset.trackAdd;
-      if (kind === "method" && !current.method) { pm.toast("Esta ação não veio das Oportunidades: não tem um método para verificar.", "warning"); return; }
+      if (kind === "method" && !current.method) { pm.toast("Esta ação não veio da triagem: não tem uma lente para verificar.", "warning"); return; }
       if ((kind === "method" || kind === "moat") && box.querySelector(`[data-rule="${kind}"]`)) return;
       const empty = box.querySelector("[data-empty]");
       if (empty) empty.remove();

@@ -1,4 +1,37 @@
-<ul class="nav nav-tabs mb-3" id="radarTabs">
-  <li class="nav-item"><a class="nav-link {{ 'active' if request.path == '/radar' }}" href="/radar"><i class="bi bi-search"></i> Oportunidades</a></li>
-  <li class="nav-item"><a class="nav-link {{ 'active' if request.path == '/radar/acompanhamento' }}" href="/radar/acompanhamento"><i class="bi bi-binoculars"></i> Acompanhamento</a></li>
+<ul class="nav nav-tabs mb-3 flex-nowrap pm-radar-tabs" id="radarTabs">
+  <li class="nav-item"><a class="nav-link {{ 'active' if request.path == '/radar' }}" href="/radar"><i class="bi bi-funnel"></i> Ações</a></li>
+  {% for wl in lists %}
+  <li class="nav-item"><a class="nav-link text-nowrap {{ 'active' if request.path == '/radar/acompanhamento' and current_list and current_list.id == wl.id }}" href="/radar/acompanhamento?lista={{ wl.id }}"><i class="bi bi-bookmark"></i> {{ wl.title }} <span class="badge rounded-pill bg-body-secondary text-body">{{ wl.n }}</span></a></li>
+  {% endfor %}
+  <li class="nav-item"><button class="nav-link text-nowrap" type="button" data-bs-toggle="modal" data-bs-target="#newListModal"><i class="bi bi-plus-lg"></i> Nova lista</button></li>
 </ul>
+
+{# ------------------------------------------------------------------ nova lista #}
+<div class="modal fade" id="newListModal" tabindex="-1" aria-labelledby="newListTitle" aria-hidden="true">
+  <div class="modal-dialog modal-sm"><div class="modal-content">
+    <form id="newListForm">
+      <div class="modal-header"><h5 class="modal-title" id="newListTitle">Nova lista</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+      <div class="modal-body">
+        <label class="small w-100">Nome<input class="form-control" name="title" maxlength="60" placeholder="ex.: Dividendos, Para estudar" required></label>
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" type="submit">Criar</button></div>
+    </form>
+  </div></div>
+</div>
+
+{# ------------------------------------------------------------------ guardar numa lista #}
+<div class="modal fade" id="saveListModal" tabindex="-1" aria-labelledby="saveListTitle" aria-hidden="true">
+  <div class="modal-dialog modal-sm"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="saveListTitle">Guardar <span id="saveListTicker"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+    <div class="modal-body">
+      <p class="small text-secondary mb-2">Em que lista? <span id="saveListLens"></span></p>
+      <div class="list-group" id="saveListChoices">
+        {% for wl in lists %}<button type="button" class="list-group-item list-group-item-action d-flex align-items-center" data-save-list="{{ wl.id }}"><i class="bi bi-bookmark me-2"></i><span class="me-auto">{{ wl.title }}</span><i class="bi bi-check-lg text-success d-none" data-in-list></i></button>{% endfor %}
+      </div>
+      <form class="d-flex gap-2 mt-3" id="saveListNew">
+        <input class="form-control form-control-sm" name="title" maxlength="60" placeholder="Ou numa lista nova…" aria-label="Lista nova">
+        <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit">Criar e guardar</button>
+      </form>
+    </div>
+  </div></div>
+</div>

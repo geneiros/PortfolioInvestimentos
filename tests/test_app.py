@@ -3603,44 +3603,36 @@ def _q(sym, name, exchange="NMS", pe=12.0, pb=1.2, price=100.0, high=120.0, low=
             "trailingAnnualDividendYield": kw.get("div", 0.02)}
 
 
-def test_screener_methods_and_listings(app):
-    from portfolio_investimentos.services import screener
-    crit, post = screener.criteria("graham", {"c0": "4", "c0b": "14", "p0": "20"})
-    assert crit[0]["value"] == (4.0, 14.0) and post[0]["value"] == 20
-    q = screener.build_query(crit, "europa", "1e9")
-    assert q["operands"][0]["operator"] == "or" and len(q["operands"][0]["operands"]) == 15
-    assert {"operator": "btwn", "operands": ["peratio.lasttwelvemonths", 4.0, 14.0]} in q["operands"]
-    assert screener.build_query(crit, "portugal")["operands"][0] == {"operator": "eq", "operands": ["region", "pt"]}
-    with pytest.raises(screener.ScreenError):
-        screener.criteria("ninguem")
-    with pytest.raises(screener.ScreenError):
-        screener.criteria("graham", {"c0": "abc"})
+def test_screener_listings_and_lenses():
+    from portfolio_investimentos.services import lenses, screener
     quotes = [_q("GOOGL.MX", "Alphabet Inc.", "MEX", cur="MXN"), _q("GOOG.TO", "Alphabet Inc. CDR (CAD Hedged)", "TOR",
               cur="CAD"), _q("GOOGL", "Alphabet Inc."), _q("ABEA.F", "Alphabet Inc.", "FRA", cur="EUR"),
               _q("GOGL34.SA", "Alphabet Inc.", "SAO", cur="BRL"), _q("0RIH.L", "Alphabet Inc.", "LSE"),
-              _q("CHEAP", "Cheap Co", pe=10, pb=1.5), _q("DEAR", "Dear Co", pe=14, pb=2.5, div=10.0)]
-    sent = {}
-
-    def fetch(body):
-        sent.update(body)
-        return {"total": 8, "quotes": quotes}
-    with app.app_context():
-        out = screener.run("graham", "mundo", "1e9", {}, fetch=fetch)
-        assert sent["sortField"] == "intradaymarketcap" and sent["size"] == 250
-        tickers = [r["ticker"] for r in out["rows"]]
-        # uma linha por empresa (a bolsa principal); P/L × P/VP < 22,5 tira a «Dear» (14 × 2,5 = 35)
-        assert tickers == ["GOOGL", "CHEAP"]
-        assert screener.last()["method"] == "graham"
-        assert screener._dividend({"trailingAnnualDividendYield": 10.0}) is None
-        assert screener._dividend({"dividendYield": 3.65, "trailingAnnualDividendYield": 0.0365}) == pytest.approx(0.0365)
-        # Fórmula Mágica: soma das posições no retorno sobre o capital e no earnings yield (1 ÷ P/L)
-        ranked = screener.magic_rank([{"pe": 20}, {"pe": 5}, {"pe": 10}])
-        assert [r["rank"] for r in ranked] == [3, 4, 5] and ranked[0]["pe"] == 5
-        # Templeton: perto do mínimo de 52 semanas e P/L previsto baixo
-        far = _q("FAR", "Far Co", price=150, low=80, high=160, fpe=8)
-        near = _q("NEAR", "Near Co", price=85, low=80, high=160, fpe=8)
-        rows = screener.run("templeton", fetch=lambda b: {"quotes": [far, near]})["rows"]
-        assert [r["ticker"] for r in rows] == ["NEAR"]
+              _q("CHEAP", "Cheap Co", pe=10, pb=1.5)]
+    # uma linha por empresa (a bolsa principal), sem segundas cotações nem certificados
+    kept = screener.dedupe([q for q in quotes if screener.primary(q)])
+    assert [q["symbol"] for q in kept] == ["GOOGL", "CHEAP"]
+    assert screener._dividend({"trailingAnnualDividendYield": 10.0}) is None
+    assert screener._dividend({"dividendYield": 3.65, "trailingAnnualDividendYield": 0.0365}) == pytest.approx(0.0365)
+    # a capitalização vem na unidade principal mesmo com a cotação em pence
+    assert lenses.usd(1e9, "GBp") == pytest.approx(1.27e9) and lenses.usd(1e9, "EUR") == pytest.approx(1.1e9)
+    # os indicadores: o yfinance dá o dividendo em %; dívida/capital em fração
+    m = lenses.metrics_from_info({"trailingPE": 10.0, "priceToBook": 1.2, "regularMarketPrice": 50.0,
+                                  "trailingEps": 5.0, "bookValue": 40.0, "dividendYield": 4.0, "_yfinance": True,
+                                  "debtToEquity": 30.0, "currentRatio": 2.5, "marketCap": 5e10, "currency": "USD",
+                                  "netIncomeToCommon": 1e9, "dividendRate": 2.0})
+    assert m["div"] == pytest.approx(0.04) and m["de"] == pytest.approx(0.3) and m["profit"] is True
+    assert lenses.graham_number(m) == pytest.approx((22.5 * 5 * 40) ** 0.5)
+    assert lenses.bazin_ceiling(m) == pytest.approx(2.0 / 0.06)
+    status, rows = lenses.evaluate("graham_def", m)
+    assert status == "entra" and all(st == "pass" for _, _, _, st in rows)
+    assert lenses.evaluate("graham_def", {**m, "current": 1.8})[0] == "quase"  # a menos de 15% do limite
+    assert lenses.evaluate("graham_def", {**m, "current": 1.0})[0] == "quase"  # só um falha, numa lente longa
+    assert lenses.evaluate("graham_def", {**m, "current": 1.0, "de": 0.9})[0] == "falha"
+    assert lenses.evaluate("graham_num", {**m, "price": 80.0})[0] == "falha"  # 2 critérios: falhar é falhar
+    assert lenses.evaluate("lynch", {})[0] is None  # sem dados
+    assert lenses.evaluate("templeton", {**m, "country": "EUA"})[0] in ("quase", "falha")
+    assert ("Preço baixo", "up") in lenses.tags(m) and lenses.blurb(m)
 
 
 def _moat_series(rev=(100, 110, 121, 133), gm=0.6, ebit=0.3, ic=100, fcf=0.25, capex=0.03, debt=10, cash=20):
@@ -3680,47 +3672,96 @@ def test_moat_score_sources_and_checklist(app):
         assert not moat.has_moat({"score": 60}, {"pillars": ["rede"], "tests": ["bilhao"]})
 
 
-def test_opportunities_page_and_actions(app, client, monkeypatch):
-    from portfolio_investimentos.services import moat, yahoo
+def _tq(sym, name, exchange="NMS", cur="USD", **kw):
+    q = _q(sym, name, exchange, cur=cur, **kw)
+    q.update({"epsTrailingTwelveMonths": kw.get("eps", 5.0), "bookValue": kw.get("bvps", 40.0)})
+    return q
+
+
+def _tinfo(**kw):
+    info = {"regularMarketPrice": 50.0, "currency": "USD", "marketCap": 5e10, "trailingPE": 10.0, "priceToBook": 1.2,
+            "trailingEps": 5.0, "bookValue": 40.0, "returnOnEquity": 0.25, "profitMargins": 0.2,
+            "operatingMargins": 0.25, "revenueGrowth": 0.12, "earningsGrowth": 0.2, "debtToEquity": 30.0,
+            "currentRatio": 2.5, "netIncomeToCommon": 1e9, "freeCashflow": 1e9, "dividendYield": 3.0,
+            "_yfinance": True, "dividendRate": 1.5, "payoutRatio": 0.3, "fiftyTwoWeekHigh": 55.0,
+            "fiftyTwoWeekLow": 30.0, "sector": "Consumer Defensive", "country": "United States",
+            "longName": "Coca-Cola", "longBusinessSummary": "Sells drinks."}
+    info.update(kw)
+    return info
+
+
+def test_triage_universe_page_and_profile(app, client, monkeypatch):
+    from portfolio_investimentos.services import lenses, moat, triage, yahoo
     token = csrf(client)
     html = client.get("/radar").get_data(as_text=True)
-    assert 'id="radarTabs"' in html and "Oportunidades" in html
-    html = client.get("/radar").get_data(as_text=True)
-    assert "Carrega em <b>Procurar</b>" in html.replace("carrega", "Carrega") and "Benjamin Graham" in html
-    from portfolio_investimentos.services import screener
-    monkeypatch.setattr(screener, "fetch_yahoo", lambda body: {"total": 2, "quotes": [
-        _q("KO", "The Coca-Cola Company", "NYQ"), _q("MSFT", "Microsoft Corporation")]})
-    r = post(client, "run_screen", token, method="buffett", region="eua", min_cap="1e10", c0="16", c0b="90")
-    assert r.status_code == 200 and "2 ações" in r.get_json()["message"]
-    assert post(client, "run_screen", token, method="buffett", region="marte").status_code == 400
-    html = client.get("/radar?metodo=buffett").get_data(as_text=True)
-    assert "KO" in html and "Microsoft Corporation" in html and 'value="16"' in html and "Analisar" in html
+    assert 'id="radarTabs"' in html and "Ainda não há ações na triagem" in html and "Nova lista" in html
+    sent = []
 
-    def boom(body):
-        raise yahoo.YahooError("HTTP 429")
-    monkeypatch.setattr(screener, "fetch_yahoo", boom)
-    assert post(client, "run_screen", token, method="buffett").status_code == 400
-    # 2.º passo: o moat e o checklist
-    monkeypatch.setattr(moat, "analyse", lambda t: moat.Setting.set(f"moat:{t}", json.dumps(
-        {"ticker": t, "score": 80, "verdict": "Largo", "parts": [], "sources": ["intangiveis"], "years": [],
-         "roic": {}, "gross_margin": {}, "fcf_conversion": {}, "capex_sales": {}, "date": "2026-11-21"})) or
-        {"verdict": "Largo", "score": 80})
-    assert "moat largo" in post(client, "analyse_moat", token, ticker="ko").get_json()["message"]
-    assert post(client, "save_moat_checklist", token, ticker="KO", pillars='["mudanca"]', tests="[]",
-                note="cloud").status_code == 200
-    html = client.get("/radar?metodo=buffett&moat=1").get_data(as_text=True)
-    assert "Largo · 80" in html and "Microsoft Corporation" not in html  # só KO passa o 2.º passo
-    html = client.get("/radar?metodo=buffett").get_data(as_text=True)
-    assert "cloud" in html and "sugerido" in html
+    def fetch(body):
+        sent.append(body)
+        if body["offset"]:
+            return {"total": 3, "quotes": []}
+        return {"total": 3, "quotes": [_tq("KO", "The Coca-Cola Company", "NYQ"),
+                                       _tq("KO.MX", "The Coca-Cola Company", "MEX", cur="MXN"),
+                                       _tq("NESN.SW", "Nestlé S.A.", "EBS", cur="CHF", pe=18)]}
+    monkeypatch.setattr(triage.screener, "fetch_yahoo", fetch)
+    for _ in range(5):
+        out = post(client, "triage_refresh", token).get_json()["message"]
+        if out["done"]:
+            break
+    assert out["done"] and len(sent) == len(lenses.REAL)  # 1 página por lente (a 1.ª já não vem cheia)
+    q = json.dumps(sent[0]["query"])
+    assert '"exchange", "NMS"' in q and '"exchange", "FRA"' not in q  # só as bolsas principais
+    assert any('"NMS"' not in json.dumps(b["query"]) for b in sent)  # o Templeton procura fora dos EUA
+    with app.app_context():
+        u = triage.universe()
+        assert [r["ticker"] for r in u["rows"]] == ["KO", "NESN.SW"]
+    html = client.get("/radar").get_data(as_text=True)
+    assert "window.pmTriage" in html and "NESN.SW" in html and 'data-missing="2"' in html
+    calls = []
+
+    def info_of(t):
+        calls.append(t)
+        if t == "NESN.SW" and calls.count(t) == 1:
+            raise yahoo.YahooError("HTTP Error 429: Too Many Requests")
+        return _tinfo() if t == "KO" else _tinfo(country="Switzerland", currency="CHF", trailingPE=18.0,
+                                                  longName="Nestlé")
+    monkeypatch.setattr(moat, "info_of", info_of)
+    out = post(client, "triage_enrich", token).get_json()["message"]
+    assert out["wait"] == 60 and out["left"] == 1  # o Yahoo pediu uma pausa: o NESN.SW fica para depois
+    out = post(client, "triage_enrich", token).get_json()["message"]
+    assert out["done"] and out["left"] == 0
+    with app.app_context():
+        tab = triage.table()
+        ko = next(r for r in tab["rows"] if r["t"] == "KO")
+        assert ko["st"]["graham_def"] == "entra" and ko["c"] == "EUA" and ko["g"] == "América do Norte"
+        assert ko["s"] == "Consumo básico" and ko["st"]["varias"] == "entra" and ko["k"] >= 2
+        assert next(r for r in tab["rows"] if r["t"] == "NESN.SW")["c"] == "Suíça"
+    html = client.get("/radar").get_data(as_text=True)
+    assert 'data-missing="0"' in html and "Só as que entram" in html and "Melhor nesta lente" in html
+    # a ficha completa
+    html = client.get("/radar/acao/KO?lente=buffett").get_data(as_text=True)
+    for text in ("The Coca-Cola Company", "Número de Graham", "Tecto de Bazin", "Várias lentes", "Graham defensivo",
+                 "Passa", "Avaliação", "Resultados", "Crescimento", "Balanço", "Acionista", "52 semanas",
+                 "O negócio", "Sells drinks.", "Analisar o moat", "Se entrar na lista", "Guardar na lista",
+                 'data-save-lens="buffett"'):
+        assert text in html, text
+    r = post(client, "save_triage_notes", token, ticker="KO", answers=json.dumps({"negocio": "Bebidas"}))
+    assert r.status_code == 200 and "Bebidas" in client.get("/radar/acao/KO").get_data(as_text=True)
+
+    def boom(t):  # uma ação fora do universo lê-se ao Yahoo; sem dados, a ficha diz porquê
+        raise yahoo.YahooError("HTTP 404")
+    monkeypatch.setattr(moat, "info_of", boom)
+    assert "Não foi possível ler os dados de" in client.get("/radar/acao/XYZ").get_data(as_text=True)
+    assert client.get("/oportunidades").headers["Location"].endswith("/radar")
 
 
 def test_screener_query_for_yfinance():
     pytest.importorskip("yfinance")
-    from portfolio_investimentos.services import screener
-    crit, _ = screener.criteria("buffett")
-    q = screener._equity_query(screener.build_query(crit, "europa", "1e9"))
-    d = q.to_dict()
-    assert d["operator"].lower() == "and" and len(d["operands"]) == 2 + len(crit)
+    from portfolio_investimentos.services import lenses, screener, triage
+    for k in lenses.REAL:
+        d = screener._equity_query(triage._query(k)).to_dict()
+        assert d["operator"].lower() == "and" and len(d["operands"]) == len(lenses.LENSES[k]["query"]) + 1
 
 
 def test_migration_moves_price_alerts_to_tracking(tmp_path, monkeypatch):
@@ -3754,20 +3795,19 @@ def test_migration_moves_price_alerts_to_tracking(tmp_path, monkeypatch):
 def test_tracking_rules_and_alerts(app, client, monkeypatch):
     from datetime import datetime
     from portfolio_investimentos.models import Instrument, Price, WatchItem, WatchRule
-    from portfolio_investimentos.services import moat, screener, tracking
+    from portfolio_investimentos.services import moat, tracking
     token = csrf(client)
     with app.app_context():
         db.session.add(Instrument(ticker="KO", currency="USD"))
         db.session.add_all([Price(instrument="KO", date=date(2026, 1, d), close=c) for d, c in ((5, 100.0), (6, 70.0))])
         db.session.commit()
-        screener.Setting.set("screen:last", json.dumps({"method": "buffett", "values": {"c0": "16"}, "rows": [], "region": "mundo", "min_cap": "1e9", "total": 0, "at": "2026-11-21T12:00"}))
-    # das Oportunidades: com o método e os parâmetros desse método
+    # da triagem: com a lente onde entrou e os parâmetros dela
     r = post(client, "add_watch", token, instrument="KO", currency="USD", method="buffett")
-    assert r.status_code == 200 and "Acompanhamento" in r.get_json()["message"]
+    assert r.status_code == 200 and "A minha lista" in r.get_json()["message"]
     assert post(client, "add_watch", token, instrument="KO", currency="USD").status_code == 400  # já está
     with app.app_context():
         w = WatchItem.query.filter_by(instrument="KO").one()
-        assert w.method == "buffett" and json.loads(w.criteria) == {"c0": "16"}
+        assert w.method == "buffett" and w.list_id is not None
         assert {r.kind for r in WatchRule.query.filter_by(watch_id=w.id)} == {"method", "from_high"}
         wid = w.id
     # os parâmetros: preço abaixo de 80 (com alerta) e P/L abaixo de 15
@@ -3782,44 +3822,82 @@ def test_tracking_rules_and_alerts(app, client, monkeypatch):
         assert r.met is True and r.triggered_on is not None and "preço abaixo de 80" in r.message  # 70 ≤ 80
         assert WatchRule.query.filter_by(watch_id=wid, kind="pe_below").one().met is None  # sem P/L ainda
         assert tracking.check() == []  # não volta a disparar enquanto se verificar
-    # «Atualizar indicadores»: P/L 12 e os critérios do Buffett
+    # «Atualizar indicadores»: P/L 12 e os critérios da lente Buffett
     info = {"trailingPE": 12.0, "priceToBook": 4.0, "dividendYield": 0.03, "returnOnEquity": 0.40,
-            "profitMargins": 0.25, "ebitda": 100.0, "totalDebt": 150.0, "totalCash": 50.0, "regularMarketPrice": 70.0,
-            "fiftyTwoWeekHigh": 100.0, "currency": "USD"}
+            "profitMargins": 0.25, "debtToEquity": 30.0, "netIncomeToCommon": 1e9, "freeCashflow": 1e9,
+            "revenueGrowth": 0.05, "regularMarketPrice": 70.0, "fiftyTwoWeekHigh": 100.0, "currency": "USD"}
     monkeypatch.setattr(moat, "info_of", lambda t: info)
     r = post(client, "refresh_tracking", token, ticker="KO")
     assert r.status_code == 200 and "alerta" in r.get_json()["message"]
     with app.app_context():
         assert WatchRule.query.filter_by(watch_id=wid, kind="pe_below").one().met is True
         assert WatchRule.query.filter_by(watch_id=wid, kind="method").one().met is True
-        assert tracking.snapshot("KO")["method_met"] is True
+        assert tracking.snapshot("KO")["lenses"]["buffett"][0] == "entra"
     # os critérios deixam de se cumprir (ROE de 10%): avisa da mudança
     info["returnOnEquity"] = 0.10
     post(client, "refresh_tracking", token, ticker="KO")
     with app.app_context():
         r = WatchRule.query.filter_by(watch_id=wid, kind="method").one()
-        assert r.met is False and "deixou de cumprir" in r.message and "Buffett" in r.message
+        assert r.met is False and "deixou de entrar" in r.message and "Buffett" in r.message
         assert tracking.recent(now=datetime.now())
     html = client.get("/radar/acompanhamento").get_data(as_text=True)
-    for text in ("Acompanhamento", "Warren Buffett", "Alertas dos últimos dias", "Preço ≤ 80", "Não cumpre",
-                 'id="portfolioAlerts"', 'id="trackModal"', "deixou de cumprir"):
+    for text in ("A minha lista", "Buffett", "Alertas dos últimos dias", "Preço ≤ 80", "Fora de Buffett",
+                 'id="portfolioAlerts"', 'id="trackModal"', "deixou de entrar", "Critérios da lente"):
         assert text in html, text
     # a Visão Geral avisa quando dispara (aqui já tinha disparado: sem aviso novo)
     assert "Ver em Acompanhamento" not in client.get("/").get_data(as_text=True)
     assert post(client, "delete_watch", token, name=str(wid)).status_code == 200
     with app.app_context():
         assert WatchRule.query.count() == 0
-    # o separador Oportunidades é o primeiro e o endereço antigo continua a funcionar
+    # o separador Ações é o primeiro, depois as listas
     html = client.get("/radar").get_data(as_text=True)
-    assert html.index("Oportunidades</a>") < html.index("Acompanhamento</a>")
-    assert client.get("/oportunidades?metodo=graham").headers["Location"].endswith("/radar?metodo=graham")
+    assert html.index("Ações</a>") < html.index("A minha lista") < html.index("Nova lista")
 
 
-def test_screener_criteria_from_stock_data():
-    from portfolio_investimentos.services import screener
-    info = {"trailingPE": 10.0, "priceToBook": 1.0, "currentRatio": 2.5, "dividendYield": 0.04}
-    met, details = screener.check_info("graham", {}, info)
-    assert met is True and all(ok for _, _, ok in details)
-    met, _ = screener.check_info("graham", {}, {**info, "currentRatio": 1.2})
-    assert met is False
-    assert screener.check_info("lynch", {}, {})[0] is None  # sem dados
+def test_watch_lists(app, client):
+    from portfolio_investimentos.models import WatchItem, WatchList
+    token = csrf(client)
+    r = post(client, "create_watch_list", token, title="Dividendos")
+    lid = r.get_json()["message"]["id"]
+    assert r.get_json()["message"]["title"] == "Dividendos"
+    assert post(client, "create_watch_list", token, title="dividendos").status_code == 400  # já há
+    assert post(client, "create_watch_list", token, title=" ").status_code == 400
+    # a mesma ação pode estar em duas listas, mas não duas vezes na mesma
+    assert post(client, "add_watch", token, instrument="KO", currency="USD").status_code == 200
+    r = post(client, "add_watch", token, instrument="KO", currency="USD", method="bazin", list_id=str(lid))
+    assert r.status_code == 200 and "Dividendos" in r.get_json()["message"]
+    assert post(client, "add_watch", token, instrument="KO", list_id=str(lid)).status_code == 400
+    with app.app_context():
+        assert WatchItem.query.filter_by(instrument="KO").count() == 2
+        first = WatchList.query.order_by(WatchList.id).first()
+    html = client.get(f"/radar/acompanhamento?lista={lid}").get_data(as_text=True)
+    assert "Dividendos" in html and "Bazin" in html and 'name="list_id" value="%d"' % lid in html
+    assert post(client, "rename_watch_list", token, name=str(lid), title="Rendimento").status_code == 200
+    assert "Rendimento" in client.get("/radar").get_data(as_text=True)
+    assert post(client, "delete_watch_list", token, name=str(lid)).status_code == 200
+    with app.app_context():
+        assert WatchItem.query.count() == 1 and WatchList.query.count() == 1
+    assert post(client, "delete_watch_list", token, name=str(first.id)).status_code == 400  # fica uma
+
+
+def test_migration_watch_lists(tmp_path, monkeypatch):
+    import sqlite3
+    from portfolio_investimentos import migrations
+    from portfolio_investimentos.models import WatchItem, WatchList
+    _legacy_db(tmp_path, monkeypatch)
+    conn = sqlite3.connect(tmp_path / "portfolio.db")
+    conn.execute("DROP TABLE watch_rule")
+    conn.execute("DROP TABLE watch_item")
+    conn.execute("CREATE TABLE watch_item (id INTEGER PRIMARY KEY, instrument VARCHAR(32) NOT NULL, "
+                 "target_price FLOAT, note VARCHAR(255), creation DATETIME, method VARCHAR(16), criteria TEXT)")
+    conn.execute("INSERT INTO instrument (ticker, currency) VALUES ('AAA', 'EUR')")
+    conn.execute("INSERT INTO watch_item (instrument, method) VALUES ('AAA', 'graham')")
+    conn.commit()
+    conn.close()
+    app = create_app({"TESTING": True})
+    assert migrations.schema_version(app.config["DB_PATH"]) == migrations.LATEST
+    with app.app_context():
+        w = WatchItem.query.one()
+        wl = WatchList.query.one()
+        assert w.list_id == wl.id and wl.title == "A minha lista" and w.method == "graham_def"
+

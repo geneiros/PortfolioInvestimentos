@@ -1,11 +1,11 @@
-"""Acompanhamento (Prospeção): as ações que juntaste (das Oportunidades ou à mão), os parâmetros que
-acompanhas em cada uma e os alertas.
+"""Listas de acompanhamento (Prospeção): as ações que juntaste (da triagem ou à mão), em uma ou mais listas, os
+parâmetros que acompanhas em cada uma e os alertas.
 
 Cada parâmetro é uma `WatchRule`:
 - preço abaixo/acima de um valor, variação do dia acima de x%, x% ou mais abaixo do máximo de 52 semanas (cotações
   guardadas, atualizadas com as cotações);
 - P/L abaixo de x, P/VP abaixo de x, dividendo acima de x% (indicadores do Yahoo, «Atualizar indicadores»);
-- critérios do método onde a ação foi encontrada (avisa quando deixa de os cumprir ou volta a cumprir);
+- critérios da lente onde a ação foi encontrada (avisa quando deixa de os cumprir ou volta a cumprir);
 - moat (avisa quando a leitura muda, ex.: de Largo para Estreito, ao reanalisar).
 Os alertas verificam-se ao abrir a aplicação (Visão Geral, Carteira, Prospeção) e depois de cada atualização;
 disparam quando a condição passa a verificar-se e voltam a ficar prontos quando deixa de se verificar.
@@ -13,8 +13,8 @@ disparam quando a condição passa a verificar-se e voltam a ficar prontos quand
 import json
 from datetime import date, datetime, timedelta
 
-from ..models import Instrument, Price, Setting, WatchItem, WatchRule, db
-from . import moat, screener
+from ..models import Instrument, Price, Setting, WatchItem, WatchList, WatchRule, db
+from . import lenses, moat
 
 KINDS = {
     "price_below": ("Preço abaixo de", "price"),
@@ -24,7 +24,7 @@ KINDS = {
     "pe_below": ("P/L abaixo de", ""),
     "pb_below": ("P/VP abaixo de", ""),
     "div_above": ("Dividendo acima de", "%"),
-    "method": ("Critérios do método", None),
+    "method": ("Critérios da lente", None),
     "moat": ("Leitura do moat", None),
 }
 GROUPS = (("Preço", ("price_below", "price_above", "change_pct", "from_high")),
@@ -42,20 +42,24 @@ def snapshot(ticker):
 
 
 def refresh(ticker, fetch_info=None, now=None):
-    """Lê os indicadores ao Yahoo (P/L, P/VP, dividendo, máximo de 52 semanas, critérios do método) e guarda-os.
-    Reanalisa o moat se a análise tiver mais de 30 dias."""
+    """Lê os indicadores ao Yahoo (P/L, P/VP, dividendo, máximo de 52 semanas) e avalia a ação em todas as lentes;
+    guarda tudo. Reanalisa o moat se a análise tiver mais de 30 dias."""
+    from . import triage
     fetch_info = fetch_info or moat.info_of
     info = fetch_info(ticker) or {}
-    w = WatchItem.query.filter_by(instrument=ticker).order_by(WatchItem.id).first()
     out = {"pe": info.get("trailingPE"), "pb": info.get("priceToBook"),
            "div": dividend_yield(info),
            "high52": info.get("fiftyTwoWeekHigh"), "low52": info.get("fiftyTwoWeekLow"),
            "price": info.get("regularMarketPrice") or info.get("currentPrice"), "currency": info.get("currency"),
            "at": (now or datetime.now()).isoformat(timespec="minutes")}
-    if w and w.method in screener.METHODS:
-        met, details = screener.check_info(w.method, _criteria(w), info)
-        out["method_met"] = met
-        out["method_details"] = [[label, v, ok] for label, v, ok in details]
+    m = triage.metrics({"ticker": ticker, "exchange_code": ""}, info)
+    tab = triage.table() or {"rows": []}
+    me = next((x for x in tab["rows"] if x["t"] == ticker), None)
+    m["magic_q"] = me.get("mq") if me else None
+    out["lenses"] = {}
+    for k in lenses.REAL:
+        status, rows = lenses.evaluate(k, m)
+        out["lenses"][k] = [status, [[label, value, st] for label, _, value, st in rows]]
     Setting.set(f"track:{ticker}", json.dumps(out, ensure_ascii=False))
     a = moat.get(ticker)
     if a and (date.today() - date.fromisoformat(a["date"])).days > 30:
@@ -76,14 +80,6 @@ def dividend_yield(info):
     return v if v is not None and 0 <= v <= 0.25 else None
 
 
-def _criteria(w):
-    try:
-        v = json.loads(w.criteria or "{}")
-        return v if isinstance(v, dict) else {}
-    except ValueError:
-        return {}
-
-
 def _prices(ticker):
     """Último preço, o anterior e o máximo de 52 semanas, pelas cotações guardadas."""
     rows = Price.query.filter_by(instrument=ticker).order_by(Price.date.desc()).limit(2).all()
@@ -102,12 +98,14 @@ def values(w):
         price = snap.get("price")
     high = max(x for x in (high, snap.get("high52")) if x) if (high or snap.get("high52")) else None
     a = moat.get(w.instrument)
+    lens = (snap.get("lenses") or {}).get(w.method) if w.method in lenses.REAL else None
+    status = lens[0] if lens else None
     return {"price": price, "change": (price / prev - 1) if price and prev else None,
             "from_high": (price / high - 1) if price and high else None,
             "pe": snap.get("pe") if snap.get("pe") and snap["pe"] > 0 else None,
             "pb": snap.get("pb") if snap.get("pb") and snap["pb"] > 0 else None,
-            "div": snap.get("div"), "method_met": snap.get("method_met"),
-            "method_details": snap.get("method_details") or [], "moat": a, "snap_at": snap.get("at"),
+            "div": snap.get("div"), "method_met": None if status is None else status == "entra",
+            "method_status": status, "method_details": lens[1] if lens else [], "moat": a, "snap_at": snap.get("at"),
             "stale": not snap.get("at") or datetime.now() - datetime.fromisoformat(snap["at"]) > STALE}
 
 
@@ -138,8 +136,7 @@ def evaluate(rule, v):
 
 SHORT = {"price_below": "Preço ≤", "price_above": "Preço ≥", "change_pct": "Dia ±", "from_high": "Do máximo ≤ −",
          "pe_below": "P/L ≤", "pb_below": "P/VP ≤", "div_above": "Dividendo ≥"}
-METHOD_SHORT = {"graham": "Graham", "buffett": "Buffett", "lynch": "Lynch", "greenblatt": "Greenblatt",
-                "oneil": "O'Neil", "templeton": "Templeton", "resumo": "Resumo"}
+METHOD_SHORT = {k: v["name"] for k, v in lenses.LENSES.items() if not v.get("meta")}
 
 
 def chip(rule, currency=""):
@@ -180,8 +177,8 @@ def check(now=None):
             changed = False
             if r.kind == "method":
                 changed = r.met is not None and met != r.met
-                msg = f"{w.instrument} {'volta a cumprir' if met else 'deixou de cumprir'} os critérios de " \
-                      f"{screener.METHODS.get(w.method, {}).get('investor', 'o método')}"
+                msg = f"{w.instrument} {'volta a entrar' if met else 'deixou de entrar'} na lente " \
+                      f"{METHOD_SHORT.get(w.method, w.method or '')}"
             elif r.kind == "moat":
                 changed = bool(r.state) and state != r.state
                 msg = f"{w.instrument}: o moat passou de {r.state} para {state}"
@@ -206,11 +203,27 @@ def recent(days=3, now=None):
 
 
 def default_rules(w, has_moat=False):
-    """Os parâmetros com que uma ação vinda das Oportunidades começa: os critérios do método e o moat, com alerta."""
+    """Os parâmetros com que uma ação vinda da triagem começa: os critérios da lente e o moat, com alerta."""
     rules = []
-    if w.method in screener.METHODS:
+    if w.method in lenses.REAL:
         rules.append(WatchRule(watch_id=w.id, kind="method", alert=True))
     if has_moat:
         rules.append(WatchRule(watch_id=w.id, kind="moat", alert=True))
     rules.append(WatchRule(watch_id=w.id, kind="from_high", threshold=20, alert=False))
     return rules
+
+
+DEFAULT_LIST = "A minha lista"
+
+
+def watch_lists():
+    """As listas de acompanhamento (cria a primeira se ainda não houver nenhuma; as ações sem lista vão para ela)."""
+    out = WatchList.query.order_by(WatchList.id).all()
+    if not out:
+        db.session.add(WatchList(title=DEFAULT_LIST))
+        db.session.commit()
+        out = WatchList.query.order_by(WatchList.id).all()
+    if WatchItem.query.filter(WatchItem.list_id.is_(None)).count():
+        WatchItem.query.filter(WatchItem.list_id.is_(None)).update({"list_id": out[0].id})
+        db.session.commit()
+    return out

@@ -4,6 +4,14 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-21
 
+- **Prospeção: triagem pelas lentes e várias listas**  
+  O separador Oportunidades dá lugar a **Ações**, uma triagem das ações de todas as bolsas principais do mundo (mais de 2 mil milhões de dólares, uma linha por empresa) por onze lentes: Várias lentes, Graham defensivo, Número de Graham, Buffett, Lynch, Greenblatt, Bazin, Fisher, Templeton, O'Neil e Resumo.
+  - À esquerda, as lentes com o número de ações que entram; um clique mostra logo as ações dessa lente.
+  - Em cima, procurar, região, setor, ordenação («Melhor nesta lente») e «Só as que entram».
+  - Na tabela, os pontos das lentes, o estado na lente escolhida, P/L, P/VP, ROE, vendas, dividendo, dívida/capital, capitalização e «Guardar».
+  - Ao clicar numa ação, a ficha completa abre ao lado: Número de Graham, Tecto de Bazin, os critérios de cada lente com os valores, avaliação, resultados, crescimento, balanço, acionista, 52 semanas, o negócio, o moat e as perguntas «Se entrar na lista».
+
+  «Atualizar» faz as pesquisas ao Yahoo e completa os dados aos poucos, com o progresso e uma pausa quando o Yahoo a pede. O Acompanhamento passa a **listas**: um separador por lista, «Nova lista», e «Guardar» pergunta em que lista. As ações que já acompanhavas ficam em «A minha lista» (com uma cópia da base de dados guardada antes), e o método das Oportunidades passa à lente correspondente.
 - **«Radar e alertas» passa a «Prospeção»**  
   O menu muda de nome e passa para a seguir à Carteira, antes do Desempenho.
 - **Versão 0.5.0**  
