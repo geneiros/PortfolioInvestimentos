@@ -112,10 +112,34 @@ class ImportBatch(NameMixin, db.Model):
 
 
 class WatchItem(NameMixin, db.Model):
+    """Uma ação em Acompanhamento (Radar e alertas): vem das Oportunidades (com o método e os limites usados) ou é
+    juntada à mão. Os parâmetros a acompanhar e os alertas são as `WatchRule`."""
     id = db.Column(db.Integer, primary_key=True)
     instrument = db.Column(db.String(32), db.ForeignKey("instrument.ticker"), nullable=False)
     target_price = db.Column(db.Float)
     note = db.Column(db.String(255))
+    creation = db.Column(db.DateTime, default=utcnow)
+    method = db.Column(db.String(16))   # método das Oportunidades onde foi encontrada (ex.: "buffett")
+    criteria = db.Column(db.Text)       # limites usados nessa pesquisa (JSON)
+
+
+class WatchRule(NameMixin, db.Model):
+    """Um parâmetro a acompanhar numa ação (preço, P/L, critérios do método, moat...), com ou sem alerta.
+
+    `met` é o resultado da última verificação: o alerta dispara quando a condição passa a verificar-se (nos critérios
+    do método e no moat, quando muda), e fica registado em `triggered_on`."""
+    KINDS = ("price_below", "price_above", "change_pct", "from_high", "pe_below", "pb_below", "div_above",
+             "method", "moat")
+
+    id = db.Column(db.Integer, primary_key=True)
+    watch_id = db.Column(db.Integer, db.ForeignKey("watch_item.id", ondelete="CASCADE"), nullable=False)
+    kind = db.Column(db.String(16), nullable=False)
+    threshold = db.Column(db.Float)
+    alert = db.Column(db.Boolean, default=True)
+    met = db.Column(db.Boolean)
+    state = db.Column(db.String(32))     # moat: a última leitura («Largo», «Estreito»...)
+    triggered_on = db.Column(db.DateTime)
+    message = db.Column(db.String(255))  # o que disparou, para o aviso
     creation = db.Column(db.DateTime, default=utcnow)
 
 

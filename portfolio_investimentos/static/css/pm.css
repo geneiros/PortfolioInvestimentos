@@ -347,3 +347,8 @@ span.pm-logo { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; f
 .pm-ring { width: 9rem; height: 9rem; border-radius: 50%; display: grid; place-items: center;
   background: conic-gradient(var(--pm-accent) var(--pm-ring, 0%), var(--bs-secondary-bg) 0); }
 .pm-ring > div { width: 7.6rem; height: 7.6rem; border-radius: 50%; background: var(--pm-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+
+/* ---------------------------------------------------------------- Acompanhamento */
+.pm-rule { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); font-weight: 500; margin: 0 .2rem .25rem 0; white-space: normal; text-align: left; }
+.pm-rule-met { background: rgba(var(--bs-success-rgb), .15); color: var(--pm-up); }
+.pm-rule-unknown { background: transparent; border: 1px dashed var(--bs-border-color); }

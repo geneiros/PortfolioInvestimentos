@@ -279,3 +279,63 @@ def last():
         return json.loads(Setting.get("screen:last") or "null")
     except ValueError:
         return None
+
+
+# os critérios do Yahoo lidos nos dados de uma ação (Ticker.info): valor na mesma unidade do critério, ou None
+def _from_info(field, info):
+    def pct(key):
+        return info[key] * 100 if info.get(key) is not None else None
+    if field.startswith("peratio"):
+        return info.get("trailingPE")
+    if field.startswith("pricebookratio"):
+        return info.get("priceToBook")
+    if field.startswith("currentratio"):
+        return info.get("currentRatio")
+    if field == "forward_dividend_yield":
+        from .tracking import dividend_yield
+        d = dividend_yield(info)
+        return d * 100 if d is not None else 0.0
+    if field.startswith("returnonequity"):
+        return pct("returnOnEquity")
+    if field.startswith("netincomemargin"):
+        return pct("profitMargins")
+    if field.startswith("netdebtebitda"):
+        if info.get("ebitda") and info.get("totalDebt") is not None:
+            return (info["totalDebt"] - (info.get("totalCash") or 0)) / info["ebitda"]
+        return None
+    if field.startswith("pegratio"):
+        return info.get("pegRatio") or info.get("trailingPegRatio")
+    if field.startswith("epsgrowth"):
+        return pct("earningsGrowth")
+    if field.startswith("totaldebtequity"):
+        return info.get("debtToEquity")
+    if field.startswith("totalrevenues1yrgrowth"):
+        return pct("revenueGrowth")
+    if field.startswith("returnontotalcapital"):
+        return None  # o Yahoo não dá o retorno sobre o capital nos dados da ação: fica por saber
+    return None
+
+
+def check_info(method, values, info):
+    """A ação ainda cumpre os critérios do método (com os limites usados)? Devolve (cumpre, detalhes), em que cumpre é
+    None quando faltam dados para todos os critérios; os critérios sem dados não contam."""
+    crit, post = criteria(method, values)
+    details, known = [], []
+    for c in crit:
+        v = _from_info(c["field"], info)
+        if v is None:
+            details.append((c["label"], None, None))
+            continue
+        ok = (c["value"][0] <= v <= c["value"][1]) if c["op"] == "btwn" else (v > c["value"] if c["op"] == "gt"
+                                                                                 else v < c["value"])
+        details.append((c["label"], v, ok))
+        known.append(ok)
+    price, hi, lo = info.get("regularMarketPrice") or info.get("currentPrice"), info.get("fiftyTwoWeekHigh"), \
+        info.get("fiftyTwoWeekLow")
+    row = {"pe": info.get("trailingPE"), "pb": info.get("priceToBook"), "fpe": info.get("forwardPE"),
+           "from_high": (price / hi - 1) if price and hi else None, "from_low": (price / lo - 1) if price and lo else None}
+    for p in post:
+        ok = _passes(row, [p])
+        details.append((p["label"], None, ok))
+        known.append(ok)
+    return (all(known) if known else None), details

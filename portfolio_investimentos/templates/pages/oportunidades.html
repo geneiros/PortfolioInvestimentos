@@ -11,7 +11,7 @@
 {# ------------------------------------------------------------------ os métodos #}
 <div class="row g-2 mb-3" id="screenMethods">
   {% for key, mm in methods.items() %}
-  <div class="col-6 col-md-4 col-xl"><a class="pm-card pm-card-sm d-block h-100 text-decoration-none pm-method {{ 'pm-method-active' if key == method }}" href="/oportunidades?metodo={{ key }}">
+  <div class="col-6 col-md-4 col-xl"><a class="pm-card pm-card-sm d-block h-100 text-decoration-none pm-method {{ 'pm-method-active' if key == method }}" href="/radar?metodo={{ key }}">
     <div class="small text-secondary">{{ mm.investor }}</div>
     <div class="fw-semibold text-body">{{ mm.title }}</div>
   </a></div>
@@ -81,7 +81,7 @@
     </div>
     <div class="d-flex flex-wrap gap-2 mb-3">
       <button class="btn btn-sm btn-outline-primary" type="button" id="moatBatch" data-tickers='{{ res.rows|rejectattr("moat")|map(attribute="ticker")|list|tojson }}'><i class="bi bi-shield-check"></i> Analisar o moat das próximas 10</button>
-      <a class="btn btn-sm {{ 'btn-primary' if only_moat else 'btn-outline-secondary' }}" href="/oportunidades?metodo={{ method }}{{ '' if only_moat else '&moat=1' }}"><i class="bi bi-funnel"></i> Só com moat</a>
+      <a class="btn btn-sm {{ 'btn-primary' if only_moat else 'btn-outline-secondary' }}" href="/radar?metodo={{ method }}{{ '' if only_moat else '&moat=1' }}"><i class="bi bi-funnel"></i> Só com moat</a>
       <span class="small text-secondary align-self-center" id="moatProgress"></span>
     </div>
     <div class="table-responsive"><table class="table pm-table align-middle mb-0" id="screenTable">
@@ -109,8 +109,8 @@
           {% else %}<button class="btn btn-sm btn-outline-secondary py-0" type="button" data-moat="{{ r.ticker }}">Analisar</button>{% endif %}
         </td>
         <td class="text-end text-nowrap">
-          {% if r.watched %}<span class="small text-secondary" title="Já está no Radar"><i class="bi bi-bookmark-check"></i></span>
-          {% else %}<button class="btn btn-sm btn-link py-0" type="button" title="Juntar ao Radar" data-pm-action="add_watch" data-toast data-args='{{ {"instrument": r.ticker, "currency": r.currency or "USD", "instrument_name": r.name, "note": m.investor}|tojson }}'><i class="bi bi-bookmark-plus"></i></button>{% endif %}
+          {% if r.watched %}<a class="small text-secondary" href="/radar/acompanhamento" title="Já está em Acompanhamento"><i class="bi bi-binoculars-fill"></i></a>
+          {% else %}<button class="btn btn-sm btn-link py-0" type="button" title="Juntar ao Acompanhamento" data-pm-action="add_watch" data-toast data-args='{{ {"instrument": r.ticker, "currency": r.currency or "USD", "instrument_name": r.name, "method": method}|tojson }}'><i class="bi bi-binoculars"></i></button>{% endif %}
         </td>
       </tr>
       {% if r.moat %}{% set a = r.moat %}{% set u = r.user %}

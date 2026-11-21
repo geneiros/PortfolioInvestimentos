@@ -6,14 +6,14 @@ from flask import Blueprint, Response, abort, current_app, render_template, requ
 
 from .engine import costs, stress, valuation
 from .engine.portfolio import MERIT_BENCHMARK
-from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, Fundamental, ImportBatch,
-                     Instrument, Price, Setting, Transaction, WatchItem, db)
+from .models import (LIQUIDITY, OTHER_CATEGORIES, Broker, DividendHistory, Event, Fundamental, ImportBatch,
+                     Instrument, Price, Setting, Transaction, WatchItem, WatchRule, db)
 from . import auth, is_portable
 from .services import context as ctx
 from .services import backups, data, insights, market, networth, portfolio_alerts, report, sale_sim, widgets
 from .services import news as news_svc
 from .services.importer import BROKERS, INSTRUCTIONS
-from .services.market import check_alerts, refresh_state, upcoming_events, yfinance_available
+from .services.market import refresh_state, upcoming_events, yfinance_available
 
 bp = Blueprint("pages", __name__)
 
@@ -27,8 +27,10 @@ LABELS = {"BUY": "Compra", "SELL": "Venda", "DIVIDEND": "Dividendo", "DEPOSIT": 
           "WITHDRAWAL": "Levantamento", "FEE": "Comissão", "INTEREST": "Juros",
           "TRANSFER_IN": "Transferência (entrada)", "TRANSFER_OUT": "Transferência (saída)",
           "CONVERT_IN": "Conversão (entrada)", "CONVERT_OUT": "Conversão (saída)"}
-ALERT_KINDS = {"price_above": "Preço acima de", "price_below": "Preço abaixo de",
-               "change_pct": "Variação diária (±%) superior a"}
+
+def _tracking_check():
+    from .services import tracking
+    return tracking.check()
 
 
 def _int(v, default=0):
@@ -131,7 +133,7 @@ def overview():
         event_groups=[("Próxima semana", [e for e in events if e.date <= week]),
                       ("Daqui a duas semanas", [e for e in events if week < e.date <= two]),
                       ("Mais tarde", [e for e in events if e.date > two][:10])],
-        instruments=instruments, fired=check_alerts(p), portfolio_fired=portfolio_alerts.check(), perf=ctx.js_json(perf_ytd), hero=(perf_ytd or {}).get("summary"),
+        instruments=instruments, fired=_tracking_check(), portfolio_fired=portfolio_alerts.check(), perf=ctx.js_json(perf_ytd), hero=(perf_ytd or {}).get("summary"),
         benchmarks=[b for t in OVERVIEW_TICKERS for b in p.benchmarks if b.ticker == t], scores=insights.scores(p, c["broker"], c["broker_doc"].broker_name if c["broker_doc"] else None),
         networth=networth.summary(data.load_portfolio(None)) if networth.assets() else None,
         networth_late=len(networth.reminder()),
@@ -508,30 +510,41 @@ def fiscal_simulation_csv():
                     headers={"Content-Disposition": f"attachment; filename=simulacao-venda-{name}.csv"})
 
 
-@bp.route("/radar")
-def radar():
+@bp.route("/radar/acompanhamento")
+def acompanhamento():
+    """Radar e alertas → Acompanhamento: as ações que juntaste, os parâmetros e os alertas de cada uma."""
+    from .services import moat, screener, tracking
     c = ctx.build("radar", "Radar e alertas")
-    p = c["p"]
-    fired = check_alerts(p)
-    watch = []
+    fired = tracking.check()
+    currencies = {i.ticker: i for i in Instrument.query.all()}
+    rows = []
     for w in WatchItem.query.order_by(WatchItem.creation.desc()).all():
-        rows = Price.query.filter_by(instrument=w.instrument).order_by(Price.date.desc()).limit(2).all()
-        price = rows[0].close if rows else None
-        change = (rows[0].close / rows[1].close - 1) if len(rows) == 2 else None
-        inst = db.session.get(Instrument, w.instrument)
-        watch.append(SimpleNamespace(name=w.name, instrument=w.instrument, note=w.note, target_price=w.target_price,
-                                     price=price, change=change, currency=inst.currency if inst else "EUR",
-                                     distance=(price / w.target_price - 1) if price and w.target_price else None))
-    c.update(fired_now=fired, watch=watch, kinds=ALERT_KINDS,
+        inst = currencies.get(w.instrument)
+        rules = WatchRule.query.filter_by(watch_id=w.id).order_by(WatchRule.id).all()
+        rows.append(SimpleNamespace(w=w, inst=inst, currency=inst.currency if inst else "", v=tracking.values(w),
+                                    rules=rules, method=screener.METHODS.get(w.method),
+                                    user=moat.checklist(w.instrument)))
+    c.update(rows=rows, fired_now=fired, recent=tracking.recent(), kinds=tracking.KINDS, groups=tracking.GROUPS,
+             describe=tracking.describe, chip=tracking.chip, method_short=tracking.METHOD_SHORT,
+             evaluate=tracking.evaluate,
+             rules_json=lambda rules: [{"kind": r.kind, "threshold": r.threshold, "alert": bool(r.alert)} for r in rules],
              portfolio_fired=portfolio_alerts.check(), portfolio_alert_rows=portfolio_alerts.rows(),
-             alerts=Alert.query.order_by(Alert.active.desc(), Alert.creation.desc()).all(),
              instruments=Instrument.query.filter(Instrument.kind != "index").order_by(Instrument.ticker).all())
-    return render_template("pages/radar.html", **c)
+    return render_template("pages/acompanhamento.html", **c)
 
 
 @bp.route("/oportunidades")
+def oportunidades_antiga():
+    """O endereço antigo das Oportunidades (agora o primeiro separador de Radar e alertas)."""
+    from flask import redirect
+    q = request.query_string.decode()
+    return redirect("/radar" + (f"?{q}" if q else ""))
+
+
+@bp.route("/radar")
 def oportunidades():
-    """Radar e alertas → Oportunidades: as ações que cumprem os critérios dos grandes investidores e o moat."""
+    """Radar e alertas → Oportunidades (o primeiro separador): as ações que cumprem os critérios dos grandes
+    investidores e o moat."""
     from .services import moat, screener
     c = ctx.build("radar", "Radar e alertas")
     res = screener.last()

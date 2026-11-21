@@ -10,8 +10,8 @@
 {% include "pages/_portfolio_fired.html" %}
 {% for a in fired %}
 <div class="alert alert-warning d-flex align-items-center gap-2"><i class="bi bi-bell-fill"></i>
-  Alerta disparado: <b>{{ a.instrument }}</b> — {{ {'price_above': 'preço acima de', 'price_below': 'preço abaixo de', 'change_pct': 'variação diária superior a'}[a.kind] }} {{ a.threshold|number(2) }}{{ '%' if a.kind == 'change_pct' }}.
-  <a href="/radar" class="ms-auto">Ver alertas</a></div>
+  Alerta: {{ a.message }}.
+  <a href="/radar/acompanhamento" class="ms-auto">Ver em Acompanhamento</a></div>
 {% endfor %}
 
 <div class="row g-3" id="overviewGrid">
@@ -97,7 +97,7 @@
         <div class="col-12">
           <div class="d-flex align-items-center gap-2 mb-2">
             <span class="pm-label">Principais movers · {{ p.as_of|ddmm }}</span>
-            <a class="btn btn-pm btn-icon btn-sm ms-auto" href="/radar" title="Alertas"><i class="bi bi-bell"></i></a>
+            <a class="btn btn-pm btn-icon btn-sm ms-auto" href="/radar/acompanhamento" title="Acompanhamento e alertas"><i class="bi bi-bell"></i></a>
             <a class="btn btn-pm btn-icon btn-sm" href="/carteira" title="Carteira"><i class="bi bi-list"></i></a>
           </div>
           {% for m in movers %}

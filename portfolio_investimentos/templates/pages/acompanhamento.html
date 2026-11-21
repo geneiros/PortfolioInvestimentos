@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}{% autoescape true %}
+{% from "macros.html" import help %}
+{% include "pages/_radar_tabs.html" %}
+{% include "pages/_portfolio_fired.html" %}
+{% for r in fired_now %}<div class="alert alert-warning d-flex gap-2"><i class="bi bi-bell-fill"></i> Alerta: {{ r.message }}.</div>{% endfor %}
+
+<div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+  <div class="me-auto">
+    <h5 class="fw-bold mb-1">Acompanhamento</h5>
+    <p class="text-secondary mb-0">As ações que juntaste a partir das Oportunidades (ou à mão), os parâmetros que acompanhas em cada uma e se queres ser avisado. Os alertas verificam-se ao abrir a aplicação e depois de cada atualização.</p>
+  </div>
+  <button class="btn btn-sm btn-outline-primary" type="button" id="trackRefresh" data-tickers='{{ rows|map(attribute="w.instrument")|list|tojson }}' {{ 'disabled' if not rows }}><i class="bi bi-arrow-repeat"></i> Atualizar indicadores</button>
+  <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#trackAdd"><i class="bi bi-plus"></i> Juntar à mão</button>
+</div>
+<p class="small text-secondary" id="trackProgress"></p>
+
+<div class="collapse mb-3" id="trackAdd"><div class="pm-card pm-card-sm">
+  <form class="row g-2 align-items-end" data-pm-method="add_watch" data-pm-success="Juntada ao Acompanhamento.">
+    <label class="col-6 col-md-3 small">Ticker do Yahoo<input name="instrument" class="form-control form-control-sm" placeholder="ex.: KO, GALP.LS" list="instList" required></label>
+    <label class="col-6 col-md-2 small">Moeda<input name="currency" class="form-control form-control-sm" value="EUR" maxlength="3"></label>
+    <label class="col-6 col-md-2 small">Preço-alvo<input name="target_price" inputmode="decimal" class="form-control form-control-sm" placeholder="opcional"></label>
+    <label class="col-6 col-md-3 small">Nota<input name="note" class="form-control form-control-sm"></label>
+    <div class="col-md-2"><button class="btn btn-primary btn-sm w-100" type="submit">Juntar</button></div>
+    <datalist id="instList">{% for i in instruments %}<option value="{{ i.name }}">{{ i.instrument_name }}</option>{% endfor %}</datalist>
+  </form>
+</div></div>
+
+<div class="pm-card mb-3" id="trackList">
+  {% if not rows %}
+  <div class="text-center text-secondary py-5"><i class="bi bi-binoculars fs-1"></i>
+    <p class="mt-2 mb-0">Ainda não acompanhas nenhuma ação. Em <a href="/radar">Oportunidades</a>, carrega no <i class="bi bi-binoculars"></i> de uma ação para a juntares aqui.</p></div>
+  {% else %}
+  <div class="table-responsive"><table class="table pm-table align-middle mb-0">
+    <thead><tr><th>Ação</th><th class="text-end">Preço</th><th class="text-end">Dia</th><th class="text-end">Do máximo</th><th class="text-end">P/L</th><th class="text-end">P/VP</th><th class="text-end">Dividendo</th><th>Moat</th><th>Parâmetros {{ help("O sino aceso diz que há alerta. Verde: a condição verifica-se agora; cinzento: não se verifica; tracejado: falta o valor (atualiza os indicadores).") }}</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}{% set v = r.v %}
+    <tr>
+      <td><b>{{ r.w.instrument }}</b>
+        <div class="small text-secondary text-truncate" style="max-width: 15rem">{{ r.inst.instrument_name if r.inst else '' }}</div>
+        {% if r.method %}<span class="badge bg-body-secondary text-body border">{{ r.method.investor }}</span>{% endif %}
+        {% if r.w.note %}<div class="small text-secondary">{{ r.w.note }}</div>{% endif %}</td>
+      <td class="text-end">{{ v.price|number(2) if v.price else "—" }} <small class="text-secondary">{{ r.currency }}</small></td>
+      <td class="text-end {{ v.change|tone if v.change is not none }}">{{ v.change|pct(1) if v.change is not none else "—" }}</td>
+      <td class="text-end {{ v.from_high|tone if v.from_high is not none }}">{{ v.from_high|pct(0) if v.from_high is not none else "—" }}</td>
+      <td class="text-end">{{ v.pe|number(1) if v.pe else "—" }}</td>
+      <td class="text-end">{{ v.pb|number(1) if v.pb else "—" }}</td>
+      <td class="text-end">{{ v.div|pct(1, sign=False) if v.div is not none else "—" }}</td>
+      <td>{% if v.moat %}<span class="badge {{ 'text-bg-success' if v.moat.verdict == 'Largo' else 'text-bg-warning' if v.moat.verdict == 'Estreito' else 'text-bg-secondary' }}">{{ v.moat.verdict }}{% if v.moat.score is not none %} · {{ v.moat.score }}{% endif %}</span>
+          {% else %}<button class="btn btn-sm btn-outline-secondary py-0" type="button" data-moat="{{ r.w.instrument }}">Analisar</button>{% endif %}</td>
+      <td style="min-width: 14rem; white-space: normal">
+        {% for rule in r.rules %}{% set met = evaluate(rule, v)[0] %}
+        <span class="badge rounded-pill pm-rule {{ 'pm-rule-met' if met else 'pm-rule-unknown' if met is none else '' }}" title="{{ 'Verifica-se' if met else 'Falta o valor' if met is none else 'Não se verifica' }}{% if rule.triggered_on %} · disparou a {{ rule.triggered_on.strftime('%d/%m %H:%M') }}{% endif %}">
+          <i class="bi {{ 'bi-bell-fill' if rule.alert else 'bi-bell-slash' }}"></i>
+          {% if rule.kind == 'method' %}{{ 'Cumpre' if met else 'Não cumpre' if met is not none else 'Critérios' }} {{ method_short.get(r.w.method, '') }}
+          {% elif rule.kind == 'moat' %}Moat {{ rule.state or '' }}
+          {% else %}{{ chip(rule, r.currency) }}{% endif %}
+        </span>
+        {% else %}<span class="small text-secondary">Sem parâmetros.</span>{% endfor %}
+        {% if v.method_details %}<details class="small mt-1"><summary class="text-secondary">Critérios do método</summary>
+          {% for label, val, ok in v.method_details %}<div>{% if ok is none %}<i class="bi bi-dash text-secondary"></i>{% elif ok %}<i class="bi bi-check-lg text-success"></i>{% else %}<i class="bi bi-x-lg text-danger"></i>{% endif %} {{ label }}{% if val is not none %}: {{ val|number(1) }}{% endif %}</div>{% endfor %}
+        </details>{% endif %}
+      </td>
+      <td class="text-end text-nowrap">
+        <button class="btn btn-sm btn-pm" type="button" title="Parâmetros e alertas" data-track-edit="{{ r.w.name }}" data-ticker="{{ r.w.instrument }}" data-currency="{{ r.currency }}" data-note="{{ r.w.note or '' }}" data-method="{{ r.w.method or '' }}"
+                data-rules='{{ rules_json(r.rules)|tojson }}'><i class="bi bi-sliders"></i></button>
+        <button class="btn btn-sm btn-outline-danger" type="button" data-pm-action="delete_watch" data-args='{"name": "{{ r.w.name }}"}' data-confirm="Deixar de acompanhar {{ r.w.instrument }}?"><i class="bi bi-x"></i></button>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="small text-secondary mt-2 mb-0">Preço, variação e máximo vêm das cotações guardadas (atualizadas em Definições). P/L, P/VP, dividendo e critérios do método vêm do Yahoo com «Atualizar indicadores»{% if rows and rows[0].v.snap_at %}; o moat reanalisa-se sozinho quando tem mais de 30 dias{% endif %}.</p>
+  {% endif %}
+</div>
+
+{% if recent %}
+<div class="pm-card mb-3" id="trackRecent">
+  <div class="pm-label mb-2">Alertas dos últimos dias</div>
+  <ul class="list-unstyled mb-0 small">{% for r in recent %}<li><i class="bi bi-bell-fill text-warning"></i> {{ r.triggered_on.strftime('%d/%m %H:%M') }} · {{ r.message }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<div class="pm-card mb-3" id="portfolioAlerts">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <span class="pm-label">Alertas da carteira {{ help("A variação do dia de toda a carteira ou de uma corretora. Disparam no máximo uma vez por dia e por sentido; os depósitos e levantamentos não contam. Criam-se na Carteira, no cartão «Carteira vs mercado» (o sino).") }}</span>
+    <a class="small ms-auto" href="/carteira">Criar na Carteira <i class="bi bi-chevron-right"></i></a>
+  </div>
+  <table class="table pm-table mb-0">
+    <thead><tr><th>Carteira ou conta</th><th>Condição</th><th>Estado</th><th></th></tr></thead>
+    <tbody>{% for r in portfolio_alert_rows %}
+      <tr class="{{ 'opacity-50' if not r.active }}" data-portfolio-alert-row="{{ r.id }}">
+        <td><b>{{ r.scope }}</b></td>
+        <td>{{ {'up': 'Subir', 'down': 'Descer', 'both': 'Subir ou descer'}[r.direction] }} <b>{{ (r.threshold * 100)|round|int }}%</b> num dia</td>
+        <td>{% if r.active %}<span class="badge text-bg-success">Ativo</span>{% else %}<span class="badge text-bg-secondary">Pausado</span>{% endif %}
+          {% if r.last %}<span class="badge text-bg-warning">Disparado {{ r.last.strftime('%d/%m') }}</span>{% endif %}</td>
+        <td class="text-end text-nowrap">
+          <button class="btn btn-sm btn-pm" data-pm-action="toggle_portfolio_alert" data-args='{"name": "{{ r.id }}", "active": {{ 0 if r.active else 1 }}}' title="{{ 'Pausar' if r.active else 'Reativar' }}"><i class="bi {{ 'bi-pause' if r.active else 'bi-play' }}"></i></button>
+          <button class="btn btn-sm btn-outline-danger" data-pm-action="delete_portfolio_alert" data-args='{"name": "{{ r.id }}"}' data-confirm="Apagar alerta da carteira?"><i class="bi bi-trash"></i></button></td></tr>
+    {% else %}<tr><td colspan="4" class="text-secondary">Ainda não tens alertas da carteira. <a href="/carteira">Criar na Carteira</a></td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+
+{# ------------------------------------------------------------------ parâmetros de uma ação #}
+<div class="modal fade" id="trackModal" tabindex="-1" aria-labelledby="trackModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="trackModalTitle">Parâmetros</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+    <div class="modal-body">
+      <p class="small text-secondary">Escolhe o que queres acompanhar nesta ação e, em cada parâmetro, se queres ser avisado quando a condição passa a verificar-se (nos critérios do método e no moat, quando mudam).</p>
+      <div id="trackRules"></div>
+      <div class="dropdown mt-2">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-plus"></i> Juntar parâmetro</button>
+        <ul class="dropdown-menu">
+          {% for group, keys in groups %}<li><h6 class="dropdown-header">{{ group }}</h6></li>
+          {% for k in keys %}<li><a class="dropdown-item" href="#" data-track-add="{{ k }}">{{ kinds[k][0] }}</a></li>{% endfor %}{% endfor %}
+        </ul>
+      </div>
+      <label class="small text-secondary d-block mt-3">Nota<input class="form-control form-control-sm" id="trackNote" maxlength="255"></label>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" type="button" id="trackSave">Guardar</button></div>
+  </div></div>
+</div>
+<script>window.pmTrackKinds = {{ kinds|tojson }};</script>
+{% endautoescape %}{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/acompanhamento.js') }}"></script>
+{% endblock %}

@@ -197,7 +197,11 @@ def info_of(ticker):
     from . import yahoo
     from .market import _yahoo_client
     try:
-        return _yahoo_client().Ticker(ticker).info or {}
+        client = _yahoo_client()
+        info = dict(client.Ticker(ticker).info or {})
+        if client is not yahoo:
+            info["_yfinance"] = True  # o yfinance dá o «dividendYield» em %
+        return info
     except yahoo.YahooError:
         raise
     except Exception as exc:

@@ -11,7 +11,7 @@ from portfolio_investimentos import create_app
 from portfolio_investimentos.models import ImportBatch, Transaction, db
 
 PAGES = ["/", "/carteira", "/desempenho", "/desempenho?periodo=1A&bench=%5EGSPC", "/dividendos", "/fiscal",
-         "/radar", "/importar", "/transacoes", "/transacoes?tipo=BUY", "/definicoes"]
+         "/radar", "/radar/acompanhamento", "/importar", "/transacoes", "/transacoes?tipo=BUY", "/definicoes"]
 
 T212 = """Action,Time,ISIN,Ticker,Name,No. of shares,Price / share,Currency (Price / share),Exchange rate,Total,Currency (Total),Withholding tax,Currency (Withholding tax),ID
 Deposit,2024-01-02 10:00:00,,,,,,,,1000.00,EUR,,,DEP1
@@ -2115,18 +2115,18 @@ def test_market_indices_and_portfolio_alerts(app, client):
 def test_portfolio_alerts_on_radar(client):
     token = csrf(client)
     assert post(client, "load_demo", token).status_code == 200
-    assert "Ainda não tens alertas da carteira" in client.get("/radar").get_data(as_text=True)
+    assert "Ainda não tens alertas da carteira" in client.get("/radar/acompanhamento").get_data(as_text=True)
     assert post(client, "add_portfolio_alert", token, threshold="2", direction="down").status_code == 200
-    html = client.get("/radar").get_data(as_text=True)
+    html = client.get("/radar/acompanhamento").get_data(as_text=True)
     section = html.split('id="portfolioAlerts"', 1)[1]
     assert "Toda a carteira" in section and "Descer <b>2%</b> num dia" in section and "Ativo" in section
     aid = re.search(r'data-portfolio-alert-row="(\d+)"', html).group(1)
     assert post(client, "toggle_portfolio_alert", token, name=aid, active="0").status_code == 200
-    assert "Pausado" in client.get("/radar").get_data(as_text=True).split('id="portfolioAlerts"', 1)[1]
+    assert "Pausado" in client.get("/radar/acompanhamento").get_data(as_text=True).split('id="portfolioAlerts"', 1)[1]
     assert post(client, "toggle_portfolio_alert", token, name=aid, active="1").status_code == 200
     assert post(client, "toggle_portfolio_alert", token, name="999", active="1").status_code == 400
     assert post(client, "delete_portfolio_alert", token, name=aid).status_code == 200
-    assert "Ainda não tens alertas da carteira" in client.get("/radar").get_data(as_text=True)
+    assert "Ainda não tens alertas da carteira" in client.get("/radar/acompanhamento").get_data(as_text=True)
 
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 200
@@ -2701,7 +2701,7 @@ def test_news_radar_tab(app, client, monkeypatch):
         WatchItem.query.delete()
         db.session.commit()
     html = client.get("/noticias").get_data(as_text=True)
-    assert "Ainda não segues ativos no Radar" in html
+    assert "Ainda não acompanhas ativos" in html
     with app.app_context():
         db.session.add_all([Instrument(ticker="NVDA", currency="USD", instrument_name="NVIDIA Corp"),
                             WatchItem(instrument="NVDA", note="seguir"),
@@ -3685,7 +3685,7 @@ def test_opportunities_page_and_actions(app, client, monkeypatch):
     token = csrf(client)
     html = client.get("/radar").get_data(as_text=True)
     assert 'id="radarTabs"' in html and "Oportunidades" in html
-    html = client.get("/oportunidades").get_data(as_text=True)
+    html = client.get("/radar").get_data(as_text=True)
     assert "Carrega em <b>Procurar</b>" in html.replace("carrega", "Carrega") and "Benjamin Graham" in html
     from portfolio_investimentos.services import screener
     monkeypatch.setattr(screener, "fetch_yahoo", lambda body: {"total": 2, "quotes": [
@@ -3693,7 +3693,7 @@ def test_opportunities_page_and_actions(app, client, monkeypatch):
     r = post(client, "run_screen", token, method="buffett", region="eua", min_cap="1e10", c0="16", c0b="90")
     assert r.status_code == 200 and "2 ações" in r.get_json()["message"]
     assert post(client, "run_screen", token, method="buffett", region="marte").status_code == 400
-    html = client.get("/oportunidades?metodo=buffett").get_data(as_text=True)
+    html = client.get("/radar?metodo=buffett").get_data(as_text=True)
     assert "KO" in html and "Microsoft Corporation" in html and 'value="16"' in html and "Analisar" in html
 
     def boom(body):
@@ -3708,9 +3708,9 @@ def test_opportunities_page_and_actions(app, client, monkeypatch):
     assert "moat largo" in post(client, "analyse_moat", token, ticker="ko").get_json()["message"]
     assert post(client, "save_moat_checklist", token, ticker="KO", pillars='["mudanca"]', tests="[]",
                 note="cloud").status_code == 200
-    html = client.get("/oportunidades?metodo=buffett&moat=1").get_data(as_text=True)
+    html = client.get("/radar?metodo=buffett&moat=1").get_data(as_text=True)
     assert "Largo · 80" in html and "Microsoft Corporation" not in html  # só KO passa o 2.º passo
-    html = client.get("/oportunidades?metodo=buffett").get_data(as_text=True)
+    html = client.get("/radar?metodo=buffett").get_data(as_text=True)
     assert "cloud" in html and "sugerido" in html
 
 
@@ -3721,3 +3721,105 @@ def test_screener_query_for_yfinance():
     q = screener._equity_query(screener.build_query(crit, "europa", "1e9"))
     d = q.to_dict()
     assert d["operator"].lower() == "and" and len(d["operands"]) == 2 + len(crit)
+
+
+def test_migration_moves_price_alerts_to_tracking(tmp_path, monkeypatch):
+    import sqlite3
+    from portfolio_investimentos import migrations
+    from portfolio_investimentos.models import WatchItem, WatchRule
+    _legacy_db(tmp_path, monkeypatch)
+    conn = sqlite3.connect(tmp_path / "portfolio.db")  # as tabelas da versão anterior
+    conn.execute("DROP TABLE watch_rule")
+    conn.execute("DROP TABLE watch_item")
+    conn.execute("CREATE TABLE watch_item (id INTEGER PRIMARY KEY, instrument VARCHAR(32) NOT NULL, "
+                 "target_price FLOAT, note VARCHAR(255), creation DATETIME)")
+    conn.execute("INSERT INTO instrument (ticker, currency) VALUES ('AAA', 'EUR'), ('BBB', 'USD')")
+    conn.execute("INSERT INTO watch_item (instrument, target_price, note) VALUES ('AAA', 9.5, 'barata')")
+    conn.execute("INSERT INTO alert (instrument, kind, threshold, active) VALUES ('AAA', 'price_above', 12, 1), "
+                 "('BBB', 'change_pct', 5, 0)")
+    conn.commit()
+    conn.close()
+    app = create_app({"TESTING": True})
+    assert migrations.schema_version(app.config["DB_PATH"]) == migrations.LATEST
+    with app.app_context():
+        items = {w.instrument: w for w in WatchItem.query.all()}
+        assert set(items) == {"AAA", "BBB"} and items["AAA"].note == "barata"  # o BBB passa a ser acompanhado
+        rules = {(r.watch_id, r.kind): r for r in WatchRule.query.all()}
+        a, b = items["AAA"].id, items["BBB"].id
+        assert rules[(a, "price_below")].threshold == 9.5 and not rules[(a, "price_below")].alert  # o preço-alvo
+        assert rules[(a, "price_above")].threshold == 12 and rules[(a, "price_above")].alert
+        assert rules[(b, "change_pct")].threshold == 5 and not rules[(b, "change_pct")].alert  # estava pausado
+
+
+def test_tracking_rules_and_alerts(app, client, monkeypatch):
+    from datetime import datetime
+    from portfolio_investimentos.models import Instrument, Price, WatchItem, WatchRule
+    from portfolio_investimentos.services import moat, screener, tracking
+    token = csrf(client)
+    with app.app_context():
+        db.session.add(Instrument(ticker="KO", currency="USD"))
+        db.session.add_all([Price(instrument="KO", date=date(2026, 1, d), close=c) for d, c in ((5, 100.0), (6, 70.0))])
+        db.session.commit()
+        screener.Setting.set("screen:last", json.dumps({"method": "buffett", "values": {"c0": "16"}, "rows": [], "region": "mundo", "min_cap": "1e9", "total": 0, "at": "2026-11-21T12:00"}))
+    # das Oportunidades: com o método e os parâmetros desse método
+    r = post(client, "add_watch", token, instrument="KO", currency="USD", method="buffett")
+    assert r.status_code == 200 and "Acompanhamento" in r.get_json()["message"]
+    assert post(client, "add_watch", token, instrument="KO", currency="USD").status_code == 400  # já está
+    with app.app_context():
+        w = WatchItem.query.filter_by(instrument="KO").one()
+        assert w.method == "buffett" and json.loads(w.criteria) == {"c0": "16"}
+        assert {r.kind for r in WatchRule.query.filter_by(watch_id=w.id)} == {"method", "from_high"}
+        wid = w.id
+    # os parâmetros: preço abaixo de 80 (com alerta) e P/L abaixo de 15
+    rules = [{"kind": "price_below", "threshold": "80", "alert": True}, {"kind": "pe_below", "threshold": "15",
+                                                                        "alert": True},
+             {"kind": "method", "alert": True}]
+    assert post(client, "save_watch_rules", token, name=str(wid), rules=json.dumps(rules), note="ver").status_code == 200
+    assert post(client, "save_watch_rules", token, name=str(wid),
+                rules=json.dumps([{"kind": "pe_below", "threshold": "", "alert": True}])).status_code == 400
+    with app.app_context():
+        r = WatchRule.query.filter_by(watch_id=wid, kind="price_below").one()
+        assert r.met is True and r.triggered_on is not None and "preço abaixo de 80" in r.message  # 70 ≤ 80
+        assert WatchRule.query.filter_by(watch_id=wid, kind="pe_below").one().met is None  # sem P/L ainda
+        assert tracking.check() == []  # não volta a disparar enquanto se verificar
+    # «Atualizar indicadores»: P/L 12 e os critérios do Buffett
+    info = {"trailingPE": 12.0, "priceToBook": 4.0, "dividendYield": 0.03, "returnOnEquity": 0.40,
+            "profitMargins": 0.25, "ebitda": 100.0, "totalDebt": 150.0, "totalCash": 50.0, "regularMarketPrice": 70.0,
+            "fiftyTwoWeekHigh": 100.0, "currency": "USD"}
+    monkeypatch.setattr(moat, "info_of", lambda t: info)
+    r = post(client, "refresh_tracking", token, ticker="KO")
+    assert r.status_code == 200 and "alerta" in r.get_json()["message"]
+    with app.app_context():
+        assert WatchRule.query.filter_by(watch_id=wid, kind="pe_below").one().met is True
+        assert WatchRule.query.filter_by(watch_id=wid, kind="method").one().met is True
+        assert tracking.snapshot("KO")["method_met"] is True
+    # os critérios deixam de se cumprir (ROE de 10%): avisa da mudança
+    info["returnOnEquity"] = 0.10
+    post(client, "refresh_tracking", token, ticker="KO")
+    with app.app_context():
+        r = WatchRule.query.filter_by(watch_id=wid, kind="method").one()
+        assert r.met is False and "deixou de cumprir" in r.message and "Buffett" in r.message
+        assert tracking.recent(now=datetime.now())
+    html = client.get("/radar/acompanhamento").get_data(as_text=True)
+    for text in ("Acompanhamento", "Warren Buffett", "Alertas dos últimos dias", "Preço ≤ 80", "Não cumpre",
+                 'id="portfolioAlerts"', 'id="trackModal"', "deixou de cumprir"):
+        assert text in html, text
+    # a Visão Geral avisa quando dispara (aqui já tinha disparado: sem aviso novo)
+    assert "Ver em Acompanhamento" not in client.get("/").get_data(as_text=True)
+    assert post(client, "delete_watch", token, name=str(wid)).status_code == 200
+    with app.app_context():
+        assert WatchRule.query.count() == 0
+    # o separador Oportunidades é o primeiro e o endereço antigo continua a funcionar
+    html = client.get("/radar").get_data(as_text=True)
+    assert html.index("Oportunidades</a>") < html.index("Acompanhamento</a>")
+    assert client.get("/oportunidades?metodo=graham").headers["Location"].endswith("/radar?metodo=graham")
+
+
+def test_screener_criteria_from_stock_data():
+    from portfolio_investimentos.services import screener
+    info = {"trailingPE": 10.0, "priceToBook": 1.0, "currentRatio": 2.5, "dividendYield": 0.04}
+    met, details = screener.check_info("graham", {}, info)
+    assert met is True and all(ok for _, _, ok in details)
+    met, _ = screener.check_info("graham", {}, {**info, "currentRatio": 1.2})
+    assert met is False
+    assert screener.check_info("lynch", {}, {})[0] is None  # sem dados

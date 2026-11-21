@@ -9,8 +9,8 @@ import math
 import random
 from datetime import date, timedelta
 
-from ..models import (Alert, Broker, Event, Fundamental, FxRate, ImportBatch, Instrument, OtherAsset, OtherAssetValue,
-                      Price, Setting, Transaction, WatchItem, db)
+from ..models import (Broker, Event, Fundamental, FxRate, ImportBatch, Instrument, OtherAsset, OtherAssetValue,
+                      Price, Setting, Transaction, WatchItem, WatchRule, db)
 from .market import DEFAULT_BENCHMARKS, OVERVIEW_BENCHMARKS, ensure_benchmarks
 
 START = date(2021, 6, 1)
@@ -86,7 +86,7 @@ def create_demo(seed=42):
         _insert_series(Price, "instrument", ticker, "close", series)
         prices[ticker] = dict(series)
 
-    for model in (Transaction, ImportBatch, Alert, WatchItem, OtherAssetValue, OtherAsset):
+    for model in (Transaction, ImportBatch, WatchRule, WatchItem, OtherAssetValue, OtherAsset):
         model.query.delete()
     Broker.query.delete()
     db.session.commit()
@@ -167,10 +167,18 @@ def create_demo(seed=42):
                              title="(demo)", timing="antes da abertura",
                              eps_estimate=round(rng.uniform(-0.1, 2.5), 2),
                              revenue_estimate=round(rng.uniform(1e8, 5e10), -6)))
-    db.session.add(Alert(instrument="DEMO-NVTX", kind="price_below",
-                         threshold=round(prices["DEMO-NVTX"][days[-1]] * 0.9, 2), active=True))
-    db.session.add(WatchItem(instrument="DEMO-ATLE", target_price=round(prices["DEMO-ATLE"][days[-1]] * 0.95, 2),
-                             note="Comprar abaixo do alvo"))
+    # Acompanhamento: uma ação com o preço-alvo e outra com um alerta de queda e da variação do dia
+    atle = WatchItem(instrument="DEMO-ATLE", target_price=round(prices["DEMO-ATLE"][days[-1]] * 0.95, 2),
+                     note="Comprar abaixo do alvo")
+    nvtx = WatchItem(instrument="DEMO-NVTX", note="Esperar por uma correção")
+    db.session.add_all([atle, nvtx])
+    db.session.flush()
+    db.session.add_all([
+        WatchRule(watch_id=atle.id, kind="price_below", threshold=atle.target_price, alert=True),
+        WatchRule(watch_id=atle.id, kind="from_high", threshold=20, alert=False),
+        WatchRule(watch_id=nvtx.id, kind="price_below", threshold=round(prices["DEMO-NVTX"][days[-1]] * 0.9, 2),
+                  alert=True),
+        WatchRule(watch_id=nvtx.id, kind="change_pct", threshold=5, alert=True)])
     _other_assets(rng, today)
     _fundamentals(prices, days[-1], today)
     db.session.commit()

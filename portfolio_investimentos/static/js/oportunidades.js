@@ -12,7 +12,7 @@
       args.method = form.dataset.method;
       const msg = await pm.call("run_screen", args);
       pm.toast(msg);
-      location.href = `/oportunidades?metodo=${encodeURIComponent(form.dataset.method)}`;
+      location.href = `/radar?metodo=${encodeURIComponent(form.dataset.method)}`;
     } catch (err) {
       btn.disabled = false;
       btn.innerHTML = old;

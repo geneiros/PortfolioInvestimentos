@@ -57,6 +57,37 @@ def _m006_fundamental_more(conn):
 
 
 # (versão, descrição, função)
+def _m007_watch_rules(conn):
+    """As ações do Radar passam a ter parâmetros e alertas (watch_rule); os alertas de preço de cada ativo passam a
+    ser parâmetros desse ativo (criado em Acompanhamento se ainda não estava) e o preço-alvo vira «Preço abaixo de»
+    sem alerta."""
+    _add_column(conn, "watch_item", "method", "VARCHAR(16)")
+    _add_column(conn, "watch_item", "criteria", "TEXT")
+    conn.execute("""CREATE TABLE IF NOT EXISTS watch_rule (
+        id INTEGER NOT NULL PRIMARY KEY, watch_id INTEGER NOT NULL REFERENCES watch_item (id) ON DELETE CASCADE,
+        kind VARCHAR(16) NOT NULL, threshold FLOAT, alert BOOLEAN, met BOOLEAN, state VARCHAR(32),
+        triggered_on DATETIME, message VARCHAR(255), creation DATETIME)""")
+    now = "datetime('now')"
+
+    def watch_for(ticker):
+        row = conn.execute("SELECT id FROM watch_item WHERE instrument = ? ORDER BY id LIMIT 1", (ticker,)).fetchone()
+        if row:
+            return row[0]
+        cur = conn.execute(f"INSERT INTO watch_item (instrument, creation) VALUES (?, {now})", (ticker,))
+        return cur.lastrowid
+    for wid, target in conn.execute("SELECT id, target_price FROM watch_item WHERE target_price IS NOT NULL").fetchall():
+        conn.execute(f"INSERT INTO watch_rule (watch_id, kind, threshold, alert, creation) VALUES (?, 'price_below', ?, 0, "
+                     f"{now})", (wid, target))
+    if "alert" in {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}:
+        for ticker, kind, threshold, active, triggered in conn.execute(
+                "SELECT instrument, kind, threshold, active, triggered_on FROM alert").fetchall():
+            conn.execute(f"INSERT INTO watch_rule (watch_id, kind, threshold, alert, met, triggered_on, creation) "
+                         f"VALUES (?, ?, ?, ?, ?, ?, {now})",
+                         (watch_for(ticker), kind, threshold, 1 if active or triggered else 0,
+                          1 if triggered else None, triggered))
+        conn.execute("DELETE FROM alert")
+
+
 MIGRATIONS = [
     (1, "Resultado indicado pela corretora em cada venda", _m001_transaction_result),
     (2, "Data da última cotação obtida de cada ativo", _m002_instrument_last_quote),
@@ -64,6 +95,7 @@ MIGRATIONS = [
     (4, "Património: nível de liquidez, casa própria e crédito ligado ao imóvel", _m004_other_asset_liquidity),
     (5, "Custo anual (TER) de cada ETF", _m005_instrument_ter),
     (6, "Valor de cada ação: owner earnings, NOPAT e caixa líquida", _m006_fundamental_more),
+    (7, "Acompanhamento: parâmetros e alertas de cada ação (os alertas de preço passam para lá)", _m007_watch_rules),
 ]
 LATEST = MIGRATIONS[-1][0]
 
