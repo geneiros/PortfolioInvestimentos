@@ -59,8 +59,9 @@
               {% if market_alerts.rows %}
               <div class="pm-label mb-1">Alertas guardados</div>
               {% for r in market_alerts.rows %}
-              <div class="d-flex align-items-center gap-2 small border-bottom py-1">
-                <span class="flex-grow-1">{{ r.scope }} · {{ {'up': 'subir', 'down': 'descer', 'both': 'subir ou descer'}[r.direction] }} {{ (r.threshold * 100)|round|int }}%</span>
+              <div class="d-flex align-items-center gap-2 small border-bottom py-1 {{ 'opacity-50' if not r.active }}" data-portfolio-alert-row="{{ r.id }}">
+                <span class="flex-grow-1">{{ r.scope }} · {{ {'up': 'subir', 'down': 'descer', 'both': 'subir ou descer'}[r.direction] }} {{ (r.threshold * 100)|round|int }}%{% if not r.active %} · <span class="text-secondary">pausado</span>{% endif %}{% if r.last %} · <span class="text-warning">disparou a {{ r.last.strftime('%d/%m') }}</span>{% endif %}</span>
+                <button type="button" class="btn btn-sm btn-link p-0" data-pm-action="toggle_portfolio_alert" data-args='{"name": "{{ r.id }}", "active": {{ 0 if r.active else 1 }}}' title="{{ 'Pausar' if r.active else 'Reativar' }}"><i class="bi {{ 'bi-pause' if r.active else 'bi-play' }}"></i></button>
                 <button type="button" class="btn btn-sm btn-link text-danger p-0" data-pm-action="delete_portfolio_alert" data-args='{"name": "{{ r.id }}"}' title="Apagar"><i class="bi bi-trash"></i></button>
               </div>
               {% endfor %}

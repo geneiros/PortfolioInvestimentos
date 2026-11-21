@@ -551,7 +551,7 @@ def acompanhamento():
              method_short=tracking.METHOD_SHORT, evaluate=tracking.evaluate, lists=lists, current_list=current,
              priorities=tracking.PRIORITIES, questions=triage.QUESTIONS,
              rules_json=lambda rules: [{"kind": r.kind, "threshold": r.threshold, "alert": bool(r.alert)} for r in rules],
-             portfolio_fired=portfolio_alerts.check(), portfolio_alert_rows=portfolio_alerts.rows(),
+             portfolio_fired=portfolio_alerts.check(),
              instruments=Instrument.query.filter(Instrument.kind != "index").order_by(Instrument.ticker).all())
     return render_template("pages/acompanhamento.html", **c)
 

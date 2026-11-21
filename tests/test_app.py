@@ -2112,21 +2112,19 @@ def test_market_indices_and_portfolio_alerts(app, client):
         assert PortfolioAlert.query.count() == 0
 
 
-def test_portfolio_alerts_on_radar(client):
+def test_portfolio_alerts_pause_in_carteira(client):
     token = csrf(client)
     assert post(client, "load_demo", token).status_code == 200
-    assert "Ainda não tens alertas da carteira" in client.get("/radar/acompanhamento").get_data(as_text=True)
     assert post(client, "add_portfolio_alert", token, threshold="2", direction="down").status_code == 200
-    html = client.get("/radar/acompanhamento").get_data(as_text=True)
-    section = html.split('id="portfolioAlerts"', 1)[1]
-    assert "Toda a carteira" in section and "Descer <b>2%</b> num dia" in section and "Ativo" in section
+    html = client.get("/carteira").get_data(as_text=True)
     aid = re.search(r'data-portfolio-alert-row="(\d+)"', html).group(1)
+    assert "Toda a carteira · descer 2%" in html and "toggle_portfolio_alert" in html
     assert post(client, "toggle_portfolio_alert", token, name=aid, active="0").status_code == 200
-    assert "Pausado" in client.get("/radar/acompanhamento").get_data(as_text=True).split('id="portfolioAlerts"', 1)[1]
+    assert "pausado" in client.get("/carteira").get_data(as_text=True)
     assert post(client, "toggle_portfolio_alert", token, name=aid, active="1").status_code == 200
     assert post(client, "toggle_portfolio_alert", token, name="999", active="1").status_code == 400
+    assert 'id="portfolioAlerts"' not in client.get("/radar/acompanhamento").get_data(as_text=True)  # já não está em Prospeção
     assert post(client, "delete_portfolio_alert", token, name=aid).status_code == 200
-    assert "Ainda não tens alertas da carteira" in client.get("/radar/acompanhamento").get_data(as_text=True)
 
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 200
@@ -3849,7 +3847,7 @@ def test_tracking_rules_and_alerts(app, client, monkeypatch):
         assert tracking.recent(now=datetime.now())
     html = client.get("/radar/acompanhamento").get_data(as_text=True)
     for text in ("A minha lista", "Buffett", "Alertas dos últimos dias", "Preço ≤ 80", "Fora de Buffett",
-                 'id="portfolioAlerts"', 'id="trackModal"', "deixou de entrar", "Por abrir"):
+                 "Alertas dos últimos dias", 'id="trackModal"', "deixou de entrar", "Por abrir"):
         assert text in html, text
     # a Visão Geral avisa quando dispara (aqui já tinha disparado: sem aviso novo)
     assert "Ver em Acompanhamento" not in client.get("/").get_data(as_text=True)
