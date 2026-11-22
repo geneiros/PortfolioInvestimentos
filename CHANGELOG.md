@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-22
+
+- **Menu: Prospeção passa para a seguir ao Planeamento**  
+  A ordem fica Visão Geral, Carteira, Desempenho, Dividendos, Património, Planeamento, Prospeção, Notícias e Fiscal.
+
 ## 2026-11-21
 
 - **Triagem: «Ao lado dos pares» na ficha**  
