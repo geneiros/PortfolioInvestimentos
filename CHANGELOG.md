@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-22
 
+- **Margem do conteúdo**  
+  O espaço à volta do conteúdo das páginas passa de 1,5rem para 1rem, igual em todos os ecrãs.
 - **Triagem: os critérios de cada lente, editáveis, e ordenar por lente**  
   Por baixo do nome da lente aparecem os critérios dela, e cada um pode mudar-se temporariamente: o limite, ligar ou desligar, e em «Várias lentes» o número mínimo de lentes. A lista, as contagens das lentes e os pontos recalculam-se logo no browser. A ficha mostra os critérios mudados, com a nota «com os teus critérios». «Repor» volta aos de origem, e ao recarregar a página voltam sozinhos; os alertas das listas usam sempre os de origem. Na ordenação há «Mais lentes» e cada lente (as que entram primeiro, depois as que ficam perto).
 - **Menu: Prospeção passa para a seguir ao Planeamento**  

@@ -46,7 +46,7 @@ html.pm-purple[data-bs-theme="dark"] .modal { --bs-modal-bg: #272236; }
 .pm-sidebar .nav-link { display: flex; align-items: center; gap: .6rem; }
 .pm-logo { flex: 0 0 auto; }
 .pm-main { flex: 1; min-width: 0; }
-.pm-content { padding: 1.5rem; }
+.pm-content { padding: 1rem; }
 body.pm-collapsed .pm-sidebar { --pm-sidebar-width: 76px; }
 body.pm-collapsed .pm-sidebar .label, body.pm-collapsed .pm-sidebar .badge { display: none; }
 /* barra recolhida (76 px): os botões do fundo não cabem lado a lado; ficam em coluna, só com o ícone,
@@ -192,7 +192,6 @@ html.pm-private [data-pm-toggle=private] .bi-eye::before { content: "\f340"; }
   /* fundo escurecido com o menu aberto: tocar fora da barra fecha-a */
   .pm-backdrop { position: fixed; inset: 0; z-index: 1039; background: rgba(0, 0, 0, .35); display: none; }
   body.pm-menu-open .pm-backdrop { display: block; }
-  .pm-content { padding: 1rem; }
 }
 
 /* Visão Geral: notas, peso vs retorno e alocação */
