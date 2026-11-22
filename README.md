@@ -2,7 +2,7 @@
 
 [![Testes](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml/badge.svg)](https://github.com/geneiros/PortfolioInvestimentos/actions/workflows/testes.yml) [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/geneiros)
 
-Gestor de carteira de investimentos local: desempenho, dividendos, património, planeamento FIRE, uma triagem das ações do mundo pelas lentes dos grandes investidores (Graham, Buffett, Lynch, Bazin…) com a ficha completa e o moat de cada empresa, notícias, fiscalidade (PT) e importação de extratos da Trading 212, XTB, Trade Republic, DEGIRO e Interactive Brokers. **Corre no teu computador**, com listas de acompanhamento das ações que te interessam (preço, P/L, dividendo, critérios da lente e moat, cada um com alerta) e alertas da carteira.
+Tracker de carteira de investimentos local: desempenho, dividendos, património, planeamento FIRE, uma triagem das ações do mundo pelas lentes dos grandes investidores (Graham, Buffett, Lynch, Bazin…) com a ficha completa e o moat de cada empresa, notícias, fiscalidade (PT) e importação de extratos da Trading 212, XTB, Trade Republic, DEGIRO e Interactive Brokers. **Corre no teu computador**, com listas de acompanhamento das ações que te interessam (preço, P/L, dividendo, critérios da lente e moat, cada um com alerta) e alertas da carteira.
 
 - **Sem servidor e sem base de dados para instalar.** Os dados ficam num único ficheiro SQLite no teu computador.
 - **Abre-se com um duplo clique.** O script de arranque prepara tudo na primeira vez e abre o browser; sem Python, há um **executável único** para Windows, macOS e Linux e uma **app Android** (APK).
