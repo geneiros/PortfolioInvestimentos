@@ -43,8 +43,10 @@
       <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
         <h6 class="fw-bold mb-0" id="lensName"></h6>
         <span class="small text-secondary" id="lensText"></span>
+        <span class="badge text-bg-warning d-none" id="lensCustom">personalizado</span>
         <span class="small ms-auto" id="lensSummary"></span>
       </div>
+      <div class="pm-crit small mb-2" id="lensCrit" aria-label="Critérios desta lente"></div>
       <div class="row g-2 align-items-center small">
         <div class="col-12 col-md"><div class="input-group input-group-sm"><span class="input-group-text"><i class="bi bi-search"></i></span>
           <input class="form-control" id="fSearch" type="search" placeholder="Empresa, ticker ou país" aria-label="Procurar"></div></div>
@@ -52,7 +54,9 @@
         <div class="col-6 col-md-auto"><select class="form-select form-select-sm" id="fSector" aria-label="Setor"><option value="">Todos os setores</option>{% for s in sectors %}<option>{{ s }}</option>{% endfor %}</select></div>
         <div class="col-6 col-md-auto"><select class="form-select form-select-sm" id="fSort" aria-label="Ordenação">
           <option value="best">Melhor nesta lente</option><option value="cap">Maior capitalização</option><option value="pe">P/L mais baixo</option>
-          <option value="roe">ROE mais alto</option><option value="rg">Vendas a crescer mais</option><option value="dv">Dividendo mais alto</option><option value="name">Nome</option></select></div>
+          <option value="roe">ROE mais alto</option><option value="rg">Vendas a crescer mais</option><option value="dv">Dividendo mais alto</option><option value="name">Nome</option>
+          <option value="k">Mais lentes</option>
+          <optgroup label="Por lente (as que entram primeiro)">{% for l in lens_list if l.key != 'varias' %}<option value="lens:{{ l.key }}">{{ l.name }}</option>{% endfor %}</optgroup></select></div>
         <div class="col-6 col-md-auto"><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" id="fOnly" checked><label class="form-check-label" for="fOnly">Só as que entram</label></div></div>
       </div>
     </div>

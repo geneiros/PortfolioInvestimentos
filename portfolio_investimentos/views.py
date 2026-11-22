@@ -598,17 +598,39 @@ def triagem():
         rows.append([r["t"], r["n"], r["c"], r["g"], r["s"], r["cur"], _short(r["p"]), _short(r["cap"], 3),
                      _short(r["pe"], 3), _short(r["pb"], 3), _short(r["roe"], 3), _short(r["rg"], 3),
                      _short(r["dv"], 3), _short(r["de"], 3), "".join(code[r["st"][k]] for k in order), r["k"],
-                     1 if r["full"] else 0])
+                     1 if r["full"] else 0, [_short(v, 4) for v in r["cv"]]])
     watched = {}
     for w in WatchItem.query.all():
         watched.setdefault(w.instrument, []).append(w.list_id)
     lens_list = [{"key": k, "name": v["name"], "sub": v["sub"], "text": v["text"]}
                  for k, v in lenses.LENSES.items()]
     c.update(tab=tab, lists=_radar_lists(), lens_list=lens_list,
-             triage_json=ctx.js_json({"order": order, "rows": rows, "watched": watched}),
+             triage_json=ctx.js_json({"order": order, "rows": rows, "watched": watched, "spec": lenses.spec()}),
              regions=sorted({r["g"] for r in (tab or {}).get("rows", [])}),
              sectors=sorted({r["s"] for r in (tab or {}).get("rows", []) if r["s"]}))
     return render_template("pages/triagem.html", **c)
+
+
+def _lens_overrides(raw):
+    """Os critérios mudados na página (temporários): {lente: {chave: limite ou None}}, só com o que existe."""
+    import json
+    from .services import lenses
+    try:
+        data = json.loads(raw or "{}")
+    except ValueError:
+        return {}
+    out = {}
+    for lens, crit in (data.items() if isinstance(data, dict) else []):
+        if lens not in lenses.REAL or not isinstance(crit, dict):
+            continue
+        keys = {f.key for f in lenses.LENSES[lens]["criteria"]}
+        clean = {}
+        for k, v in crit.items():
+            if k in keys and (v is None or (isinstance(v, (int, float)) and not isinstance(v, bool))):
+                clean[k] = v
+        if clean:
+            out[lens] = clean
+    return out
 
 
 @bp.route("/radar/acao/<ticker>")
@@ -616,8 +638,9 @@ def triagem_acao(ticker):
     """A ficha completa de uma ação (o painel ao lado da tabela da triagem)."""
     from .services import lenses, moat, triage, yahoo
     ticker = ticker.strip().upper()[:32]
+    overrides = _lens_overrides(request.args.get("p"))
     try:
-        d = triage.detail(ticker)
+        d = triage.detail(ticker, overrides)
     except yahoo.YahooError as exc:
         return render_template("pages/_triagem_ficha.html", error=str(exc), ticker=ticker)
     in_lists = [w.list_id for w in WatchItem.query.filter_by(instrument=ticker).all()]

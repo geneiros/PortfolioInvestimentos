@@ -116,12 +116,13 @@ def _c(label, key, op, limit, fmt="{:.1f}", unit="", scale=1.0, text=None):
     def f(m):
         v = m.get(key)
         return (None if v is None else v * scale), limit, op, text or label
-    f.label, f.fmt, f.unit = label, fmt, unit
+    f.label, f.fmt, f.unit, f.key = label, fmt, unit, key
     return f
 
 
-def _custom(label, fn, fmt="{:.1f}", unit=""):
+def _custom(label, fn, fmt="{:.1f}", unit="", key=None):
     fn.label, fn.fmt, fn.unit = label, fmt, unit
+    fn.key = key or getattr(fn, "key", None) or fn.__name__.lstrip("_")
     return fn
 
 
@@ -150,7 +151,8 @@ def _fcf_pos(m):
 
 def _size(limit):
     return _custom("Tamanho", lambda m: ((m["cap_usd"] / 1e6) if m.get("cap_usd") else None, limit, ">=",
-                                        f"Capitalização de pelo menos {limit / 1000:g} mil M$"), "{:,.0f}", " M$")
+                                        f"Capitalização de pelo menos {limit / 1000:g} mil M$"), "{:,.0f}", " M$",
+                   key="cap_musd")
 
 
 def _near_high(m):
@@ -158,12 +160,17 @@ def _near_high(m):
     return v, 0.15, "<=", "Até 15% abaixo do máximo de 52 semanas"
 
 
-for _f, _label in ((_not_us, "Fora dos EUA"), (_profit, "Tem lucro"), (_fcf_pos, "Caixa livre positivo")):
-    _custom(_label, _f, "bool")
+for _f, _label, _key in ((_not_us, "Fora dos EUA", "not_us"), (_profit, "Tem lucro", "profit"),
+                         (_fcf_pos, "Caixa livre positivo", "fcf_pos")):
+    _custom(_label, _f, "bool", key=_key)
+_pe_pb.key, _graham.key, _near_high.key = "pe_pb", "graham_gap", "from_high"
 
 
 def _greenblatt(m):
     return m.get("magic_q"), 1.0, "<=", "Quartil de topo do ranking (ROE + earnings yield)"
+
+
+_greenblatt.key = "magic_q"
 
 
 LENSES = {
@@ -213,7 +220,7 @@ LENSES = {
         "name": "Bazin", "sub": "Preço-teto pelo dividendo",
         "text": "Rendimento de pelo menos 6%, com payout e dívida dentro do limite.",
         "query": [("forward_dividend_yield", "btwn", (5, 25)), ("peratio.lasttwelvemonths", "btwn", (2, 30))],
-        "criteria": [_c("Rendimento de 6%", "div", ">=", 6, "{:.1f}", "%", 100), _profit,
+        "criteria": [_c("Rendimento", "div", ">=", 6, "{:.1f}", "%", 100, "Rendimento de pelo menos 6%"), _profit,
                      _c("Payout sustentável", "payout", "<=", 85, "{:.0f}", "%", 100),
                      _c("Dívida / capital", "de", "<=", 1.0, "{:.2f}")],
     },
@@ -267,13 +274,18 @@ def _status(v, limit, op):
     return "near" if gap <= NEAR else "fail"
 
 
-def evaluate(lens, m):
+def evaluate(lens, m, overrides=None):
     """(estado, [(rótulo, texto, valor formatado, estado)]) de uma ação numa lente: «entra», «quase», «falha» ou
-    None (sem dados)."""
+    None (sem dados). `overrides` = {chave do critério: limite, ou None para o desligar} (critérios mudados na
+    página, temporários)."""
     rows, passes, fails, nears, known = [], 0, 0, 0, 0
-    crit = LENSES[lens]["criteria"]
+    overrides = overrides or {}
+    crit = [f for f in LENSES[lens]["criteria"] if not (f.key in overrides and overrides[f.key] is None)]
     for f in crit:
         v, limit, op, text = f(m)
+        if f.key in overrides and f.fmt != "bool":
+            limit = float(overrides[f.key])
+            text = f"{f.label} {'≤' if op == '<=' else '≥'} {_shown(limit, f)}"
         st = _status(v, limit, op)
         if v is None:
             shown = None
@@ -296,6 +308,53 @@ def evaluate(lens, m):
     if (fails == 0 and nears <= 2) or (fails == 1 and nears == 0 and known >= 5):
         return "quase", rows
     return "falha", rows
+
+
+def _shown(limit, f):
+    """O limite como se escreve na página (as frações em %)."""
+    scale = DISPLAY_SCALE.get(f.key, 1)
+    v = limit * scale
+    unit = "%" if scale == 100 else f.unit
+    return (f"{v:g}" if abs(v) >= 1 or v == 0 else f"{v:.2g}").replace(".", ",") + unit
+
+
+# critérios em fração mostrados em % na página (o resto já vem na unidade do limite)
+DISPLAY_SCALE = {"graham_gap": 100, "from_high": 100}
+STEP = {"cap_musd": 100, "magic_q": 1, "pe_pb": 0.5, "current": 0.1, "de": 0.05, "peg": 0.05,
+        "net_debt_ebitda": 0.1, "pe": 0.5}
+
+
+def spec():
+    """As lentes e os critérios, para a página poder mudar os limites (temporariamente) e recalcular."""
+    out, keys = [], []
+    for k, v in LENSES.items():
+        if v.get("meta"):
+            out.append({"key": k, "meta": True, "min": 2})
+            continue
+        crit = []
+        for f in v["criteria"]:
+            _, limit, op, text = f({})
+            scale = DISPLAY_SCALE.get(f.key, 1)
+            crit.append({"key": f.key, "label": f.label, "text": text, "op": op, "limit": limit, "scale": scale,
+                         "unit": "%" if scale == 100 else f.unit, "kind": "bool" if f.fmt == "bool" else "limit",
+                         "step": STEP.get(f.key, 1)})
+            if f.key not in keys:
+                keys.append(f.key)
+        out.append({"key": k, "criteria": crit})
+    return {"lenses": out, "keys": keys}
+
+
+KEYS = []  # preenchido no fim do módulo (a ordem de `spec()["keys"]`)
+
+
+def criterion_values(m):
+    """Os valores de todos os critérios de uma ação (na unidade do limite), pela ordem de `spec()["keys"]`."""
+    seen = {}
+    for v in LENSES.values():
+        for f in v.get("criteria", []):
+            if f.key not in seen:
+                seen[f.key] = f(m)[0]
+    return [seen[k] for k in KEYS]
 
 
 def tags(m):
@@ -339,3 +398,6 @@ def blurb(m):
         return ""
     s = parts[0] + (". " + ", ".join(parts[1:]).capitalize() if len(parts) > 1 else "")
     return s.replace(". As", ". As") + "."
+
+
+KEYS.extend(spec()["keys"])

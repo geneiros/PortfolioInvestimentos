@@ -291,7 +291,8 @@ def table():
         out.append({"t": x["r"]["ticker"], "n": x["r"]["name"], "c": m["country"], "g": m["region"],
                     "s": m["sector"] or "", "cur": m["currency"], "p": m["price"], "cap": m["cap_usd"],
                     "pe": m["pe"], "pb": m["pb"], "roe": m["roe"], "rg": m["rev_growth"], "dv": m["div"],
-                    "de": m["de"], "st": st, "k": len(enters), "full": x["info"], "mq": m.get("magic_q")})
+                    "de": m["de"], "st": st, "k": len(enters), "full": x["info"], "mq": m.get("magic_q"),
+                    "cv": lenses.criterion_values(m)})
     return {"at": u["at"], "rows": out, "errors": u.get("errors") or [],
             "stale": datetime.now() - datetime.fromisoformat(u["at"]) > STALE,
             "missing": sum(1 for x in out if not x["full"])}
@@ -443,7 +444,7 @@ def peers(ticker, m, info, data=None, rows=None):
     return {"scope": scope, "label": label, "n": len(group_m), "rows": out} if out else None
 
 
-def detail(ticker):
+def detail(ticker, overrides=None):
     """A ficha de uma ação do universo (ou de qualquer ação, lendo os dados ao Yahoo)."""
     from . import moat
     u = universe() or {"rows": []}
@@ -460,11 +461,14 @@ def detail(ticker):
     tab = table() or {"rows": []}
     me = next((x for x in tab["rows"] if x["t"] == ticker), None)
     m["magic_q"] = me.get("mq") if me else None  # fora do universo, o ranking de Greenblatt não se aplica
-    evals = {k: lenses.evaluate(k, m) for k in lenses.REAL}
+    overrides = overrides or {}
+    evals = {k: lenses.evaluate(k, m, overrides.get(k)) for k in lenses.REAL}
     if me:  # o estado é o da tabela (conta com o ranking e com as ações ainda sem os dados completos)
-        evals = {k: (me["st"][k], rows) for k, (_, rows) in evals.items()}
+        evals = {k: ((me["st"][k] if k not in overrides else s_), rows) for k, (s_, rows) in evals.items()}
     return {"ticker": ticker, "name": row.get("name") or ticker, "m": m, "info": info, "evals": evals,
             "enters": [k for k, (s, _) in evals.items() if s == "entra"], "tags": lenses.tags(m),
             "blurb": lenses.blurb(m), "graham": lenses.graham_number(m), "bazin": lenses.bazin_ceiling(m),
             "row": row, "in_universe": me is not None, "questions": QUESTIONS, "answers": answers(ticker),
-            "val": valuation_of(ticker, m, info), "peers": peers(ticker, m, info, data, u["rows"])}
+            "val": valuation_of(ticker, m, info), "peers": peers(ticker, m, info, data, u["rows"]),
+            "custom": [k for k in lenses.REAL if k in overrides],
+            "custom_names": [lenses.LENSES[k]["name"] for k in lenses.REAL if k in overrides]}

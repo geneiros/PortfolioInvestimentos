@@ -4023,3 +4023,39 @@ def test_triage_peers_same_industry():
     assert next(r for r in out["rows"] if r["key"] == "roe")["me"] == 100  # acima do máximo: no fim da barra
     assert [r["key"] for r in out["rows"]] == ["pe", "roe"]  # sem dados suficientes, a medida não aparece
     assert triage.peers("X", me, {"industry": "Outra", "sector": "Outro"}, data, rows) is None  # poucos pares
+
+
+def test_lens_criteria_overrides_and_spec():
+    from portfolio_investimentos.services import lenses
+    m = {"pe": 10.0, "pb": 1.2, "price": 50.0, "eps": 5.0, "bvps": 41.7, "current": 1.0, "de": 0.9, "profit": True,
+         "cap_usd": 5e9, "div": 0.05, "payout": 0.4}
+    assert lenses.evaluate("bazin", m)[0] == "falha"  # rendimento de 5% < 6%
+    status, rows = lenses.evaluate("bazin", m, {"div": 4})  # limite mais largo: entra
+    assert status == "entra" and rows[0][1] == "Rendimento ≥ 4%"
+    assert lenses.evaluate("graham_def", m)[0] == "falha"
+    assert lenses.evaluate("graham_def", m, {"current": None, "de": 1.0})[0] == "entra"  # desligado e mais largo
+    sp = lenses.spec()
+    assert [x["key"] for x in sp["lenses"]] == list(lenses.LENSES) and sp["lenses"][0]["meta"]
+    for x in sp["lenses"][1:]:
+        keys = [c["key"] for c in x["criteria"]]
+        assert len(keys) == len(set(keys)) and all(k in sp["keys"] for k in keys)
+    assert len(lenses.criterion_values(m)) == len(sp["keys"])
+
+
+def test_triage_page_has_criteria_and_profile_overrides(app, client, monkeypatch):
+    from portfolio_investimentos.services import moat, triage
+    monkeypatch.setattr(triage.screener, "fetch_yahoo", lambda body: {"total": 1, "quotes": [_tq("KO", "The Coca-Cola Company", "NYQ")]})
+    token = csrf(client)
+    for _ in range(5):
+        if post(client, "triage_refresh", token).get_json()["message"]["done"]:
+            break
+    monkeypatch.setattr(moat, "info_of", lambda t: _tinfo(dividendYield=4.0))
+    post(client, "triage_enrich", token)
+    html = client.get("/radar").get_data(as_text=True)
+    assert '"spec"' in html and 'id="lensCrit"' in html and 'value="lens:bazin"' in html and "Mais lentes" in html
+    plain = client.get("/radar/acao/KO").get_data(as_text=True)
+    assert "Com os teus critérios" not in plain
+    html = client.get('/radar/acao/KO?p={"bazin":{"div":3.5,"profit":null},"nada":{"x":1}}').get_data(as_text=True)
+    assert "Com os teus critérios em Bazin" in html and "Rendimento ≥ 3,5%" in html
+    assert "Tem lucro" not in html.split('data-lens-detail="bazin"', 1)[1].split("</details>", 1)[0]
+    assert client.get("/radar/acao/KO?p=nao-e-json").status_code == 200

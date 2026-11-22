@@ -55,8 +55,48 @@
   const ORDER = T.order;  // as lentes reais e, no fim, «varias»
   const REAL = ORDER.filter((k) => k !== "varias");
   const R = T.rows.map((r) => ({ t: r[0], n: r[1], c: r[2], g: r[3], s: r[4], cur: r[5], p: r[6], cap: r[7], pe: r[8], pb: r[9],
-    roe: r[10], rg: r[11], dv: r[12], de: r[13], st: r[14], k: r[15], full: r[16] }));
-  const st = (r, lens) => r.st[ORDER.indexOf(lens)];
+    roe: r[10], rg: r[11], dv: r[12], de: r[13], st: r[14], k: r[15], full: r[16], cv: r[17] || [] }));
+  // ---- os critérios de cada lente, que se podem mudar (temporariamente, só nesta página)
+  const SPEC = T.spec || { lenses: [], keys: [] };
+  const KIDX = Object.fromEntries(SPEC.keys.map((k, i) => [k, i]));
+  const CRIT = Object.fromEntries(SPEC.lenses.filter((l) => !l.meta).map((l) => [l.key, l.criteria]));
+  const custom = {};  // {lente: {chave: limite | null (desligado)}}
+  let variasMin = 2;
+  let version = 0;  // muda quando os critérios mudam (para limpar a cache dos estados)
+  const isCustom = (k) => (k === "varias" ? variasMin !== 2 : !!custom[k] && Object.keys(custom[k]).length > 0);
+  const anyCustom = () => variasMin !== 2 || REAL.some(isCustom);
+  // o mesmo cálculo de lenses.evaluate (Python): perto = a menos de 15% do limite
+  const evaluate = (r, k) => {
+    const over = custom[k] || {};
+    const crit = CRIT[k].filter((c) => over[c.key] !== null);
+    let known = 0, passes = 0, fails = 0, nears = 0;
+    for (const c of crit) {
+      const v = r.cv[KIDX[c.key]];
+      if (v === null || v === undefined) continue;
+      const limit = c.kind !== "bool" && over[c.key] !== undefined ? over[c.key] : c.limit;
+      known += 1;
+      if (c.op === "<=" ? v <= limit : v >= limit) { passes += 1; continue; }
+      const gap = Math.abs(v - limit) / (limit ? Math.abs(limit) : 1);
+      if (gap <= 0.15) nears += 1; else fails += 1;
+    }
+    if (known === 0 || known < 0.6 * crit.length) return "-";
+    if (passes === known) return "e";
+    if ((fails === 0 && nears <= 2) || (fails === 1 && nears === 0 && known >= 5)) return "q";
+    return "f";
+  };
+  const enters = (r) => REAL.filter((k) => st(r, k) === "e").length;
+  const st = (r, k) => {
+    if (!anyCustom()) return r.st[ORDER.indexOf(k)];  // os estados do servidor
+    if (r._v !== version) { r._v = version; r._s = {}; }
+    if (r._s[k] !== undefined) return r._s[k];
+    let out;
+    if (k === "varias") {
+      const n = enters(r);
+      out = n >= variasMin ? "e" : (n === variasMin - 1 && variasMin > 1 ? "q" : "f");
+    } else out = isCustom(k) ? evaluate(r, k) : r.st[ORDER.indexOf(k)];
+    r._s[k] = out;
+    return out;
+  };
   const nf = (d) => new Intl.NumberFormat("pt-PT", { minimumFractionDigits: d, maximumFractionDigits: d });
   const num = (v, d = 1) => (v === null || v === undefined ? "—" : nf(d).format(v));
   const pct = (v, d = 0) => (v === null || v === undefined ? "—" : nf(d).format(v * 100) + "%");
@@ -119,7 +159,8 @@
     const by = {
       best: (r) => [RANK[st(r, lens)], SORTS[lens](r)], cap: (r) => [-(r.cap || 0)], pe: (r) => [r.pe ?? 1e9],
       roe: (r) => [-(r.roe ?? -1e9)], rg: (r) => [-(r.rg ?? -1e9)], dv: (r) => [-(r.dv ?? 0)], name: (r) => [r.n.toLowerCase()],
-    }[key];
+      k: (r) => [-enters(r), SORTS.varias(r)],
+    }[key] || (key.startsWith("lens:") ? ((k) => (r) => [RANK[st(r, k)], SORTS[k](r)])(key.slice(5)) : (r) => [RANK[st(r, lens)], SORTS[lens](r)]);
     rows = rows.map((r) => [by(r), r]).sort((a, b) => {
       for (let i = 0; i < a[0].length; i++) { if (a[0][i] < b[0][i]) return -1; if (a[0][i] > b[0][i]) return 1; }
       return 0;
@@ -127,6 +168,8 @@
     const n = rows0.filter((r) => st(r, lens) === "e").length;
     const nq = rows0.filter((r) => st(r, lens) === "q").length;
     document.getElementById("lensName").textContent = L[lens].name;
+    document.getElementById("lensCustom").classList.toggle("d-none", !isCustom(lens));
+    document.querySelectorAll("[data-lens]").forEach((b) => b.classList.toggle("pm-lens-custom", isCustom(b.dataset.lens)));
     document.getElementById("lensText").textContent = L[lens].text;
     document.getElementById("lensSummary").innerHTML = `<b>${n}</b> entram · ${nq} quase · ${rows0.length} na lista`;
     document.getElementById("triageBody").innerHTML = rows.slice(0, shown).map(rowHtml).join("")
@@ -142,8 +185,61 @@
     document.querySelectorAll("[data-lens]").forEach((x) => x.classList.toggle("active", x === b));
     lens = b.dataset.lens;
     shown = 150;
+    critPanel();
     render();
   }));
+
+  // ---------------------------------------------------------------- os critérios da lente escolhida
+  const critBox = document.getElementById("lensCrit");
+  const shownLimit = (c, v) => String(Math.round(v * c.scale * 1000) / 1000).replace(".", ",");
+  const critPanel = () => {
+    if (!critBox) return;
+    if (lens === "varias") {
+      critBox.innerHTML = `<span class="pm-crit-item">Entra em pelo menos <input type="number" min="1" max="${REAL.length}" step="1"
+        class="form-control form-control-sm pm-crit-input" data-varias value="${variasMin}" aria-label="Número mínimo de lentes"> lentes</span>
+        ${isCustom("varias") ? '<button type="button" class="btn btn-sm btn-link p-0" data-crit-reset>Repor</button>' : ""}`;
+      return;
+    }
+    const over = custom[lens] || {};
+    critBox.innerHTML = CRIT[lens].map((c) => {
+      const on = over[c.key] !== null;
+      const limit = over[c.key] !== undefined && over[c.key] !== null ? over[c.key] : c.limit;
+      const changed = over[c.key] !== undefined;
+      const id = `crit-${lens}-${c.key}`;
+      const input = c.kind === "bool" ? "" : ` ${c.op === "<=" ? "≤" : "≥"} <input type="text" inputmode="decimal" class="form-control form-control-sm pm-crit-input"
+        data-crit="${c.key}" value="${shownLimit(c, limit)}" ${on ? "" : "disabled"} aria-label="${esc(c.label)}">${esc(c.unit.trim())}`;
+      return `<span class="pm-crit-item${changed ? " pm-crit-changed" : ""}${on ? "" : " pm-crit-off"}">
+        <input class="form-check-input" type="checkbox" id="${id}" data-crit-on="${c.key}" ${on ? "checked" : ""} title="Contar este critério">
+        <label for="${id}">${esc(c.label)}</label>${input}</span>`;
+    }).join("") + (isCustom(lens) ? ' <button type="button" class="btn btn-sm btn-link p-0" data-crit-reset>Repor</button>' : "");
+  };
+  const changed = () => { version += 1; shown = 150; render(); };
+  if (critBox) {
+    critBox.addEventListener("change", (e) => {
+      const el = e.target;
+      if (el.dataset.varias !== undefined) {
+        variasMin = Math.max(1, Math.min(REAL.length, parseInt(el.value, 10) || 2));
+      } else if (el.dataset.critOn) {
+        const k = el.dataset.critOn;
+        custom[lens] = custom[lens] || {};
+        if (el.checked) delete custom[lens][k]; else custom[lens][k] = null;
+      } else if (el.dataset.crit) {
+        const c = CRIT[lens].find((x) => x.key === el.dataset.crit);
+        const v = parseFloat(el.value.replace(/\s/g, "").replace(",", "."));
+        custom[lens] = custom[lens] || {};
+        if (Number.isFinite(v) && Math.abs(v / c.scale - c.limit) > 1e-9) custom[lens][c.key] = v / c.scale;
+        else delete custom[lens][c.key];
+      } else return;
+      critPanel();
+      changed();
+    });
+    critBox.addEventListener("click", (e) => {
+      if (!e.target.closest("[data-crit-reset]")) return;
+      if (lens === "varias") variasMin = 2; else delete custom[lens];
+      critPanel();
+      changed();
+    });
+  }
   document.addEventListener("pm:saved", render);
 
   // ---------------------------------------------------------------- a ficha
@@ -155,7 +251,9 @@
     panel.classList.add("pm-open");
     body.innerHTML = '<div class="text-center text-secondary py-5"><span class="spinner-border"></span></div>';
     try {
-      const res = await fetch(`/radar/acao/${encodeURIComponent(ticker)}?lente=${encodeURIComponent(lens)}`, { credentials: "same-origin" });
+      const over = Object.fromEntries(REAL.filter(isCustom).map((k) => [k, custom[k]]));
+      const extra = Object.keys(over).length ? `&p=${encodeURIComponent(JSON.stringify(over))}` : "";
+      const res = await fetch(`/radar/acao/${encodeURIComponent(ticker)}?lente=${encodeURIComponent(lens)}${extra}`, { credentials: "same-origin" });
       if (selected !== ticker) return;
       body.innerHTML = await res.text();
       body.scrollTop = 0;
@@ -199,5 +297,6 @@
   document.addEventListener("pm:saved", (e) => { if (e.detail.ticker === selected) open(selected); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") panel.classList.remove("pm-open"); });
 
+  critPanel();
   render();
 })();
