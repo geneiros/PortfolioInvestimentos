@@ -4,6 +4,15 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-22
 
+- **Versão 0.6.0**  
+  Executáveis e APK novos com a Prospeção nova:
+  - a triagem das ações do mundo pelas lentes dos grandes investidores, com os critérios editáveis e a ordenação por lente;
+  - a ficha completa da ação, com «O valor da ação» e «Ao lado dos pares»;
+  - as listas de acompanhamento em quadro de cartões, com estados, prioridade, notas, perguntas, exportar e importar.
+
+  Ao abrir, as ações que já acompanhavas passam para «A minha lista», no estado «Por abrir», com uma cópia da base de dados guardada antes. Quem tem uma versão anterior vê a faixa «Há uma versão nova».
+- **README: capturas e funcionalidades atualizadas**  
+  Todas as capturas refeitas, claro e escuro. A da triagem mostra os critérios de uma lente mudados; a da ficha mostra «O valor da ação» e os pares. Na tabela de funcionalidades, Prospeção passa para a seguir ao Planeamento, como no menu.
 - **Margem do conteúdo**  
   O espaço à volta do conteúdo das páginas passa de 1,5rem para 1rem, igual em todos os ecrãs.
 - **Triagem: os critérios de cada lente, editáveis, e ordenar por lente**  
