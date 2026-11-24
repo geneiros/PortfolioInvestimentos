@@ -3,6 +3,17 @@
 {% from "macros.html" import help, logo %}
 <div class="row g-3">
   <div class="col-xl-5">
+    <div class="pm-card mb-3" id="themeSettings">
+      <div class="pm-label mb-2">Tema</div>
+      <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Tema">
+        <button type="button" class="btn btn-outline-secondary" data-pm-theme="light"><i class="bi bi-sun me-1"></i>Claro</button>
+        <button type="button" class="btn btn-outline-secondary" data-pm-theme="dark"><i class="bi bi-moon-stars me-1"></i>Escuro</button>
+        <button type="button" class="btn btn-outline-secondary" data-pm-theme="purple"><i class="bi bi-palette me-1"></i>Purple</button>
+        <button type="button" class="btn btn-outline-secondary" data-pm-theme="auto"><i class="bi bi-circle-half me-1"></i>Automático</button>
+      </div>
+      <p class="small text-body-secondary mt-2 mb-0">«Automático» segue o tema claro ou escuro do sistema. Fica guardado neste browser.</p>
+    </div>
+
     <div class="pm-card mb-3">
       <div class="pm-label mb-3">Corretoras</div>
       {% for b in brokers %}
@@ -181,6 +192,13 @@
           <button class="btn btn-sm btn-outline-danger text-nowrap" type="submit"><i class="bi bi-unlock"></i> Remover</button>
         </form>
         {% endif %}
+      {% endif %}
+      {% if auth_enabled %}
+      <hr>
+      <div class="d-flex align-items-center gap-2">
+        <span class="small text-body-secondary me-auto">Terminar a sessão neste browser (a cópia offline é apagada).</span>
+        <button class="btn btn-sm btn-outline-secondary text-nowrap" type="button" data-pm-action="logout" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Sair</button>
+      </div>
       {% endif %}
     </div>
 

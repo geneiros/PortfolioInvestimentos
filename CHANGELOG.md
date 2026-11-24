@@ -4,6 +4,10 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-24
 
+- **Tema e «Sair» passam para as Definições**  
+  O fundo do menu lateral deixa de ter os botões do tema e de sair. Nas Definições há um novo cartão «Tema», no topo, com Claro, Escuro, Purple e Automático (o escolhido fica destacado). O «Sair» fica no cartão «Segurança», quando a aplicação tem palavra-passe.
+- **Menu: recolher ou expandir com um pin ao lado do logótipo**  
+  O botão de recolher ou expandir o menu sai do fundo da barra lateral e passa a ser um pin no topo, à direita do logótipo: cheio com o menu expandido, vazio com o menu recolhido. Com o menu recolhido, o pin fica por baixo do logótipo.
 - **Preços de 5 em 5 minutos: mais rápidos e com um spinner**  
   A atualização automática dos preços das posições abertas faz agora os pedidos ao Yahoo em paralelo (8 de cada vez), lê da base de dados só os últimos dias de cada ativo e grava tudo de uma vez. Com 25 posições e 5 moedas passou de cerca de 4,3 s para 0,8 s. Na atualização completa, cada ativo também deixa de carregar o histórico todo para gravar os dias novos. Enquanto atualiza, aparece um spinner na Visão Geral, ao lado da data da variação diária, no sítio da hora da última atualização.
 - **Triagem: até 1000 ações por lente**  
