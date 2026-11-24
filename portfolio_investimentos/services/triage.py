@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from ..models import Setting
 from . import lenses, screener
 
-PAGES = 2
+PAGES = 4  # 4 × 250 = até 1000 ações por lente
 PAGE_SIZE = 250
 STALE = timedelta(hours=24)
 INFO_STALE = timedelta(days=7)

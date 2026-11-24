@@ -63,13 +63,13 @@
     <div class="pm-card pm-card-sm p-0">
       <div class="pm-triage-wrap"><table class="table pm-table pm-triage-table align-middle mb-0" id="triageTable">
         <thead><tr>
-          <th>Empresa</th>
+          <th>Empresa {{ help("Nome da empresa, ticker e país da bolsa onde é negociada. A ampulheta indica que os dados ainda estão a ser completados.") }}</th>
           <th>Lentes {{ help("Um ponto por lente, pela ordem da lista à esquerda: cheio = entra, meio = quase, vazio = falha, tracejado = sem dados.") }}</th>
-          <th>Nesta</th>
-          <th class="text-end">P/L</th><th class="text-end">P/VP</th><th class="text-end">ROE</th>
-          <th class="text-end">Vendas {{ help("Crescimento das vendas no último ano.") }}</th><th class="text-end">Div.</th>
-          <th class="text-end">D/E {{ help("Dívida ÷ capital próprio.") }}</th><th class="text-end">Cap. {{ help("Capitalização em milhares de milhões de dólares (aproximado).") }}</th>
-          <th class="text-center">Guardar</th>
+          <th>Nesta {{ help("Como a ação fica na lente escolhida à esquerda: entra (passa em todos os critérios com dados), quase (o que falta está perto do limite), falha ou sem dados.") }}</th>
+          <th class="text-end">P/L {{ help("Preço ÷ lucro por ação: quantos anos de lucros atuais pagas pela ação. Mais baixo = mais barata face ao que ganha.") }}</th><th class="text-end">P/VP {{ help("Preço ÷ valor patrimonial (capital próprio) por ação. Abaixo de 1 = cotada abaixo do valor contabilístico.") }}</th><th class="text-end">ROE {{ help("Rentabilidade do capital próprio: lucro em % do capital dos acionistas. Verde a partir de 15%.") }}</th>
+          <th class="text-end">Vendas {{ help("Crescimento das vendas no último ano.") }}</th><th class="text-end">Div. {{ help("Dividend yield: dividendos pagos por ano, em % do preço atual.") }}</th>
+          <th class="text-end">D/E {{ help("Dívida ÷ capital próprio: quanto a empresa deve por cada euro dos acionistas. Vermelho acima de 1,5.") }}</th><th class="text-end">Cap. {{ help("Capitalização em milhares de milhões de dólares (aproximado).") }}</th>
+          <th class="text-center">Guardar {{ help("Guarda a ação numa lista de acompanhamento. O marcador cheio indica que já está numa lista.") }}</th>
         </tr></thead>
         <tbody id="triageBody"></tbody>
       </table></div>
