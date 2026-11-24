@@ -1040,6 +1040,8 @@ def test_password_login_flow(app, client):
     resp = post(client, "set_password", token, new_password="segredo123", confirm="segredo123")
     assert resp.status_code == 200
     assert client.get("/").status_code == 200  # quem definiu continua com a sessão aberta
+    assert 'data-pm-action="logout"' in client.get("/definicoes").get_data(as_text=True)  # «Sair» nas Definições
+    assert 'data-pm-action="logout"' not in client.get("/").get_data(as_text=True)  # e já não no menu
 
     other = app.test_client()  # outro dispositivo
     resp = other.get("/carteira", environ_base=REMOTE)
@@ -3220,8 +3222,10 @@ def test_etf_holdings_invesco_full_name_xlsx():
 
 def test_purple_theme_option(client):
     html = client.get("/").get_data(as_text=True)
-    assert 'data-pm-theme="purple"' in html and ">Purple</button>" in html
+    assert 'data-pm-theme=' not in html  # a escolha do tema está nas Definições, não no menu
     assert 'pref === "purple"' in html  # o tema aplica-se antes de a página aparecer
+    html = client.get("/definicoes").get_data(as_text=True)
+    assert 'data-pm-theme="purple"' in html and "Purple</button>" in html
     css = client.get("/static/css/pm.css").get_data(as_text=True)
     assert "html.pm-purple" in css and "#272236" in css and "#312b44" in css
 

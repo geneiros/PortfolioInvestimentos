@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-24
 
+- **Tema e «Sair» passam para as Definições**  
+  O fundo do menu lateral deixa de ter os botões do tema e de sair. Nas Definições há um novo cartão «Tema», no topo, com Claro, Escuro, Purple e Automático (o escolhido fica destacado). O «Sair» fica no cartão «Segurança», quando a aplicação tem palavra-passe.
 - **Menu: recolher ou expandir com um pin ao lado do logótipo**  
   O botão de recolher ou expandir o menu sai do fundo da barra lateral e passa a ser um pin no topo, à direita do logótipo: cheio com o menu expandido, vazio com o menu recolhido. Com o menu recolhido, o pin fica por baixo do logótipo.
 - **Preços de 5 em 5 minutos: mais rápidos e com um spinner**  

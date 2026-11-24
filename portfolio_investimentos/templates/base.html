@@ -48,23 +48,6 @@
       <li class="nav-item"><a href="{{ url }}" class="nav-link {{ 'active' if active == key else 'link-body-emphasis' }}"><i class="bi {{ icon }}"></i><span class="label">{{ label }}</span></a></li>
       {% endfor %}
     </ul>
-    <hr>
-    <div class="pm-sidebar-foot d-flex align-items-center gap-2">
-      <div class="dropup">
-        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Tema">
-          <i class="bi bi-circle-half"></i><span class="label ms-1">Tema</span>
-        </button>
-        <ul class="dropdown-menu">
-          <li><button class="dropdown-item" data-pm-theme="light"><i class="bi bi-sun me-2"></i>Claro</button></li>
-          <li><button class="dropdown-item" data-pm-theme="dark"><i class="bi bi-moon-stars me-2"></i>Escuro</button></li>
-          <li><button class="dropdown-item" data-pm-theme="purple"><i class="bi bi-palette me-2"></i>Purple</button></li>
-          <li><button class="dropdown-item" data-pm-theme="auto"><i class="bi bi-circle-half me-2"></i>Automático</button></li>
-        </ul>
-      </div>
-      {% if auth_enabled %}
-      <button class="btn btn-sm btn-outline-secondary" data-pm-action="logout" title="Sair"><i class="bi bi-box-arrow-right"></i><span class="label ms-1">Sair</span></button>
-      {% endif %}
-    </div>
   </aside>
   <div class="pm-backdrop d-lg-none" data-pm-toggle="menu" aria-hidden="true"></div>
 

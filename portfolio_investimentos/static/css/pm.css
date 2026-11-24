@@ -49,11 +49,6 @@ html.pm-purple[data-bs-theme="dark"] .modal { --bs-modal-bg: #272236; }
 .pm-content { padding: 1rem; }
 body.pm-collapsed .pm-sidebar { --pm-sidebar-width: 76px; }
 body.pm-collapsed .pm-sidebar .label, body.pm-collapsed .pm-sidebar .badge { display: none; }
-/* barra recolhida (76 px): os botões do fundo não cabem lado a lado; ficam em coluna, só com o ícone,
-   para o botão de expandir continuar visível */
-body.pm-collapsed .pm-sidebar-foot { flex-direction: column; align-items: center; }
-body.pm-collapsed .pm-sidebar-foot .ms-auto { margin-left: 0 !important; }
-body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
 /* o pin de recolher/expandir, ao lado do logótipo: cheio com o menu expandido (fixo), vazio recolhido; na barra
    recolhida fica por baixo do logótipo */
 .pm-pin { padding: 0 .15rem; line-height: 1; }
