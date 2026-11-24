@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-24
 
+- **Preços de 5 em 5 minutos: mais rápidos e com um spinner**  
+  A atualização automática dos preços das posições abertas faz agora os pedidos ao Yahoo em paralelo (8 de cada vez), lê da base de dados só os últimos dias de cada ativo e grava tudo de uma vez. Com 25 posições e 5 moedas passou de cerca de 4,3 s para 0,8 s. Na atualização completa, cada ativo também deixa de carregar o histórico todo para gravar os dias novos. Enquanto atualiza, aparece um spinner na Visão Geral, ao lado da data da variação diária, no sítio da hora da última atualização.
 - **Triagem: até 1000 ações por lente**  
   Ao carregar em «Atualizar», cada lente faz até 4 pesquisas de 250 ações ao Yahoo (eram 2), ou seja, até 1000 ações por lente em vez de 500. As lentes com menos resultados param mais cedo, como antes. O universo fica maior e a primeira atualização demora mais.
 - **Triagem: ajuda em todas as colunas da tabela**  

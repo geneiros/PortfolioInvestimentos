@@ -567,10 +567,14 @@
     const run = async () => {
       if (document.visibilityState !== "visible") return;
       last = Date.now();
+      // enquanto atualiza, um spinner no sítio da hora da última atualização (no fim volta a hora, nova ou a de antes)
+      const at = $("quickAt"), before = at ? at.textContent : "";
+      if (at) at.innerHTML = '<span class="spinner-border spinner-border-sm align-middle" style="width:.7rem;height:.7rem;border-width:.12em" role="status" aria-label="A atualizar os preços"></span>';
       try {
         const r = await pm.call("quick_quotes", {}, { silent: true });
         if (r && r.enabled) apply(r);
       } catch (e) { /* sem rede ou servidor ocupado: tenta na próxima */ }
+      if (at && at.querySelector(".spinner-border")) at.textContent = before;
     };
     const schedule = () => { clearInterval(timer); timer = setInterval(run, EVERY); };
     setTimeout(() => { run(); schedule(); }, 3000);

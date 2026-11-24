@@ -7,6 +7,7 @@ import logging
 import math
 import threading
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 import time as _time
 from datetime import date, datetime, time, timedelta, tzinfo
 from statistics import median
@@ -740,6 +741,7 @@ def refresh_step(only_open=False, restart=False, budget=STEP_BUDGET):
 
 QUICK_MIN_GAP = 240      # segundos entre pedidos rápidos (várias páginas abertas não multiplicam os pedidos)
 QUICK_BUDGET = 20.0      # segundos no máximo por atualização rápida
+QUICK_WORKERS = 8        # pedidos ao Yahoo em simultâneo na atualização rápida
 
 
 def quick_quotes_enabled():
@@ -766,34 +768,47 @@ def quick_quotes(instruments, regions=("EU",), force=False, client=None, now=Non
         return {"updated": 0, "fx": 0, "at": last, "skipped": "busy"}
     yf = client or _yahoo_client()
     since = date.today() - timedelta(days=6)
-    t0, updated, fx = _time.monotonic(), 0, 0
-    for inst in instruments:
-        symbol = getattr(inst, "data_symbol", None)
-        if not symbol or getattr(inst, "kind", None) == "index" or _time.monotonic() - t0 > QUICK_BUDGET:
-            continue
+    t0 = _time.monotonic()
+    # os pedidos ao Yahoo vão em paralelo (é quase só espera pela rede); a base de dados escreve-se depois,
+    # nesta thread, com um só commit
+    jobs = [("price", inst, inst.data_symbol) for inst in instruments
+            if getattr(inst, "data_symbol", None) and getattr(inst, "kind", None) != "index"]
+    jobs += [("fx", cur, f"EUR{cur}=X") for cur in sorted({getattr(i, "currency", "EUR") for i in instruments} - {"EUR"})]
+
+    def fetch(job):
+        kind, _, symbol = job
+        if _time.monotonic() - t0 > QUICK_BUDGET:
+            return None, None
         try:
             t = yf.Ticker(symbol)
-            hist = t.history(start=since, auto_adjust=False)
-            if hist is None or hist.empty:
-                continue
-            cur = (getattr(t, "history_metadata", None) or {}).get("currency")
-            cur, scale = SUBUNITS.get(cur, (cur, 1.0))
-            if cur and cur != inst.currency:
-                continue  # outra moeda (o símbolo mudou?): a atualização completa resolve
-            if any(split for _, row in hist.iterrows() for split in [_split(row)]):
-                continue  # desdobramento recente: precisa do histórico todo
-            if _upsert(Price, "instrument", inst.ticker, "close", hist, scale):
-                updated += 1
+            hist = t.history(start=since, auto_adjust=False) if kind == "price" else t.history(start=since)
+            return hist, (getattr(t, "history_metadata", None) or {}).get("currency")
         except Exception as exc:  # um ativo que falha não impede os outros
             log.info("cotação rápida de %s falhou: %s", symbol, exc)
-    for cur in sorted({getattr(i, "currency", "EUR") for i in instruments} - {"EUR"}):
-        if _time.monotonic() - t0 > QUICK_BUDGET:
-            break
+            return None, None
+    with ThreadPoolExecutor(max(1, min(QUICK_WORKERS, len(jobs)))) as pool:
+        results = list(pool.map(fetch, jobs))
+    updated, fx = 0, 0
+    for (kind, obj, symbol), (hist, cur) in zip(jobs, results):
+        if hist is None or hist.empty:
+            continue
+        scale = 1.0
         try:
-            if _upsert(FxRate, "currency", cur, "rate", yf.Ticker(f"EUR{cur}=X").history(start=since)):
-                fx += 1
-        except Exception as exc:
-            log.info("câmbio rápido de %s falhou: %s", cur, exc)
+            if kind == "price":
+                cur, scale = SUBUNITS.get(cur, (cur, 1.0))
+                if cur and cur != obj.currency:
+                    continue  # outra moeda (o símbolo mudou?): a atualização completa resolve
+                if any(_split(row) for _, row in hist.iterrows()):
+                    continue  # desdobramento recente: precisa do histórico todo
+            _closes(hist, scale)  # uma resposta estranha falha aqui, antes de mexer na base de dados
+        except Exception as exc:  # um ativo que falha não impede os outros
+            log.info("cotação rápida de %s falhou: %s", symbol, exc)
+            continue
+        if kind == "fx":
+            fx += 1 if _upsert(FxRate, "currency", obj, "rate", hist, commit=False) else 0
+        else:
+            updated += 1 if _upsert(Price, "instrument", obj.ticker, "close", hist, scale, commit=False) else 0
+    db.session.commit()
     at = now.isoformat(timespec="seconds")
     Setting.set("quick_quotes_at", at)
     return {"updated": updated, "fx": fx, "at": at, "skipped": None}
@@ -877,17 +892,23 @@ def _closes(hist, scale=1.0):
     return out[::-1]
 
 
-def _upsert(model, key_field, key, value_field, hist, scale=1.0):
-    existing = {r.date: r for r in model.query.filter(getattr(model, key_field) == key).all()}
+def _upsert(model, key_field, key, value_field, hist, scale=1.0, commit=True):
+    closes = _closes(hist, scale)
+    if not closes:
+        return 0
+    # só os registos dos dias que chegaram (numa atualização rápida são uns dias, não o histórico todo)
+    existing = {r.date: r for r in model.query.filter(getattr(model, key_field) == key,
+                                                      model.date >= closes[0][0]).all()}
     n = 0
-    for d, v in _closes(hist, scale):
+    for d, v in closes:
         rec = existing.get(d)
         if rec is None:
             rec = model(**{key_field: key, "date": d})
             db.session.add(rec)
         setattr(rec, value_field, v)
         n += 1
-    db.session.commit()
+    if commit:
+        db.session.commit()
     return n
 
 
