@@ -54,6 +54,13 @@ body.pm-collapsed .pm-sidebar .label, body.pm-collapsed .pm-sidebar .badge { dis
 body.pm-collapsed .pm-sidebar-foot { flex-direction: column; align-items: center; }
 body.pm-collapsed .pm-sidebar-foot .ms-auto { margin-left: 0 !important; }
 body.pm-collapsed .pm-sidebar-foot .dropdown-toggle::after { display: none; }
+/* o pin de recolher/expandir, ao lado do logótipo: cheio com o menu expandido (fixo), vazio recolhido; na barra
+   recolhida fica por baixo do logótipo */
+.pm-pin { padding: 0 .15rem; line-height: 1; }
+.pm-pin .pm-pin-off, body.pm-collapsed .pm-pin .pm-pin-on { display: none; }
+body.pm-collapsed .pm-pin .pm-pin-off { display: inline; }
+body.pm-collapsed .pm-sidebar-head { flex-direction: column; align-items: center !important; }
+body.pm-collapsed .pm-sidebar-head .ms-auto { margin-left: 0 !important; }
 
 /* ------------------------------------------------------------------ cartões (equivalentes a .card) */
 .pm-card {
