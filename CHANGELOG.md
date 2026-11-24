@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-24
 
+- **Menu recolhido: sem expandir e recolher ao mudar de página**  
+  Com o menu recolhido, cada página nova aparecia por instantes com o menu expandido até o JavaScript o recolher. Agora o estado do menu aplica-se logo no início da página, antes de ela aparecer.
 - **Tema e «Sair» passam para as Definições**  
   O fundo do menu lateral deixa de ter os botões do tema e de sair. Nas Definições há um novo cartão «Tema», no topo, com Claro, Escuro, Purple e Automático (o escolhido fica destacado). O «Sair» fica no cartão «Segurança», quando a aplicação tem palavra-passe.
 - **Menu: recolher ou expandir com um pin ao lado do logótipo**  

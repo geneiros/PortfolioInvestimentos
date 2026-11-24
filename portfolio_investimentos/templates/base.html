@@ -20,6 +20,10 @@
 </head>
 {% from "macros.html" import broker_badge %}
 <body data-offline="{{ 1 if offline_enabled else 0 }}"{% if quick_quotes %} data-quick="1"{% endif %} data-generated="{{ generated_at }}">
+<script>
+  // menu recolhido já antes de a página aparecer (sem o ver expandir e recolher a cada página)
+  try { if (localStorage.getItem("pm-collapsed") === "1") document.body.classList.add("pm-collapsed"); } catch (e) {}
+</script>
 <div id="pmProgress" aria-hidden="true"></div>
 <script>(function () {  // barra de progresso ao abrir a página: só no computador (rato e ecrã largo) e com a aplicação
   // acedida online (no próprio computador ou na rede de casa as páginas abrem logo); a mesma regra de pm.js
