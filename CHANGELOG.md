@@ -2,6 +2,13 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-24
+
+- **Triagem: até 1000 ações por lente**  
+  Ao carregar em «Atualizar», cada lente faz até 4 pesquisas de 250 ações ao Yahoo (eram 2), ou seja, até 1000 ações por lente em vez de 500. As lentes com menos resultados param mais cedo, como antes. O universo fica maior e a primeira atualização demora mais.
+- **Triagem: ajuda em todas as colunas da tabela**  
+  Todas as colunas da lista de ações têm agora um «?» que explica o indicador: Empresa, Nesta, P/L, P/VP, ROE, Div. e Guardar, além dos que já havia em Lentes, Vendas, D/E e Cap. O de D/E diz também que fica a vermelho acima de 1,5.
+
 ## 2026-11-22
 
 - **Versão 0.6.0**  
