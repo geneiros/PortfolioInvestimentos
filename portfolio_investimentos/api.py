@@ -11,8 +11,8 @@ from datetime import date
 from flask import Blueprint, Response, abort, current_app, jsonify, request, send_file, session
 
 from .models import (LIQUIDITY, OTHER_CATEGORIES, Alert, Broker, DividendHistory, Event, FxRate, ImportBatch, Instrument,
-                     OtherAsset, OtherAssetValue, PortfolioAlert, Price, Setting, Transaction, WatchItem, WatchList, WatchRule,
-                     WatchState, db)
+                     NewsItem, OtherAsset, OtherAssetValue, PortfolioAlert, Price, Setting, Transaction, WatchItem,
+                     WatchList, WatchRule, WatchState, db)
 from . import auth
 from .engine.formatting import parse_number
 from .engine.portfolio import ASSET_TYPES
@@ -1052,9 +1052,14 @@ def set_news_sources(**values):
     # sem nenhuma fonte fica "" (diferente de «sem valor», que é todas): o menu Notícias deixa de aparecer
     Setting.set("news_sources", ",".join(chosen))
     Setting.set("news_fetched", None)
+    # as notícias das fontes desligadas saem da base de dados (ao voltar a ligar uma fonte, pedem-se de novo)
+    gone = NewsItem.query.filter(db.or_(NewsItem.provider.is_(None), NewsItem.provider.notin_(chosen or [""]))) \
+        .delete(synchronize_session=False)
+    db.session.commit()
+    removed = f" {gone} {'notícia apagada' if gone == 1 else 'notícias apagadas'} das fontes desligadas." if gone else ""
     if not chosen:
-        return "Notícias desligadas: o menu Notícias fica escondido até ligares uma fonte."
-    return "Fontes de notícias guardadas."
+        return "Notícias desligadas: o menu Notícias fica escondido até ligares uma fonte." + removed
+    return "Fontes de notícias guardadas." + removed
 
 
 @action

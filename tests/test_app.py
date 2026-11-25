@@ -2486,7 +2486,7 @@ def test_news_settings_and_reset(app, client):
         db.session.commit()
     html = client.get("/definicoes").get_data(as_text=True).split('id="newsSources"', 1)[1]
     assert "Mais recente" in html and "Atualizar todas as fontes" in html
-    assert re.search(r'data-source="finnhub".*?<td class="text-end">1 ', html, re.S)  # 1 notícia do Finnhub
+    assert re.search(r'data-source="finnhub".*?<td class="text-end" data-news-count="1">1 ', html, re.S)  # 1 notícia do Finnhub
     assert post(client, "reset_data", token, confirm="APAGAR").status_code == 200
     with app.app_context():
         assert NewsItem.query.count() == 0
@@ -2750,16 +2750,15 @@ def test_news_hidden_when_source_unselected(app, client, monkeypatch):
                             NewsItem(ticker="", headline="Do Google", url="https://g.com/1", published=datetime.now(), provider="google")])
         db.session.commit()
     assert "Do Yahoo" in client.get("/noticias").get_data(as_text=True)
-    # desligar o Yahoo em Definições e gravar: as notícias dele deixam de aparecer (ficam guardadas)
+    # desligar o Yahoo em Definições e gravar: as notícias dele saem da base de dados
     assert post(client, "set_news_sources", token, source_google="1", source_yahoo="0", source_finnhub="1",
                 source_marketaux="1").status_code == 200
     html = client.get("/noticias").get_data(as_text=True)
     assert "Do Yahoo" not in html and "Do Google" in html and 'data-src="yahoo"' not in html
     with app.app_context():
-        assert NewsItem.query.filter_by(provider="yahoo").count() == 1
-        Setting.set("news_sources", None)
-        db.session.commit()
-    assert "Do Yahoo" in client.get("/noticias").get_data(as_text=True)  # ligado outra vez, volta a aparecer
+        assert NewsItem.query.filter_by(provider="yahoo").count() == 0
+        assert NewsItem.query.filter_by(provider="google").count() == 1
+        assert Setting.get("news_sources") == "finnhub,google,marketaux"
 
 
 def test_core_portfolio_removed(client):
@@ -3283,6 +3282,29 @@ def test_news_all_sources_off_hides_menu(app, client, monkeypatch):
     # ligar uma fonte repõe o menu
     post(client, "set_news_sources", token, **{**off, "source_google": "1"})
     assert 'href="/noticias"' in client.get("/").get_data(as_text=True)
+
+
+def test_news_sources_off_deletes_their_news(app, client):
+    from datetime import datetime
+    from portfolio_investimentos.models import NewsItem, db
+    from portfolio_investimentos.services import news
+    with app.app_context():
+        for i, prov in enumerate(["yahoo", "yahoo", "google", "finnhub"]):
+            db.session.add(NewsItem(ticker="AAPL", headline=f"n{i}", url=f"https://x/{i}", published=datetime.now(),
+                                    provider=prov))
+        db.session.commit()
+    token = csrf(client)
+    off = {f"source_{p}": "0" for p in news.PROVIDERS}
+    r = post(client, "set_news_sources", token, **{**off, "source_google": "1", "source_finnhub": "1"})
+    assert "2 notícias apagadas" in r.get_json()["message"]
+    with app.app_context():
+        assert sorted(n.provider for n in NewsItem.query) == ["finnhub", "google"]
+    r = post(client, "set_news_sources", token, **{**off, "source_google": "1", "source_finnhub": "1"})
+    assert r.get_json()["message"] == "Fontes de notícias guardadas."  # nada para apagar
+    r = post(client, "set_news_sources", token, **off)
+    assert "2 notícias apagadas" in r.get_json()["message"] and "Notícias desligadas" in r.get_json()["message"]
+    with app.app_context():
+        assert NewsItem.query.count() == 0
 
 
 def test_update_notice_only_in_executable(app, client, monkeypatch):

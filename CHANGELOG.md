@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-25
 
+- **Notícias: desligar uma fonte apaga as notícias dela**  
+  Em Definições → Notícias, ao tirar o visto de uma fonte e carregar em «Guardar», as notícias dessa fonte são apagadas da base de dados (antes ficavam guardadas, só escondidas). Se a fonte tiver notícias, a página pergunta antes quantas vão ser apagadas; depois de guardar, a mensagem diz quantas saíram. Ao voltar a ligar a fonte, as notícias pedem-se de novo.
 - **Menu recolhido: o nome da página num tooltip**  
   Com o menu recolhido, ao passar o rato por cima do ícone de uma página aparece o nome dela num tooltip, à direita. Com o menu expandido não aparece, porque o nome já se vê.
 
