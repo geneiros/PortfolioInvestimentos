@@ -158,9 +158,11 @@
         if (typeof args[el.name] === "string") args[el.name] = args[el.name].replace(".", ",");
       });
       // com um campo de ficheiro, vai o formulário tal como está (multipart), para o ficheiro chegar ao servidor
-      await pm.call(form.dataset.pmMethod, form.querySelector("input[type=file]") ? new FormData(form) : args);
-      if (form.dataset.pmSuccess) pm.toast(form.dataset.pmSuccess);
-      if (form.dataset.pmReload !== "false") setTimeout(() => location.reload(), form.dataset.pmSuccess ? 600 : 0);
+      const msg = await pm.call(form.dataset.pmMethod, form.querySelector("input[type=file]") ? new FormData(form) : args);
+      // data-pm-success="@": mostra a mensagem que o servidor devolveu
+      if (form.dataset.pmSuccess) pm.toast(form.dataset.pmSuccess === "@" && typeof msg === "string" ? msg : form.dataset.pmSuccess);
+      const wait = form.dataset.pmSuccess === "@" ? 1800 : form.dataset.pmSuccess ? 600 : 0;  // mensagem mais longa
+      if (form.dataset.pmReload !== "false") setTimeout(() => location.reload(), wait);
       else keepValues(form);
     } catch (err) { /* já mostrado */ } finally { if (btn) btn.disabled = false; }
   });

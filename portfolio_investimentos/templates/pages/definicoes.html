@@ -112,7 +112,7 @@
           {% if marketaux_saved %}<button class="btn btn-sm btn-link text-danger" type="button" data-pm-action="set_marketaux_key" data-args='{"key": ""}' data-confirm="Apagar a chave do Marketaux?">Apagar</button>{% endif %}
           {% endif %}
         </form>
-        <form class="mt-2" data-pm-method="set_news_sources" data-pm-success="Guardado." id="newsSources">
+        <form class="mt-2" data-pm-method="set_news_sources" data-pm-success="@" id="newsSources">
           <div class="d-flex flex-wrap align-items-baseline gap-2 mb-1"><span class="text-body-secondary">Fontes de notícias</span>
             <button class="btn btn-link btn-sm p-0" type="button" data-news-all="1">Todas</button>
             <button class="btn btn-link btn-sm p-0" type="button" data-news-all="0">Nenhuma</button>
@@ -121,7 +121,7 @@
           {% for key, name in news_providers.items() %}{% set st = news_stats.get(key, {}) %}
             <tr data-source="{{ key }}"><td><label class="d-flex gap-2 align-items-center"><input type="hidden" name="source_{{ key }}" value="0"><input class="form-check-input mt-0" type="checkbox" name="source_{{ key }}" value="1" {{ 'checked' if key in news_sources }}> {{ name }}
               {% if (key == 'finnhub' and not (finnhub_saved or finnhub_env)) or (key == 'marketaux' and not (marketaux_saved or marketaux_env)) %}<span class="text-body-secondary">(precisa da chave)</span>{% endif %}</label></td>
-              <td class="text-end">{{ st.count or 0 }}{% if st.count %} <span class="text-body-secondary">({{ st.assets }} {{ 'ativo' if st.assets == 1 else 'ativos' }}{{ ' + mercado' if st.market }})</span>{% endif %}</td>
+              <td class="text-end" data-news-count="{{ st.count or 0 }}">{{ st.count or 0 }}{% if st.count %} <span class="text-body-secondary">({{ st.assets }} {{ 'ativo' if st.assets == 1 else 'ativos' }}{{ ' + mercado' if st.market }})</span>{% endif %}</td>
               <td class="text-body-secondary text-nowrap">{{ st.last.strftime('%d/%m %H:%M') if st.last else '—' }}</td>
               {% set lr = news_last.get(key) %}
               <td class="text-nowrap small">{% if lr %}{{ lr.found }} em {{ lr.asked }} {{ 'pedido' if lr.asked == 1 else 'pedidos' }}{% if lr.new %} ({{ lr.new }} novas){% endif %}{% if lr.errors %} · <span class="text-danger">{{ lr.errors }} com erro</span>{% endif %}{% else %}<span class="text-body-secondary">—</span>{% endif %}</td></tr>
@@ -359,6 +359,18 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-news-all]").forEach((b) => b.addEventListener("click", () => {
     document.querySelectorAll('#newsSources input[type=checkbox][name^="source_"]').forEach((c) => { c.checked = b.dataset.newsAll === "1"; });
   }));
+  // desligar uma fonte apaga as notícias dela da base de dados: pede-se confirmação antes de guardar
+  const newsForm = document.getElementById("newsSources");
+  if (newsForm) newsForm.addEventListener("submit", (e) => {
+    const off = [...newsForm.querySelectorAll("tr[data-source]")].filter((tr) =>
+      !tr.querySelector('input[type=checkbox]').checked && Number(tr.querySelector("[data-news-count]")?.dataset.newsCount) > 0);
+    if (!off.length) return;
+    const n = off.reduce((a, tr) => a + Number(tr.querySelector("[data-news-count]").dataset.newsCount), 0);
+    const names = off.map((tr) => tr.querySelector("label").textContent.replace("(precisa da chave)", "").trim()).join(", ");
+    if (!confirm(`Desligar ${names} apaga ${n} ${n === 1 ? "notícia guardada" : "notícias guardadas"} dessa${off.length > 1 ? "s fontes" : " fonte"}. Continuar?`)) {
+      e.preventDefault(); e.stopPropagation();
+    }
+  });
   // diagnóstico da aplicação instalada: modo de abertura e cor pedida para a barra do sistema
   const info = document.getElementById("pwaInfo");
   const showInfo = () => {
