@@ -443,6 +443,14 @@
       location.reload();
     }));
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => new bootstrap.Tooltip(el));
+    // menu recolhido: o nome de cada página num tooltip à direita do ícone (com o menu expandido o nome já se vê)
+    const navTips = [...document.querySelectorAll("[data-pm-navtip]")].map((el) =>
+      new bootstrap.Tooltip(el, { placement: "right", trigger: "hover" }));
+    const syncNavTips = () => navTips.forEach((t) => {
+      if (document.body.classList.contains("pm-collapsed")) t.enable(); else { t.hide(); t.disable(); }
+    });
+    syncNavTips();
+    document.querySelectorAll("[data-pm-toggle=collapse]").forEach((b) => b.addEventListener("click", syncNavTips));
     pm.drawSparklines();
     document.addEventListener("pm:theme", pm.drawSparklines);
     // aplicação instalável (PWA): o browser só a oferece com um service worker registado

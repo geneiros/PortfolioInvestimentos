@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-25
+
+- **Menu recolhido: o nome da página num tooltip**  
+  Com o menu recolhido, ao passar o rato por cima do ícone de uma página aparece o nome dela num tooltip, à direita. Com o menu expandido não aparece, porque o nome já se vê.
+
 ## 2026-11-24
 
 - **Menu recolhido: sem expandir e recolher ao mudar de página**  

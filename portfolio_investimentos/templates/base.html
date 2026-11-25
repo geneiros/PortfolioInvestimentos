@@ -44,12 +44,12 @@
     <ul class="nav nav-pills flex-column mb-auto">
       {% for key, label, url, icon in nav %}
       <li class="nav-item">
-        <a href="{{ url }}" class="nav-link {{ 'active' if active == key else 'link-body-emphasis' }}"><i class="bi {{ icon }}"></i><span class="label">{{ label }}</span></a>
+        <a href="{{ url }}" class="nav-link {{ 'active' if active == key else 'link-body-emphasis' }}" data-pm-navtip data-bs-title="{{ label }}"><i class="bi {{ icon }}"></i><span class="label">{{ label }}</span></a>
       </li>
       {% endfor %}
       <li><hr></li>
       {% for key, label, url, icon in nav_bottom %}
-      <li class="nav-item"><a href="{{ url }}" class="nav-link {{ 'active' if active == key else 'link-body-emphasis' }}"><i class="bi {{ icon }}"></i><span class="label">{{ label }}</span></a></li>
+      <li class="nav-item"><a href="{{ url }}" class="nav-link {{ 'active' if active == key else 'link-body-emphasis' }}" data-pm-navtip data-bs-title="{{ label }}"><i class="bi {{ icon }}"></i><span class="label">{{ label }}</span></a></li>
       {% endfor %}
     </ul>
   </aside>
