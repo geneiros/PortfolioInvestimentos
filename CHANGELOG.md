@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-26
 
+- **cPanel: arranque pelo Passenger**  
+  Novo `passenger_wsgi.py`, para o Setup Python App do cPanel com os valores de omissão (startup file `passenger_wsgi.py`, entry point `application`). Se a aplicação não arrancar, mostra uma página com o motivo (por exemplo, uma dependência em falta) e o que fazer, em vez do erro genérico do Passenger. O README tem os passos, na secção «Num alojamento com cPanel».
 - **README: capturas e funcionalidades atualizadas, e os scripts que as geram**  
   As 36 capturas refeitas em claro e escuro, com a interface atual, e três novas (a ficha da ação na Carteira, a análise com IA nas Notícias e Definições → Inteligência artificial). A descrição das funcionalidades inclui a análise com IA, a ficha na Carteira, o tema e o «Sair» nas Definições e o menu recolhível, com uma secção nova sobre a análise das notícias com IA. Os scripts que preparam os dados e tiram as capturas ficam em `docs/screenshots/gerar` (com um LEIAME).
 - **Análise com IA: repetir quando a plataforma está sobrecarregada**  

@@ -137,6 +137,18 @@ Em **Definições → Segurança** podes definir uma palavra-passe. A partir da�
 - **Atrás de um proxy** (PythonAnywhere, nginx, Caddy…): define também `PORTFOLIO_PROXY=1` (o número de proxies à frente da aplicação). Assim o endereço de cada pedido é o do visitante e não o do proxy, e o limite de tentativas de login vale por visitante. Sem ela, todos os visitantes parecem vir do mesmo endereço, e as tentativas erradas de alguém bloqueiam também o teu acesso. Não a definas sem proxy: os cabeçalhos `X-Forwarded-For` podiam ser falsificados.
 - Ao mudar a palavra-passe, as sessões abertas noutros dispositivos terminam. Depois de 5 tentativas erradas do mesmo endereço, o login (e a palavra-passe atual pedida em Definições) fica bloqueado para esse endereço durante 5 minutos. As tentativas ficam guardadas na base de dados, por isso valem entre processos e depois de reiniciar.
 
+### Num alojamento com cPanel
+
+Com a ferramenta **Setup Python App** do cPanel (Passenger), a aplicação arranca pelo `passenger_wsgi.py` do repositório.
+
+1. **Subdomínio:** cria um subdomínio para a aplicação (ex.: `carteira.teudominio.pt`) e ativa o SSL (AutoSSL). Numa subpasta (`teudominio.pt/carteira`) algumas ligações não funcionam.
+2. **Aplicação:** em **Setup Python App → Create Application**: Python 3.10 ou mais recente; *Application root* uma pasta fora do `public_html` (ex.: `portfolio`); *Application URL* o subdomínio; *Application startup file* `passenger_wsgi.py`; *Application Entry point* `application`; *Passenger log file* por exemplo `/home/UTILIZADOR/logs/passenger.log` (é lá que ficam os erros).
+3. **Variáveis de ambiente** (na mesma página): `PORTFOLIO_PASSWORD` (uma palavra-passe forte), `PORTFOLIO_HTTPS=1`, `PORTFOLIO_PROXY=1` e `PORTFOLIO_DATA_DIR` (ex.: `/home/UTILIZADOR/portfolio-dados`, fora do `public_html`).
+4. **Código:** com **Git™ Version Control** clona o repositório para a pasta da aplicação, ou carrega o ZIP do GitHub com o **File Manager**. O ZIP extrai-se para uma subpasta (`PortfolioInvestimentos-main`): move o conteúdo dela para a pasta da aplicação, substituindo o `passenger_wsgi.py` de exemplo que o cPanel criou.
+5. **Dependências:** escreve `requirements.txt` em *Configuration files*, carrega em **Run Pip Install** e depois em **Restart**. Se o `yfinance` não instalar (precisa do `curl_cffi`), instala o resto sem ele: as cotações vêm diretamente do Yahoo, como no Android.
+
+Se a aplicação não arrancar, a página mostra o motivo (por exemplo, uma dependência em falta) em vez do erro genérico do Passenger. Para atualizar: «Pull» no Git Version Control (ou o ZIP novo) e **Restart**; os dados ficam na pasta de `PORTFOLIO_DATA_DIR`. Alguns alojamentos bloqueiam ligações a outros sites: se as cotações não vierem, pede para permitir `query1.finance.yahoo.com`, `query2.finance.yahoo.com` e `fc.yahoo.com`.
+
 ### Opções da linha de comandos
 
 ```bash
