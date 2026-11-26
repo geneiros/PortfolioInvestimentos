@@ -4212,7 +4212,7 @@ def test_ai_analyse_news_cache_and_fallback(app, client, monkeypatch):
     post(client, "load_demo", token)
     r = post(client, "ai_analyse_news", token, scope="carteira")
     assert r.status_code == 400 and "Não há notícias" in r.get_json()["error"]
-    monkeypatch.setattr(ai, "_post", lambda p, m, o=None: '{"resumo": "Juros estáveis.", "ativos": []}')
+    monkeypatch.setattr(ai, "_post", lambda p, m, o=None, n=None: '{"resumo": "Juros estáveis.", "ativos": []}')
     r = post(client, "ai_analyse_news", token, scope="mercado").get_json()["message"]
     assert r["result"]["resumo"] == "Juros estáveis." and r["count"] == 1
     html = client.get("/noticias").get_data(as_text=True)
@@ -4224,3 +4224,42 @@ def test_ai_off_shows_hint(app, client):
     post(client, "load_demo", token)
     html = client.get("/noticias").get_data(as_text=True)
     assert 'id="aiCard"' in html and 'id="aiRun"' not in html and "/definicoes#aiSettings" in html
+
+
+def test_ai_retries_overloaded_platform(app, monkeypatch):
+    from portfolio_investimentos.models import Setting
+    from portfolio_investimentos.services import ai
+    waits = []
+    monkeypatch.setattr(ai.time, "sleep", waits.append)
+    with app.app_context():
+        Setting.set("ai_provider", "gemini")
+        Setting.set("ai_key_gemini", "AIzaTESTkey123")
+        # sobrecarregado duas vezes, à terceira responde: repete com pausas, sem mudar de modelo
+        opener = _AiOpener(503, 503, "OK")
+        assert ai.test(opener=opener) == ("gemini", "gemini-flash-latest", "OK")
+        assert waits == [2, 5] and [c["body"]["model"] for c in opener.calls] == ["gemini-flash-latest"] * 3
+        # continua sobrecarregado: no fim, o modelo de recurso (mais leve)
+        opener = _AiOpener(503, 503, 503, "OK")
+        assert ai.test(opener=opener) == ("gemini", "gemini-flash-lite-latest", "OK")
+        # sem recurso que resulte e sem alternativa: a mensagem explica e sugere uma alternativa
+        try:
+            ai.test(opener=_AiOpener(503, 503, 503, 503))
+            raise AssertionError("devia falhar")
+        except ai.AiError as exc:
+            assert "HTTP 503 (plataforma sobrecarregada)" in str(exc) and "falha passageira" in str(exc)
+            assert "escolhe uma alternativa" in str(exc)
+        # um erro que não é passageiro (chave inválida) não se repete
+        opener = _AiOpener(401)
+        try:
+            ai.test(opener=opener)
+            raise AssertionError("devia falhar")
+        except ai.AiError as exc:
+            assert "chave inválida" in str(exc) and "passageira" not in str(exc) and len(opener.calls) == 1
+        # com um modelo escolhido em Definições, não se troca por outro
+        Setting.set("ai_model_gemini", "gemini-2.5-pro")
+        opener = _AiOpener(503, 503, 503, "OK")
+        try:
+            ai.test(opener=opener)
+            raise AssertionError("devia falhar")
+        except ai.AiError:
+            assert {c["body"]["model"] for c in opener.calls} == {"gemini-2.5-pro"} and len(opener.calls) == 3

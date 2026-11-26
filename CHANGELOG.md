@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-26
 
+- **Análise com IA: repetir quando a plataforma está sobrecarregada**  
+  Quando a plataforma responde que está sobrecarregada (erro 503, como o Gemini em horas de muita procura) ou há uma falha de ligação, o pedido repete-se mais duas vezes, com pausas de 2 e 5 segundos. No Gemini, se o modelo de omissão continuar sobrecarregado, tenta-se ainda o gemini-flash-lite-latest (mais leve), e só depois a plataforma alternativa. Se tudo falhar, a mensagem explica que é passageiro e sugere escolher uma alternativa. Erros que não são passageiros (chave inválida, limite do dia) não se repetem.
 - **Notícias: análise com inteligência artificial (planos gratuitos)**  
   Na página Notícias há um cartão «Análise com IA»: escolhe-se o que analisar (os meus ativos, o mercado ou o Radar) e carrega-se em «Analisar». As notícias dos últimos 7 dias (no máximo 12 por ativo, sem repetidas) vão para a plataforma escolhida, que devolve um resumo e, por ativo, o tom (positivo, neutro, negativo ou misto), a conclusão, os riscos, o que vale a pena verificar e as notícias em que se baseia. A análise fica guardada e só se volta a pedir quando há notícias novas (ou com o botão de repetir). Só se enviam as notícias; os valores da carteira nunca saem da aplicação.
 
