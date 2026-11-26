@@ -4,6 +4,8 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-26
 
+- **README: capturas e funcionalidades atualizadas, e os scripts que as geram**  
+  As 36 capturas refeitas em claro e escuro, com a interface atual, e três novas (a ficha da ação na Carteira, a análise com IA nas Notícias e Definições → Inteligência artificial). A descrição das funcionalidades inclui a análise com IA, a ficha na Carteira, o tema e o «Sair» nas Definições e o menu recolhível, com uma secção nova sobre a análise das notícias com IA. Os scripts que preparam os dados e tiram as capturas ficam em `docs/screenshots/gerar` (com um LEIAME).
 - **Análise com IA: repetir quando a plataforma está sobrecarregada**  
   Quando a plataforma responde que está sobrecarregada (erro 503, como o Gemini em horas de muita procura) ou há uma falha de ligação, o pedido repete-se mais duas vezes, com pausas de 2 e 5 segundos. No Gemini, se o modelo de omissão continuar sobrecarregado, tenta-se ainda o gemini-flash-lite-latest (mais leve), e só depois a plataforma alternativa. Se tudo falhar, a mensagem explica que é passageiro e sugere escolher uma alternativa. Erros que não são passageiros (chave inválida, limite do dia) não se repetem.
 - **Notícias: análise com inteligência artificial (planos gratuitos)**  

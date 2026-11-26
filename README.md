@@ -160,7 +160,7 @@ O que mudou em cada versão está no [histórico de alterações](CHANGELOG.md).
 
 ## Capturas de ecrã
 
-As capturas usam os dados de demonstração (empresas e preços fictícios); a Prospeção e a ficha da ação usam dados reais do Yahoo Finance, e as notícias e a análise com IA da página Notícias são exemplos fictícios, como as empresas.
+As capturas usam os dados de demonstração (empresas e preços fictícios); a Prospeção e a ficha da ação usam dados reais do Yahoo Finance, e as notícias e a análise com IA da página Notícias são exemplos fictícios, como as empresas. Geram-se com os scripts de [`docs/screenshots/gerar`](docs/screenshots/gerar/LEIAME.md).
 
 ### Modo claro
 
