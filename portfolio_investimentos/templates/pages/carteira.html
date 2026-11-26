@@ -122,7 +122,7 @@
       </tr></thead>
       <tbody>
       {% for x in positions %}{% set a = x.asset %}
-        <tr data-sector="{{ a.sector or '' }}" data-search="{{ (a.ticker ~ ' ' ~ a.name)|lower }}">
+        <tr data-sector="{{ a.sector or '' }}" data-search="{{ (a.ticker ~ ' ' ~ a.name)|lower }}"{% if symbols.get(a.ticker) %} data-ficha="{{ symbols[a.ticker] }}" tabindex="0"{% endif %}>
           <td data-v="{{ a.ticker }}"><div class="d-flex align-items-center gap-2">{{ logo(a) }}
             <div><b>{{ a.ticker }}</b> {% if a.kind == 'etf' %}<span class="pm-tag">ETF</span>{% endif %}
             <div class="sub">{{ x.qty|number(3 if x.qty % 1 else 0) }} unidades · {{ a.name|truncate(22, True, '…') }}</div></div></div></td>
@@ -381,7 +381,7 @@
       </tr></thead>
       <tbody>
       {% for x in closed %}
-        <tr>
+        <tr{% if symbols.get(x.asset.ticker) %} data-ficha="{{ symbols[x.asset.ticker] }}" tabindex="0"{% endif %}>
           <td data-v="{{ x.asset.ticker }}"><div class="d-flex align-items-center gap-2">{{ logo(x.asset) }}<div><b>{{ x.asset.ticker }}</b><div class="sub">{{ x.asset.name }}</div></div></div></td>
           <td data-v="{{ x.last_date }}">{{ x.first_date|ddmmyyyy }} → {{ x.last_date|ddmmyyyy }}</td>
           <td class="text-end money" data-v="{{ x.bought_eur }}">{{ x.bought_eur|money(2) }}</td>
@@ -405,6 +405,10 @@
 
 {% block scripts %}
 {% if has_data %}
+{# a ficha de uma ação (a mesma da Prospeção), ao clicar numa linha das tabelas de posições #}
+<aside class="pm-drawer" id="fichaPanel" aria-label="Ficha da ação"><div class="pm-card" id="fichaPanelBody"></div></aside>
+<div class="pm-drawer-backdrop" id="fichaBackdrop" aria-hidden="true"></div>
+<script src="{{ url_for('static', filename='js/ficha.js') }}"></script>
 <script>
 // «Carteira vs mercado»: escolher os índices (até {{ index_catalog.max }}) e criar alertas da variação do dia
 (function () {

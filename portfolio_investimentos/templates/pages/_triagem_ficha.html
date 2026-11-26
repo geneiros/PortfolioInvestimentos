@@ -23,9 +23,9 @@
   {% if d.blurb %}<p class="mb-2">{{ d.blurb }}</p>{% endif %}
   {% if d.tags %}<div class="d-flex flex-wrap gap-1 mb-3">{% for t, kind in d.tags %}<span class="badge pm-tag pm-tag-{{ kind }}">{{ t }}</span>{% endfor %}</div>{% endif %}
 
-  <button class="btn btn-primary w-100 mb-3" type="button" data-save-ticker="{{ d.ticker }}" data-save-name="{{ d.name }}" data-save-currency="{{ m.currency or 'USD' }}"
+  {% if request.args.get('origem') != 'carteira' %}  <button class="btn btn-primary w-100 mb-3" type="button" data-save-ticker="{{ d.ticker }}" data-save-name="{{ d.name }}" data-save-currency="{{ m.currency or 'USD' }}"
           data-save-lens="{{ request.args.get('lente') if request.args.get('lente') in real else (d.enters|first if d.enters else '') }}" data-save-lists='{{ in_lists|tojson }}'>
-    <i class="bi {{ 'bi-bookmark-check-fill' if in_lists else 'bi-bookmark-plus' }}"></i> {{ 'Guardada (' ~ (lists|selectattr("id", "in", in_lists)|map(attribute="title")|join(", ")) ~ ') · guardar noutra' if in_lists else 'Guardar na lista' }}</button>
+    <i class="bi {{ 'bi-bookmark-check-fill' if in_lists else 'bi-bookmark-plus' }}"></i> {{ 'Guardada (' ~ (lists|selectattr("id", "in", in_lists)|map(attribute="title")|join(", ")) ~ ') · guardar noutra' if in_lists else 'Guardar na lista' }}</button>{% endif %}
 
   <ul class="nav nav-pills nav-fill small mb-3" role="tablist">
     <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#fichaMain" type="button" role="tab">Ficha completa</button></li>
