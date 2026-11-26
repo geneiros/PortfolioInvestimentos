@@ -4109,3 +4109,118 @@ def test_triage_page_has_criteria_and_profile_overrides(app, client, monkeypatch
     assert "Com os teus critérios em Bazin" in html and "Rendimento ≥ 3,5%" in html
     assert "Tem lucro" not in html.split('data-lens-detail="bazin"', 1)[1].split("</details>", 1)[0]
     assert client.get("/radar/acao/KO?p=nao-e-json").status_code == 200
+
+
+# ------------------------------------------------------------------ análise das notícias com IA
+class _AiOpener:
+    """Faz de plataforma de IA: guarda os pedidos e responde com `replies` (texto ou código de erro HTTP)."""
+
+    def __init__(self, *replies):
+        self.replies, self.calls = list(replies), []
+
+    def open(self, req, timeout=None):
+        import io as _io
+        import urllib.error
+        self.calls.append({"url": req.full_url, "headers": dict(req.header_items()), "body": json.loads(req.data)})
+        reply = self.replies.pop(0)
+        if isinstance(reply, int):
+            raise urllib.error.HTTPError(req.full_url, reply, "erro", {}, _io.BytesIO(b'{"error": {"message": "x"}}'))
+
+        class _Resp(_io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+        return _Resp(json.dumps({"choices": [{"message": {"content": reply}}]}).encode())
+
+
+def _ai_news(app):
+    from datetime import datetime, timedelta
+    from portfolio_investimentos.models import NewsItem
+    with app.app_context():
+        now = datetime.now()
+        db.session.add_all([
+            NewsItem(ticker="AAPL", headline="Apple sobe receitas", summary="<b>Vendas</b> de iPhone fortes.",
+                     url="https://n/1", published=now, provider="yahoo", source="Reuters"),
+            NewsItem(ticker="AAPL", headline="Apple sobe receitas", url="https://n/1b", published=now,
+                     provider="google"),  # a mesma notícia noutra fonte: conta uma vez
+            NewsItem(ticker="AAPL", headline="Notícia antiga", url="https://n/2", published=now - timedelta(days=20),
+                     provider="yahoo"),
+            NewsItem(ticker="", headline="BCE mantém juros", url="https://n/3", published=now, provider="yahoo")])
+        db.session.commit()
+
+
+def test_ai_settings_and_keys(app, client):
+    from portfolio_investimentos.services import ai
+    token = csrf(client)
+    html = client.get("/definicoes").get_data(as_text=True)
+    assert 'id="aiSettings"' in html and "Google Gemini" in html and "openrouter/free" in html
+    r = post(client, "set_ai_settings", token, provider="gemini", fallback="groq", model_gemini="",
+             model_groq="llama-3.3-70b-versatile", ollama_url="")
+    assert "Falta a chave de Google Gemini, Groq" in r.get_json()["message"]
+    assert post(client, "set_ai_key", token, provider="gemini", key="abc").status_code == 400  # curta demais
+    assert post(client, "set_ai_key", token, provider="ollama", key="abcdefgh1").status_code == 400  # sem chave
+    assert post(client, "set_ai_key", token, provider="gemini", key="AIzaTESTkey123").status_code == 200
+    assert post(client, "set_ai_settings", token, model_gemini="mau modelo!").status_code == 400
+    assert post(client, "set_ai_settings", token, provider="gemini", ollama_url="ftp://x").status_code == 400
+    with app.app_context():
+        assert ai.chain() == ["gemini"]  # o Groq ainda não tem chave
+        assert ai.model("gemini") == "gemini-flash-latest" and ai.model("groq") == "llama-3.3-70b-versatile"
+    assert 'id="aiForm"' in client.get("/definicoes").get_data(as_text=True)
+    post(client, "set_ai_settings", token, provider="", fallback="")
+    with app.app_context():
+        assert not ai.enabled()
+
+
+def test_ai_analyse_news_cache_and_fallback(app, client, monkeypatch):
+    from portfolio_investimentos.models import Setting
+    from portfolio_investimentos.services import ai
+    _ai_news(app)
+    token = csrf(client)
+    reply = ('```json\n{"resumo": "Semana boa para a Apple.", "ativos": [{"ticker": "AAPL", "tom": "POSITIVO", '
+             '"conclusao": "Receitas a subir.", "riscos": ["Avaliação alta"], "a_verificar": ["Margens"], '
+             '"noticias": [1, 1, 99, "x"]}, "lixo"]}\n```')
+    with app.app_context():
+        Setting.set("ai_provider", "groq")
+        Setting.set("ai_fallback", "ollama")
+        Setting.set("ai_key_groq", "gsk_TESTKEY123")
+        opener = _AiOpener(429, reply)  # o Groq atingiu o limite: vai o Ollama
+        out = ai.analyse("carteira", tickers=["AAPL"], names={"AAPL": "Apple"}, opener=opener)
+        assert out["provider"] == "ollama" and not out["reused"] and out["count"] == 1
+        assert opener.calls[0]["url"] == "https://api.groq.com/openai/v1/chat/completions"
+        assert opener.calls[0]["headers"]["Authorization"] == "Bearer gsk_TESTKEY123"
+        assert opener.calls[1]["url"] == "http://localhost:11434/v1/chat/completions"
+        assert "Authorization" not in opener.calls[1]["headers"]
+        prompt = opener.calls[1]["body"]["messages"][1]["content"]
+        assert "[1] AAPL (Apple)" in prompt and "Vendas de iPhone fortes." in prompt and "<b>" not in prompt
+        assert "Notícia antiga" not in prompt and "BCE" not in prompt and prompt.count("Apple sobe receitas") == 1
+        a = out["result"]["ativos"]
+        assert len(a) == 1 and a[0]["tom"] == "positivo" and a[0]["riscos"] == ["Avaliação alta"]
+        assert a[0]["noticias"] == [{"titulo": "Apple sobe receitas", "url": "https://n/1"}]
+        # sem notícias novas: a análise guardada, sem pedidos
+        again = ai.analyse("carteira", tickers=["AAPL"], opener=_AiOpener())
+        assert again["reused"] and again["result"] == out["result"]
+        # «Analisar outra vez»
+        assert not ai.analyse("carteira", tickers=["AAPL"], force=True, opener=_AiOpener(reply))["reused"]
+        try:
+            ai.analyse("carteira", tickers=["AAPL"], force=True, opener=_AiOpener("sem json"))
+            raise AssertionError("devia falhar")
+        except ai.AiError as exc:
+            assert "formato esperado" in str(exc)
+    # pela API, com a carteira de demonstração (sem notícias dos ativos DEMO): erro legível
+    post(client, "load_demo", token)
+    r = post(client, "ai_analyse_news", token, scope="carteira")
+    assert r.status_code == 400 and "Não há notícias" in r.get_json()["error"]
+    monkeypatch.setattr(ai, "_post", lambda p, m, o=None: '{"resumo": "Juros estáveis.", "ativos": []}')
+    r = post(client, "ai_analyse_news", token, scope="mercado").get_json()["message"]
+    assert r["result"]["resumo"] == "Juros estáveis." and r["count"] == 1
+    html = client.get("/noticias").get_data(as_text=True)
+    assert 'id="aiCard"' in html and 'id="aiRun"' in html and "Juros est" in html  # a análise guardada
+
+
+def test_ai_off_shows_hint(app, client):
+    token = csrf(client)
+    post(client, "load_demo", token)
+    html = client.get("/noticias").get_data(as_text=True)
+    assert 'id="aiCard"' in html and 'id="aiRun"' not in html and "/definicoes#aiSettings" in html

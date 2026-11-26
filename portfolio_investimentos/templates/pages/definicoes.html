@@ -136,6 +136,48 @@
       </div>
     </div>
 
+    <div class="pm-card mb-3 small" id="aiSettings">
+      <div class="pm-label mb-2">Inteligência artificial {{ help("Analisa as notícias dos teus ativos, do mercado e do Radar na página Notícias, com o plano gratuito de uma destas plataformas. Só se enviam as notícias (títulos, resumos, fonte e data), que são públicas; os valores da tua carteira nunca saem da aplicação. Nos planos gratuitos, a plataforma pode usar os pedidos para melhorar os seus modelos. O Ollama corre no teu computador, sem chave e sem enviar nada para fora.") }}</div>
+      <form class="row g-2 align-items-end mb-2" data-pm-method="set_ai_settings" data-pm-success="@" id="aiForm">
+        <div class="col-sm-6"><label class="form-label text-body-secondary mb-1" for="aiProvider">Plataforma</label>
+          <select class="form-select form-select-sm" name="provider" id="aiProvider">
+            <option value="">Desligada</option>
+            {% for p in ai_cfg.providers %}<option value="{{ p.key }}" {{ 'selected' if ai_cfg.primary == p.key }}>{{ p.name }}</option>{% endfor %}
+          </select></div>
+        <div class="col-sm-6"><label class="form-label text-body-secondary mb-1" for="aiFallback">Alternativa {{ help("Usada quando a principal falha ou atinge o limite de pedidos do dia.") }}</label>
+          <select class="form-select form-select-sm" name="fallback" id="aiFallback">
+            <option value="">Nenhuma</option>
+            {% for p in ai_cfg.providers %}<option value="{{ p.key }}" {{ 'selected' if ai_cfg.fallback == p.key }}>{{ p.name }}</option>{% endfor %}
+          </select></div>
+        <div class="col-12"><div class="table-responsive"><table class="table pm-table mb-0"><thead><tr><th>Plataforma</th><th>Modelo {{ help("Vazio = o de omissão. Os nomes dos modelos mudam com o tempo: se um deixar de existir, escreve aqui outro da lista da plataforma.") }}</th><th>Chave</th></tr></thead><tbody>
+          {% for p in ai_cfg.providers %}<tr><td class="text-nowrap">{{ p.name }}</td>
+            <td><input class="form-control form-control-sm" name="model_{{ p.key }}" value="{{ p.model if p.model != p.default_model else '' }}" placeholder="{{ p.default_model }}" aria-label="Modelo de {{ p.name }}"></td>
+            <td class="text-nowrap">{% if not p.needs_key %}<span class="text-body-secondary">sem chave</span>{% elif p.env %}<span class="badge text-bg-secondary">{{ p.env_name }}</span>{% elif p.saved %}<span class="text-success"><i class="bi bi-check-circle"></i> guardada</span>{% else %}<span class="text-body-secondary">—</span>{% endif %}</td></tr>{% endfor %}
+        </tbody></table></div></div>
+        <div class="col-12"><label class="form-label text-body-secondary mb-1" for="aiOllama">Endereço do Ollama</label>
+          <input class="form-control form-control-sm" name="ollama_url" id="aiOllama" value="{{ ai_cfg.ollama_url }}"></div>
+        <div class="col-12 d-flex flex-wrap gap-2 justify-content-end">
+          <button class="btn btn-sm btn-outline-secondary" type="submit">Guardar</button>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-pm-action="test_ai" data-toast data-reload="false"><i class="bi bi-plug"></i> Testar</button>
+        </div>
+      </form>
+      <hr class="my-2">
+      {% for p in ai_cfg.providers if p.needs_key and not p.env %}
+      <form class="mb-2" data-pm-method="set_ai_key" data-pm-success="Guardado.">
+        <input type="hidden" name="provider" value="{{ p.key }}">
+        <div class="d-flex align-items-baseline gap-2 mb-1">
+          <label class="text-body-secondary me-auto" for="aiKey_{{ p.key }}">Chave {{ p.name }}</label>
+          <a href="{{ p.signup }}" target="_blank" rel="noopener noreferrer">Pedir chave gratuita <i class="bi bi-box-arrow-up-right"></i></a>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+          <input id="aiKey_{{ p.key }}" name="key" type="password" autocomplete="off" class="form-control form-control-sm" placeholder="{{ 'guardada (escreve outra para mudar)' if p.saved else 'a tua chave' }}">
+          <button class="btn btn-sm btn-outline-secondary" type="submit">Guardar</button>
+          {% if p.saved %}<button class="btn btn-sm btn-link text-danger px-1" type="button" data-pm-action="set_ai_key" data-args='{"provider": "{{ p.key }}", "key": ""}' data-confirm="Apagar a chave de {{ p.name }}?">Apagar</button>{% endif %}
+        </div>
+      </form>
+      {% endfor %}
+    </div>
+
     <div class="pm-card mb-3" id="widgetsCard">
       <div class="pm-label mb-2">Ordem dos cartões</div>
       <p class="small text-body-secondary mb-2">Em qualquer página, carrega 2 segundos no fundo de um cartão (com o rato ou o dedo) e arrasta-o para outro lugar. A ordem fica guardada na aplicação, igual em todos os dispositivos; Esc cancela.</p>
