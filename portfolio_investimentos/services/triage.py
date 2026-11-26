@@ -451,10 +451,12 @@ def detail(ticker, overrides=None):
     row = next((r for r in u["rows"] if r["ticker"] == ticker), None)
     data = infos()
     info = (data.get(ticker) or {}).get("info")
-    if info is None:
+    if not info:
         info = _slim(moat.info_of(ticker))
-        data[ticker] = {"at": datetime.now().isoformat(timespec="minutes"), "info": info}
-        Setting.set("triage:info", json.dumps(data))
+        # só se guarda uma resposta com dados: vazia (o Yahoo falhou), volta a pedir-se na próxima vez que se abrir
+        if info.get("regularMarketPrice") or info.get("currentPrice") or info.get("marketCap"):
+            data[ticker] = {"at": datetime.now().isoformat(timespec="minutes"), "info": info}
+            Setting.set("triage:info", json.dumps(data))
     row = row or {"ticker": ticker, "name": info.get("longName") or info.get("shortName") or ticker,
                   "exchange_code": "", "candidate": {}}
     m = metrics(row, info)

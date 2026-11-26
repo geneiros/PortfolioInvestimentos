@@ -2,6 +2,11 @@
 
 O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir das mensagens dos commits). Os números entre parênteses são as issues do GitHub resolvidas.
 
+## 2026-11-26
+
+- **Carteira: a ficha da ação ao clicar numa posição**  
+  Nas tabelas de posições abertas e fechadas da Carteira, clicar numa ação abre à direita a mesma ficha da Prospeção → Ações: preço, avaliação, «O valor da ação», as lentes, os pares, o moat e as perguntas. Fecha com o X, com Esc ou clicando fora. Só abre nas posições com símbolo do Yahoo; na Carteira, a ficha não tem «Guardar na lista». Se o Yahoo não devolver dados de uma ação, a ficha já não guarda a resposta vazia e volta a pedi-los da próxima vez.
+
 ## 2026-11-25
 
 - **Notícias: desligar uma fonte apaga as notícias dela**  

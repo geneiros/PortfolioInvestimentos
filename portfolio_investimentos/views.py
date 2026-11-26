@@ -207,6 +207,8 @@ def carteira():
     p = c["p"]
     c.update(
         positions=p.open_positions, closed=p.closed_positions, sectors=p.sectors(),
+        # o símbolo do Yahoo de cada ativo: ao clicar numa posição abre a ficha da ação (a da Prospeção)
+        symbols={t: s for t, s in db.session.query(Instrument.ticker, Instrument.data_symbol) if s},
         sparks={pos.asset.ticker: ctx.js_json(p.sparkline(pos.asset.ticker, 30)) for pos in p.open_positions},
         market_bars=_market_bars(p), index_catalog=_index_catalog(), market_alerts=_market_alerts(c),
         portfolio_fired=portfolio_alerts.check(),

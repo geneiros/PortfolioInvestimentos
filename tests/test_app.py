@@ -3785,6 +3785,30 @@ def test_triage_universe_page_and_profile(app, client, monkeypatch):
     monkeypatch.setattr(moat, "info_of", boom)
     assert "Não foi possível ler os dados de" in client.get("/radar/acao/XYZ").get_data(as_text=True)
     assert client.get("/oportunidades").headers["Location"].endswith("/radar")
+    # aberta da Carteira, a ficha não tem «Guardar na lista» (o modal das listas só existe na Prospeção)
+    html = client.get("/radar/acao/KO?origem=carteira").get_data(as_text=True)
+    assert "The Coca-Cola Company" in html and "data-save-ticker" not in html
+
+
+def test_carteira_rows_open_ficha_and_empty_info_not_cached(app, client, monkeypatch):
+    from portfolio_investimentos.models import Instrument
+    from portfolio_investimentos.services import data, moat, triage
+    token = csrf(client)
+    assert post(client, "load_demo", token).status_code == 200
+    with app.app_context():
+        db.session.get(Instrument, "DEMO-NVTX").data_symbol = "NVDA"
+        db.session.commit()
+        data.invalidate()
+    html = client.get("/carteira").get_data(as_text=True)
+    assert html.count('data-ficha="NVDA"') == 1 and 'id="fichaPanel"' in html and "js/ficha.js" in html
+    assert html.count("data-ficha=") == 1  # sem símbolo do Yahoo, a linha não abre a ficha
+    calls = []
+    monkeypatch.setattr(moat, "info_of", lambda t: calls.append(t) or {})  # o Yahoo não devolveu nada
+    client.get("/radar/acao/NVDA?origem=carteira")
+    client.get("/radar/acao/NVDA?origem=carteira")
+    assert calls == ["NVDA", "NVDA"]  # a resposta vazia não fica guardada: volta a pedir-se
+    with app.app_context():
+        assert "NVDA" not in triage.infos()
 
 
 def test_screener_query_for_yfinance():
