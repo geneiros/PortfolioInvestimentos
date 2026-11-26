@@ -49,6 +49,22 @@
   {% for k, v in news_errors.items() %}<div>{{ k }}: {{ v }}</div>{% endfor %}</div>
 {% endif %}
 
+<div class="pm-card mb-3" id="aiCard">
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <div class="pm-label me-auto"><i class="bi bi-stars"></i> Análise com IA {{ help("Junta as notícias dos últimos 7 dias (no máximo 12 por ativo) e pede conclusões à plataforma de IA escolhida em Definições. Só se enviam as notícias; os valores da carteira não saem da aplicação. A análise fica guardada e só se volta a pedir quando há notícias novas. É um resumo automático: confirma sempre nas notícias de origem.") }}</div>
+    {% if ai_on %}
+    <select class="form-select form-select-sm w-auto" id="aiScope" aria-label="O que analisar">
+      {% for k, label in ai_scopes.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-sm btn-primary" type="button" id="aiRun"><i class="bi bi-stars"></i> Analisar</button>
+    <button class="btn btn-sm btn-outline-secondary" type="button" id="aiAgain" title="Pedir uma análise nova, mesmo sem notícias novas"><i class="bi bi-arrow-repeat"></i></button>
+    {% else %}
+    <span class="small text-secondary">Escolhe uma plataforma gratuita (Gemini, Groq, OpenRouter, Mistral ou Ollama) em <a href="/definicoes#aiSettings">Definições → Inteligência artificial</a>.</span>
+    {% endif %}
+  </div>
+  {% if ai_on %}<div id="aiResult" class="mt-2"></div>{% endif %}
+</div>
+
 <div class="tab-content">
   <div class="tab-pane fade show active" id="tab-mine">
     <div class="pm-card">
@@ -82,6 +98,8 @@
 {% endautoescape %}{% endblock %}
 
 {% block scripts %}
+{% if ai_on %}<script>window.pmAiSaved = {{ ai_saved|tojson }};</script>
+<script src="{{ url_for('static', filename='js/noticias_ai.js') }}"></script>{% endif %}
 <script>
 // filtros por ativo de «Os meus ativos» e do «Radar»: cada um só mexe nas notícias do seu painel
 document.querySelectorAll(".pm-news-filter").forEach((bar) => bar.querySelectorAll(".pm-chip").forEach((b) => b.addEventListener("click", () => {

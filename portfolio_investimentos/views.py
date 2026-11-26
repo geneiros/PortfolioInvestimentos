@@ -12,6 +12,7 @@ from . import auth, is_portable
 from .services import context as ctx
 from .services import backups, data, insights, market, networth, portfolio_alerts, report, sale_sim, widgets
 from .services import news as news_svc
+from .services import ai as ai_svc
 from .services.importer import BROKERS, INSTRUCTIONS
 from .services.market import refresh_state, upcoming_events, yfinance_available
 
@@ -670,7 +671,7 @@ def _news_sources():
 def noticias():
     """Notícias dos ativos da carteira selecionada no topo (ou de todas), do mercado e dos ativos do Radar: Finnhub,
     Google Notícias, Yahoo Finance e Marketaux."""
-    from .services import news
+    from .services import ai, news
     c = ctx.build("noticias", "Notícias")
     if not news.selected():  # todas as fontes desligadas em Definições: nada a pedir
         c.update(news_off=True)
@@ -690,7 +691,9 @@ def noticias():
              news_counts={t: sum(1 for n in rows if n.ticker == t) for t in tickers},
              radar_rows=radar_rows, radar_assets=watch,
              radar_missing=news.without_news(watch, {n.ticker for n in radar_rows}),
-             radar_counts={t: sum(1 for n in radar_rows if n.ticker == t) for t in watch_tickers})
+             radar_counts={t: sum(1 for n in radar_rows if n.ticker == t) for t in watch_tickers},
+             ai_on=ai.enabled(), ai_scopes=ai.SCOPES,
+             ai_saved={s: ai.cached(s) for s in ai.SCOPES})
     return render_template("pages/noticias.html", **c)
 
 
@@ -750,7 +753,7 @@ def definicoes():
              finnhub_env=news_svc.key_from_env(), finnhub_saved=bool(Setting.get("finnhub_key")),
              marketaux_env=news_svc.marketaux_from_env(), marketaux_saved=bool(Setting.get("marketaux_key")),
              news_providers=news_svc.PROVIDERS, news_sources=_news_sources(), news_stats=news_svc.stats(), news_last=news_svc.last_results(),
-             password_env=bool(auth.env_password()))
+             password_env=bool(auth.env_password()), ai_cfg=ai_svc.settings_view())
     return render_template("pages/definicoes.html", **c)
 
 

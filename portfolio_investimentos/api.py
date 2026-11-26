@@ -4,6 +4,7 @@ import io
 import json
 import math
 import os
+import re
 import sqlite3
 import tempfile
 from datetime import date
@@ -1060,6 +1061,77 @@ def set_news_sources(**values):
     if not chosen:
         return "Notícias desligadas: o menu Notícias fica escondido até ligares uma fonte." + removed
     return "Fontes de notícias guardadas." + removed
+
+
+# --------------------------------------------------------- inteligência artificial (análise das notícias)
+@action
+def set_ai_settings(provider="", fallback="", ollama_url="", **models):
+    """Plataforma de IA principal e alternativa, o modelo de cada uma (campos model_<plataforma>; vazio = o de
+    omissão) e o endereço do Ollama."""
+    from .services import ai
+    provider = provider if provider in ai.PROVIDERS else ""
+    fallback = fallback if fallback in ai.PROVIDERS and fallback != provider else ""
+    Setting.set("ai_provider", provider or None)
+    Setting.set("ai_fallback", fallback or None)
+    for p in ai.PROVIDERS:
+        value = str(models.get(f"model_{p}", "") or "").strip()
+        if value and not re.match(r"^[A-Za-z0-9_\-.:/@]{1,120}$", value):
+            raise ApiError(f"O modelo de {ai.PROVIDERS[p][0]} não parece válido.")
+        if f"model_{p}" in models:
+            Setting.set(f"ai_model_{p}", value if value and value != ai.PROVIDERS[p][2] else None)
+    url = (ollama_url or "").strip().rstrip("/")
+    if url and not re.match(r"^https?://[A-Za-z0-9.\-\[\]:]+(/[A-Za-z0-9_\-./]*)?$", url):
+        raise ApiError("O endereço do Ollama não parece válido (ex.: http://localhost:11434/v1).")
+    Setting.set("ai_ollama_url", url if url and url != ai.PROVIDERS["ollama"][1] else None)
+    if not provider:
+        return "Análise com IA desligada."
+    missing = [ai.PROVIDERS[p][0] for p in (provider, fallback) if p and not ai.ready(p)]
+    return "Guardado." + (f" Falta a chave de {', '.join(missing)}." if missing else "")
+
+
+@action
+def set_ai_key(provider="", key=""):
+    """Chave da API de uma plataforma de IA (vazia apaga)."""
+    from .services import ai
+    if provider not in ai.PROVIDERS or not ai.needs_key(provider):
+        raise ApiError("Plataforma desconhecida.")
+    key = (key or "").strip()
+    if key and not ai.KEY_RE.match(key):
+        raise ApiError(f"A chave de {ai.PROVIDERS[provider][0]} não parece válida.")
+    Setting.set(f"ai_key_{provider}", key or None)
+    return f"Chave de {ai.PROVIDERS[provider][0]} {'guardada' if key else 'apagada'}."
+
+
+@action
+def test_ai():
+    """«Testar» (Definições): um pedido curto à plataforma principal (ou à alternativa)."""
+    from .services import ai
+    try:
+        provider, text = ai.test()
+    except ai.AiError as exc:
+        raise ApiError(str(exc)) from exc
+    return f"{ai.PROVIDERS[provider][0]} ({ai.model(provider)}) respondeu: {text or '(vazio)'}"
+
+
+@action
+def ai_analyse_news(scope="carteira", force=""):
+    """Analisa com IA as notícias dos últimos dias: dos ativos da carteira selecionada, do mercado ou do Radar."""
+    from .services import ai
+    from .views import radar_instruments
+    tickers, names = None, {}
+    if scope == "carteira":
+        assets = [pos.asset for pos in data.load_portfolio(data.selected_broker()).open_positions]
+    elif scope == "radar":
+        assets = radar_instruments()
+    else:
+        assets = []
+    if assets:
+        tickers = [a.ticker for a in assets]
+        names = {a.ticker: (getattr(a, "name", None) or getattr(a, "instrument_name", None) or "") for a in assets}
+    try:
+        return ai.analyse(scope, tickers=tickers, names=names, force=str(force).lower() in ("1", "true", "sim"))
+    except ai.AiError as exc:
+        raise ApiError(str(exc)) from exc
 
 
 @action

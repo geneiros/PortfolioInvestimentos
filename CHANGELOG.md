@@ -4,6 +4,10 @@ O que mudou em cada commit, do mais recente para o mais antigo (gerado a partir 
 
 ## 2026-11-26
 
+- **Notícias: análise com inteligência artificial (planos gratuitos)**  
+  Na página Notícias há um cartão «Análise com IA»: escolhe-se o que analisar (os meus ativos, o mercado ou o Radar) e carrega-se em «Analisar». As notícias dos últimos 7 dias (no máximo 12 por ativo, sem repetidas) vão para a plataforma escolhida, que devolve um resumo e, por ativo, o tom (positivo, neutro, negativo ou misto), a conclusão, os riscos, o que vale a pena verificar e as notícias em que se baseia. A análise fica guardada e só se volta a pedir quando há notícias novas (ou com o botão de repetir). Só se enviam as notícias; os valores da carteira nunca saem da aplicação.
+
+  Em Definições → Inteligência artificial escolhe-se a plataforma (Google Gemini, Groq, OpenRouter, Mistral ou Ollama no próprio computador), uma alternativa para quando a principal falha ou atinge o limite do dia, o modelo de cada uma e as chaves (com ligação para pedir uma gratuita); «Testar» confirma a chave e o modelo. Todas usam o formato da API da OpenAI, só com a biblioteca padrão.
 - **Carteira: a ficha da ação ao clicar numa posição**  
   Nas tabelas de posições abertas e fechadas da Carteira, clicar numa ação abre à direita a mesma ficha da Prospeção → Ações: preço, avaliação, «O valor da ação», as lentes, os pares, o moat e as perguntas. Fecha com o X, com Esc ou clicando fora. Só abre nas posições com símbolo do Yahoo; na Carteira, a ficha não tem «Guardar na lista». Se o Yahoo não devolver dados de uma ação, a ficha já não guarda a resposta vazia e volta a pedi-los da próxima vez.
 
