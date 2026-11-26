@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
@@ -35,16 +36,22 @@ DAYS = 7               # notícias dos últimos dias
 PER_TICKER = 12        # no máximo por ativo
 MAX_NEWS = 120         # no máximo por análise (os planos gratuitos limitam os tokens)
 SUMMARY_CHARS = 280
+RETRY_WAITS = (2, 5)   # segundos entre tentativas quando a plataforma está sobrecarregada (erros 5xx)
+TRANSIENT = {500, 502, 503, 504}
+# modelo de recurso, quando o de omissão continua sobrecarregado (só se o modelo não foi mudado em Definições)
+BACKUP_MODEL = {"gemini": "gemini-flash-lite-latest"}
 SCOPES = {"carteira": "Os meus ativos", "mercado": "Mercado", "radar": "Radar"}
 TONES = ("positivo", "neutro", "negativo", "misto")
 
 
 class AiError(Exception):
-    """Falha ao pedir a análise, com uma mensagem legível. `limited`: a plataforma limitou os pedidos."""
+    """Falha ao pedir a análise, com uma mensagem legível. `limited`: a plataforma limitou os pedidos;
+    `transient`: falha passageira (sobrecarga ou ligação), que vale a pena repetir."""
 
-    def __init__(self, message, limited=False):
+    def __init__(self, message, limited=False, transient=False):
         super().__init__(message)
         self.limited = limited
+        self.transient = transient
 
 
 # ------------------------------------------------------------------ configuração
@@ -104,8 +111,8 @@ def settings_view():
 
 
 # ------------------------------------------------------------------ pedido
-def _post(provider, messages, opener=None):
-    body = json.dumps({"model": model(provider), "messages": messages, "temperature": 0.2}).encode()
+def _post(provider, messages, opener=None, model_name=None):
+    body = json.dumps({"model": model_name or model(provider), "messages": messages, "temperature": 0.2}).encode()
     headers = {"Content-Type": "application/json", "User-Agent": "PortfolioInvestimentos"}
     key = api_key(provider)
     if key:
@@ -127,29 +134,56 @@ def _post(provider, messages, opener=None):
         except (ValueError, AttributeError):
             pass
         hint = {401: "chave inválida", 403: "chave sem acesso a este modelo", 404: "modelo inexistente",
-                429: "limite de pedidos atingido; tenta mais tarde"}.get(exc.code, "")
+                429: "limite de pedidos atingido; tenta mais tarde",
+                503: "plataforma sobrecarregada"}.get(exc.code, "")
         msg = f"{name}: HTTP {exc.code}" + (f" ({hint})" if hint else "") + (f": {str(detail)[:200]}" if detail else "")
-        raise AiError(msg, limited=exc.code == 429) from exc
+        raise AiError(msg, limited=exc.code == 429, transient=exc.code in TRANSIENT) from exc
+    except TimeoutError as exc:
+        raise AiError(f"{name}: sem resposta em {TIMEOUT} s") from exc
     except (OSError, ValueError) as exc:
-        raise AiError(f"{name}: sem ligação ({getattr(exc, 'reason', exc)})") from exc
+        raise AiError(f"{name}: sem ligação ({getattr(exc, 'reason', exc)})", transient=True) from exc
     try:
         return data["choices"][0]["message"]["content"] or ""
     except (KeyError, IndexError, TypeError) as exc:
         raise AiError(f"{name}: resposta inesperada") from exc
 
 
-def complete(messages, opener=None):
-    """Pede uma resposta à plataforma principal e, se falhar, à alternativa. Devolve (texto, plataforma)."""
+def _attempts(provider):
+    """Os modelos a tentar numa plataforma: o escolhido, repetido nas falhas passageiras, e o de recurso."""
+    tries = [None] * (1 + len(RETRY_WAITS))
+    backup = BACKUP_MODEL.get(provider)
+    if backup and not Setting.get(f"ai_model_{provider}"):
+        tries.append(backup)
+    return tries
+
+
+def complete(messages, opener=None, sleep=None):
+    """Pede uma resposta à plataforma principal e, se falhar, à alternativa. Nas falhas passageiras (plataforma
+    sobrecarregada, sem ligação) repete o pedido algumas vezes, com uma pausa, e no fim tenta o modelo de recurso.
+    Devolve (texto, plataforma, modelo)."""
     providers = chain()
     if not providers:
         raise AiError("Escolhe uma plataforma de IA e indica a chave em Definições → Inteligência artificial.")
-    errors = []
+    errors, transient = [], False
     for p in providers:
-        try:
-            return _post(p, messages, opener), p
-        except AiError as exc:
-            errors.append(str(exc))
-    raise AiError(" · ".join(errors), limited=False)
+        tries = _attempts(p)
+        for i, model_name in enumerate(tries):
+            try:
+                return _post(p, messages, opener, model_name), p, model_name or model(p)
+            except AiError as exc:
+                last = exc
+                if not exc.transient or i == len(tries) - 1:
+                    break
+                if i < len(RETRY_WAITS):
+                    (sleep or time.sleep)(RETRY_WAITS[i])
+        errors.append(str(last))
+        transient = transient or last.transient
+    msg = " · ".join(errors)
+    if transient:
+        msg += (". É uma falha passageira do lado da plataforma: tenta daqui a uns minutos"
+                + ("." if len(providers) > 1 else ", ou escolhe uma alternativa em Definições → Inteligência "
+                   "artificial (por exemplo o Groq, também gratuito)."))
+    raise AiError(msg)
 
 
 # ------------------------------------------------------------------ análise das notícias
@@ -264,11 +298,11 @@ def analyse(scope, tickers=None, names=None, force=False, opener=None, now=None)
     old = cached(scope)
     if old and old.get("key") == key and not force:
         return {**old, "reused": True}
-    text, provider = complete([{"role": "system", "content": SYSTEM},
+    text, provider, used = complete([{"role": "system", "content": SYSTEM},
                                {"role": "user", "content": _prompt(rows, names or {}, scope)}], opener)
     result = _clean(_parse(text), rows)
     saved = {"key": key, "at": (now or datetime.now()).isoformat(timespec="minutes"), "scope": scope,
-             "provider": provider, "provider_name": PROVIDERS[provider][0], "model": model(provider),
+             "provider": provider, "provider_name": PROVIDERS[provider][0], "model": used,
              "count": len(rows), "result": result}
     Setting.set(f"ai_analysis:{scope}", json.dumps(saved))
     return {**saved, "reused": False}
@@ -276,5 +310,5 @@ def analyse(scope, tickers=None, names=None, force=False, opener=None, now=None)
 
 def test(opener=None):
     """Um pedido curto, para confirmar a chave e o modelo em Definições."""
-    text, provider = complete([{"role": "user", "content": "Responde só com a palavra: OK"}], opener)
-    return provider, text.strip()[:40]
+    text, provider, used = complete([{"role": "user", "content": "Responde só com a palavra: OK"}], opener)
+    return provider, used, text.strip()[:40]

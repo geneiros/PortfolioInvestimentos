@@ -1107,10 +1107,10 @@ def test_ai():
     """«Testar» (Definições): um pedido curto à plataforma principal (ou à alternativa)."""
     from .services import ai
     try:
-        provider, text = ai.test()
+        provider, used, text = ai.test()
     except ai.AiError as exc:
         raise ApiError(str(exc)) from exc
-    return f"{ai.PROVIDERS[provider][0]} ({ai.model(provider)}) respondeu: {text or '(vazio)'}"
+    return f"{ai.PROVIDERS[provider][0]} ({used}) respondeu: {text or '(vazio)'}"
 
 
 @action
