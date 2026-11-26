@@ -1374,6 +1374,22 @@ def test_refresh_without_yfinance(app, monkeypatch):
     assert any("chart/ACME.DE" in u for u in calls)
 
 
+def test_yahoo_client_falls_back_on_binary_runtime_error(monkeypatch):
+    """NumPy ou outra extensão binária pode falhar mesmo com o módulo yfinance instalado."""
+    import builtins
+    from portfolio_investimentos.services import market, yahoo
+
+    real_import = builtins.__import__
+
+    def broken_yfinance(name, *args, **kwargs):
+        if name == "yfinance":
+            raise RuntimeError("NumPy was built with unsupported baseline optimizations")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", broken_yfinance)
+    assert market._yahoo_client() is yahoo
+
+
 def test_yahoo_direct_retries_and_crumb(monkeypatch):
     import io as _io
     import json as _json

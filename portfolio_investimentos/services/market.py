@@ -291,7 +291,9 @@ def _yahoo_client():
         # ativá-lo depois do PYTHONWARNINGS); não é um erro e não depende de nós, por isso cala-se só o dele
         warnings.filterwarnings("ignore", module=r"yfinance(\.|$)")
         return yfinance
-    except ImportError:
+    except (ImportError, RuntimeError, OSError):
+        # Pacotes binários podem estar presentes mas não arrancar nesta CPU (por exemplo NumPy/X86_V2).
+        # Nesse caso usa-se o cliente HTTP mínimo em vez de fazer a atualização terminar.
         from . import yahoo
         return yahoo
 
