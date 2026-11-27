@@ -3,7 +3,11 @@ REM Inicia o Portfolio Investimentos (Windows). Na primeira vez prepara o ambien
 REM Com git clone, verifica antes se ha uma versao nova e pergunta se deve atualizar (sem resposta em
 REM 10 segundos, atualiza). PORTFOLIO_ATUALIZAR=S atualiza sem perguntar; PORTFOLIO_ATUALIZAR=N nunca atualiza.
 cd /d "%~dp0"
-where py >nul 2>nul && (set PY=py -3) || (set PY=python)
+if defined PORTFOLIO_PYTHON (
+  set "PY=%PORTFOLIO_PYTHON%"
+) else (
+  where py >nul 2>nul && (set PY=py -3) || (set PY=python)
+)
 call :verificar
 if "%NOVAS%"=="0" goto :arrancar
 if /i "%PORTFOLIO_ATUALIZAR%"=="N" goto :arrancar

@@ -38,6 +38,7 @@ jobs:
         timeout-minutes: 10
         env:
           PORTFOLIO_ATUALIZAR: S
+          PORTFOLIO_PYTHON: python
         run: |
           Set-Location "$env:RUNNER_TEMP\app"
           cmd /c "call iniciar.bat --help < nul 2>&1" | Tee-Object saida.txt
@@ -56,6 +57,7 @@ jobs:
         timeout-minutes: 10
         env:
           PORTFOLIO_ATUALIZAR: N
+          PORTFOLIO_PYTHON: python
         run: |
           Set-Location "$env:RUNNER_TEMP\dev"
           git pull
