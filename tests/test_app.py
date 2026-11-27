@@ -4216,7 +4216,8 @@ def test_ai_analyse_news_cache_and_fallback(app, client, monkeypatch):
     r = post(client, "ai_analyse_news", token, scope="mercado").get_json()["message"]
     assert r["result"]["resumo"] == "Juros estáveis." and r["count"] == 1
     html = client.get("/noticias").get_data(as_text=True)
-    assert 'id="aiCard"' in html and 'id="aiRun"' in html and "Juros est" in html  # a análise guardada
+    assert ('id="aiCard"' in html and 'id="aiRun"' in html and 'id="aiScope"' not in html
+            and 'data-bs-target="#tab-market"' in html and "Juros est" in html)  # âmbito ligado ao separador ativo
 
 
 def test_ai_off_shows_hint(app, client):

@@ -53,9 +53,6 @@
   <div class="d-flex flex-wrap align-items-center gap-2">
     <div class="pm-label me-auto"><i class="bi bi-stars"></i> Análise com IA {{ help("Junta as notícias dos últimos 7 dias (no máximo 12 por ativo) e pede conclusões à plataforma de IA escolhida em Definições. Só se enviam as notícias; os valores da carteira não saem da aplicação. A análise fica guardada e só se volta a pedir quando há notícias novas. É um resumo automático: confirma sempre nas notícias de origem.") }}</div>
     {% if ai_on %}
-    <select class="form-select form-select-sm w-auto" id="aiScope" aria-label="O que analisar">
-      {% for k, label in ai_scopes.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}
-    </select>
     <button class="btn btn-sm btn-primary" type="button" id="aiRun"><i class="bi bi-stars"></i> Analisar</button>
     <button class="btn btn-sm btn-outline-secondary" type="button" id="aiAgain" title="Pedir uma análise nova, mesmo sem notícias novas"><i class="bi bi-arrow-repeat"></i></button>
     {% else %}

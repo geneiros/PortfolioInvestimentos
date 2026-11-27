@@ -2,11 +2,14 @@
    com textContent (o texto vem da IA e das notícias: nunca entra como HTML). */
 (() => {
   const box = document.getElementById("aiResult");
-  const scope = document.getElementById("aiScope");
   const run = document.getElementById("aiRun");
   const again = document.getElementById("aiAgain");
-  if (!box || !scope) return;
+  if (!box) return;
   const saved = window.pmAiSaved || {};
+  const activeScope = () => {
+    const pane = document.querySelector(".tab-pane.active");
+    return ({ "tab-mine": "carteira", "tab-market": "mercado", "tab-radar": "radar" })[pane?.id] || "carteira";
+  };
   const TONE = { positivo: ["text-bg-success", "Positivo"], negativo: ["text-bg-danger", "Negativo"],
     misto: ["text-bg-warning", "Misto"], neutro: ["text-bg-secondary", "Neutro"] };
   const el = (tag, cls, text) => {
@@ -59,18 +62,17 @@
     });
     box.appendChild(el("p", "small text-secondary mt-2 mb-0", "Resumo automático: confirma sempre nas notícias de origem. Não é uma recomendação de investimento."));
   };
-  const KEY = "pm-ai-scope";
-  try { const s = localStorage.getItem(KEY); if (s && [...scope.options].some((o) => o.value === s)) scope.value = s; } catch (e) { /* sem armazenamento */ }
-  const show = () => render(saved[scope.value]);
-  scope.addEventListener("change", () => { try { localStorage.setItem(KEY, scope.value); } catch (e) { /* */ } show(); });
+  const show = () => render(saved[activeScope()]);
+  document.addEventListener("shown.bs.tab", show);
   const go = async (force) => {
+    const requestedScope = activeScope();
     run.disabled = again.disabled = true;
     const old = run.innerHTML;
     run.innerHTML = '<span class="spinner-border spinner-border-sm"></span> A analisar…';
     try {
-      const a = await pm.call("ai_analyse_news", { scope: scope.value, force: force ? "1" : "" });
-      saved[scope.value] = a;
-      render(a);
+      const a = await pm.call("ai_analyse_news", { scope: requestedScope, force: force ? "1" : "" });
+      saved[requestedScope] = a;
+      if (activeScope() === requestedScope) render(a);
     } catch (e) { /* o erro já aparece no aviso */ } finally { run.disabled = again.disabled = false; run.innerHTML = old; }
   };
   run.addEventListener("click", () => go(false));

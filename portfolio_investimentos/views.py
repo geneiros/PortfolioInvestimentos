@@ -692,8 +692,7 @@ def noticias():
              radar_rows=radar_rows, radar_assets=watch,
              radar_missing=news.without_news(watch, {n.ticker for n in radar_rows}),
              radar_counts={t: sum(1 for n in radar_rows if n.ticker == t) for t in watch_tickers},
-             ai_on=ai.enabled(), ai_scopes=ai.SCOPES,
-             ai_saved={s: ai.cached(s) for s in ai.SCOPES})
+             ai_on=ai.enabled(), ai_saved={s: ai.cached(s) for s in ai.SCOPES})
     return render_template("pages/noticias.html", **c)
 
 
