@@ -147,6 +147,8 @@ Com a ferramenta **Setup Python App** do cPanel (Passenger), a aplicação arran
 4. **Código:** com **Git™ Version Control** clona o repositório para a pasta da aplicação, ou carrega o ZIP do GitHub com o **File Manager**. O ZIP extrai-se para uma subpasta (`PortfolioInvestimentos-main`): move o conteúdo dela para a pasta da aplicação, substituindo o `passenger_wsgi.py` de exemplo que o cPanel criou.
 5. **Dependências:** escreve `requirements.txt` em *Configuration files*, carrega em **Run Pip Install** e depois em **Restart**. Se o `yfinance` não instalar (precisa do `curl_cffi`), instala o resto sem ele: as cotações vêm diretamente do Yahoo, como no Android.
 
+   Se o Passenger indicar `attempt to write a readonly database`, a pasta configurada em `PORTFOLIO_DATA_DIR` não pertence ao utilizador do site ou não é gravável. Na Terminal do cPanel, usa `chown -R UTILIZADOR:UTILIZADOR /home/UTILIZADOR/portfolio-dados` e `chmod 750 /home/UTILIZADOR/portfolio-dados` (substitui `UTILIZADOR` pelo utilizador da conta), depois reinicia a aplicação. Se o log indicar `NumPy was built with baseline optimizations (X86_V2)`, força a reinstalação das dependências após o `numpy<2` mais recente: desinstala o NumPy 2.x e executa `pip install --upgrade -r requirements.txt`, seguido de **Restart**.
+
 Se a aplicação não arrancar, a página mostra o motivo (por exemplo, uma dependência em falta) em vez do erro genérico do Passenger. Para atualizar: «Pull» no Git Version Control (ou o ZIP novo) e **Restart**; os dados ficam na pasta de `PORTFOLIO_DATA_DIR`. Alguns alojamentos bloqueiam ligações a outros sites: se as cotações não vierem, pede para permitir `query1.finance.yahoo.com`, `query2.finance.yahoo.com` e `fc.yahoo.com`.
 
 ### Opções da linha de comandos

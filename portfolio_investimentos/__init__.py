@@ -3,6 +3,7 @@ import functools
 import mimetypes
 import os
 import secrets
+import sqlite3
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -89,6 +90,34 @@ def _secret_key(folder):
     return key_file.read_text().strip()
 
 
+def _check_database_writable(db_path):
+    """Falha cedo com uma instrução útil quando a pasta ou o ficheiro da base não é gravável."""
+    folder = Path(db_path).parent
+    probe = folder / ".escrita"
+    try:
+        probe.write_text("ok")
+        probe.unlink()
+    except OSError as exc:
+        raise RuntimeError(
+            f"A pasta dos dados não é gravável: {folder}. Corrige as permissões ou define "
+            f"PORTFOLIO_DATA_DIR para uma pasta gravável pelo utilizador do Passenger ({exc})."
+        ) from exc
+
+    if Path(db_path).exists():
+        try:
+            conn = sqlite3.connect(db_path, timeout=30)
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                conn.rollback()
+            finally:
+                conn.close()
+        except sqlite3.Error as exc:
+            raise RuntimeError(
+                f"A base de dados não aceita escritas: {db_path}. Corrige a propriedade e as permissões "
+                f"do ficheiro e da sua pasta (por exemplo, chown do utilizador do site)."
+            ) from exc
+
+
 mimetypes.add_type("application/manifest+json", ".webmanifest")  # manifesto da aplicação instalável
 
 
@@ -103,6 +132,7 @@ def create_app(config=None):
 
     folder = data_dir()
     db_path = str(folder / "portfolio.db")
+    _check_database_writable(db_path)
     app = Flask(__name__)
     app.config.update(
         SECRET_KEY=_secret_key(folder),

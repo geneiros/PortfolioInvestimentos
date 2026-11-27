@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-market = ["yfinance>=0.2"]
+market = ["yfinance>=0.2", "numpy<2"]
 janela = ["pywebview>=5"]  # abrir numa janela própria (python -m portfolio_investimentos --janela)
 test = ["pytest>=8.0"]
 lint = ["ruff"]
