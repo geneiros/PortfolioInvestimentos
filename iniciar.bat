@@ -24,10 +24,12 @@ git pull --ff-only && (
 echo Nao foi possivel atualizar - ha ficheiros alterados nesta pasta? A arrancar a versao atual.
 
 :arrancar
-if not exist .venv\Scripts\python.exe (
-  echo A preparar o ambiente - so na primeira vez...
-  %PY% -m venv .venv || (echo Python 3.10+ nao encontrado. Instala-o em https://www.python.org/downloads/ & pause & exit /b 1)
-)
+REM fora de blocos: o PY pode mudar em :garantir_python e o cmd expande %PY% num bloco antes de o correr
+if exist .venv\Scripts\python.exe goto :preparado
+echo A preparar o ambiente - so na primeira vez...
+call :garantir_python || (echo Python 3.10+ nao encontrado. Instala-o em https://www.python.org/downloads/ ^(marca Add Python to PATH^) e volta a abrir. & pause & exit /b 1)
+%PY% -m venv .venv || (echo Nao foi possivel criar o ambiente Python ^(.venv^). & pause & exit /b 1)
+:preparado
 call :dependencias || (echo Nao foi possivel instalar as dependencias. Verifica a ligacao a internet e volta a abrir. & pause & exit /b 1)
 .venv\Scripts\python -m portfolio_investimentos %*
 pause
@@ -46,6 +48,20 @@ if errorlevel 1 (
 )
 for /f %%n in ('git rev-list --count HEAD..@{u} 2^>nul') do set NOVAS=%%n
 exit /b 0
+
+:garantir_python
+REM testa a correr o Python, nao com where: o python.exe de WindowsApps e so um atalho para a Microsoft Store
+if defined PORTFOLIO_PYTHON exit /b 0
+%PY% --version >nul 2>nul && exit /b 0
+REM sem Python: instala com o winget, se existir (nas edicoes LTSC do Windows normalmente nao existe)
+where winget >nul 2>nul || exit /b 1
+echo Python nao encontrado. A instalar o Python 3.12 com o winget - pode demorar alguns minutos...
+REM 3.12 porque o numpy<2 nao tem pacotes para o 3.13; --scope user nao pede administrador
+winget install -e --id Python.Python.3.12 --scope user --silent --accept-package-agreements --accept-source-agreements
+REM esta janela nao ve o PATH novo: usa o caminho completo da instalacao para o utilizador
+set "PY="%LOCALAPPDATA%\Programs\Python\Python312\python.exe""
+%PY% --version >nul 2>nul && exit /b 0
+exit /b 1
 
 :dependencias
 REM o marcador e uma copia de requirements.txt, criada so depois de a instalacao terminar:

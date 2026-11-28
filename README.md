@@ -15,7 +15,7 @@ Tracker de carteira de investimentos local: desempenho, dividendos, património,
 
 ## Como usar
 
-Sem Python, usa o **executável único** (abaixo). Com Python, precisas apenas do **Python 3.10 ou superior** ([python.org/downloads](https://www.python.org/downloads/); no Windows marca a opção *Add Python to PATH*).
+Sem Python, usa o **executável único** (abaixo). Com Python, precisas apenas do **Python 3.10 ou superior** ([python.org/downloads](https://www.python.org/downloads/); no Windows marca a opção *Add Python to PATH*). No Windows, se o Python não estiver instalado, o `iniciar.bat` instala o Python 3.12 com o `winget` (quando existe; nas edições LTSC normalmente não vem instalado).
 
 1. Descarrega o projeto: botão **Code → Download ZIP** no GitHub, ou `git clone https://github.com/geneiros/PortfolioInvestimentos`.
 2. Abre a pasta e inicia a aplicação:
@@ -141,15 +141,38 @@ Em **Definições → Segurança** podes definir uma palavra-passe. A partir da�
 
 Com a ferramenta **Setup Python App** do cPanel (Passenger), a aplicação arranca pelo `passenger_wsgi.py` do repositório.
 
+Nos passos abaixo, substitui `UTILIZADOR` pelo utilizador da tua conta cPanel e `teudominio.pt` pelo teu domínio.
+
 1. **Subdomínio:** cria um subdomínio para a aplicação (ex.: `carteira.teudominio.pt`) e ativa o SSL (AutoSSL). Numa subpasta (`teudominio.pt/carteira`) algumas ligações não funcionam.
-2. **Aplicação:** em **Setup Python App → Create Application**: Python 3.10 ou mais recente; *Application root* uma pasta fora do `public_html` (ex.: `portfolio`); *Application URL* o subdomínio; *Application startup file* `passenger_wsgi.py`; *Application Entry point* `application`; *Passenger log file* por exemplo `/home/UTILIZADOR/logs/passenger.log` (é lá que ficam os erros).
-3. **Variáveis de ambiente** (na mesma página): `PORTFOLIO_PASSWORD` (uma palavra-passe forte), `PORTFOLIO_HTTPS=1`, `PORTFOLIO_PROXY=1` e `PORTFOLIO_DATA_DIR` (ex.: `/home/UTILIZADOR/portfolio-dados`, fora do `public_html`).
-4. **Código:** com **Git™ Version Control** clona o repositório para a pasta da aplicação, ou carrega o ZIP do GitHub com o **File Manager**. O ZIP extrai-se para uma subpasta (`PortfolioInvestimentos-main`): move o conteúdo dela para a pasta da aplicação, substituindo o `passenger_wsgi.py` de exemplo que o cPanel criou.
+2. **Código, com o Git™ Version Control:** em **Files → Git™ Version Control**, carrega em **Create**.
+   - Ativa *Clone a Repository*.
+   - *Clone URL*: `https://github.com/geneiros/PortfolioInvestimentos.git`.
+   - *Repository Path*: uma pasta fora do `public_html` que ainda não exista, por exemplo `/home/UTILIZADOR/portfolio`. O cPanel só clona para uma pasta nova ou vazia, por isso faz este passo antes de criar a aplicação.
+   - *Repository Name*: por exemplo `PortfolioInvestimentos`. Carrega em **Create** e espera que o clone termine.
+
+   Em alternativa, carrega o ZIP do GitHub com o **File Manager**. O ZIP extrai-se para uma subpasta (`PortfolioInvestimentos-main`): move o conteúdo dela para a pasta da aplicação.
+3. **Aplicação, no Setup Python App:** em **Software → Setup Python App**, carrega em **Create Application**.
+   - *Python version*: 3.12 (ou outra entre 3.10 e 3.12; o `numpy<2` não tem pacotes para o 3.13).
+   - *Application root*: a mesma pasta do passo 2, relativa à pasta pessoal (ex.: `portfolio`).
+   - *Application URL*: o subdomínio do passo 1.
+   - *Application startup file*: `passenger_wsgi.py`.
+   - *Application Entry point*: `application`.
+   - *Passenger log file*: por exemplo `/home/UTILIZADOR/logs/passenger.log`. É lá que ficam os erros.
+4. **Variáveis de ambiente,** na mesma página, em *Environment variables* → **Add Variable** (uma de cada vez):
+
+   | Nome | Valor | Para quê |
+   |------|-------|----------|
+   | `PORTFOLIO_PASSWORD` | uma palavra-passe forte | Obrigatória num servidor: sem ela, qualquer pessoa com o endereço entra. |
+   | `PORTFOLIO_HTTPS` | `1` | O cookie de sessão só segue por HTTPS. |
+   | `PORTFOLIO_PROXY` | `1` | O Passenger fica atrás de um proxy: assim o limite de tentativas de login vale por visitante. |
+   | `PORTFOLIO_DATA_DIR` | `/home/UTILIZADOR/portfolio-dados` | Pasta da base de dados, fora do `public_html` e fora da pasta do código. A aplicação cria-a se não existir. |
+
+   Carrega em **Create** (ou **Save**, se a aplicação já existir). Se o cPanel tiver posto na pasta um `passenger_wsgi.py` de exemplo, repõe o do repositório: no Terminal, `cd ~/portfolio && git checkout passenger_wsgi.py`.
 5. **Dependências:** escreve `requirements.txt` em *Configuration files*, carrega em **Run Pip Install** e depois em **Restart**. Se o `yfinance` não instalar (precisa do `curl_cffi`), instala o resto sem ele: as cotações vêm diretamente do Yahoo, como no Android.
 
    Se o Passenger indicar `attempt to write a readonly database`, a pasta configurada em `PORTFOLIO_DATA_DIR` não pertence ao utilizador do site ou não é gravável. Na Terminal do cPanel, usa `chown -R UTILIZADOR:UTILIZADOR /home/UTILIZADOR/portfolio-dados` e `chmod 750 /home/UTILIZADOR/portfolio-dados` (substitui `UTILIZADOR` pelo utilizador da conta), depois reinicia a aplicação. Se o log indicar `NumPy was built with baseline optimizations (X86_V2)`, força a reinstalação das dependências após o `numpy<2` mais recente: desinstala o NumPy 2.x e executa `pip install --upgrade -r requirements.txt`, seguido de **Restart**.
 
-Se a aplicação não arrancar, a página mostra o motivo (por exemplo, uma dependência em falta) em vez do erro genérico do Passenger. Para atualizar: «Pull» no Git Version Control (ou o ZIP novo) e **Restart**; os dados ficam na pasta de `PORTFOLIO_DATA_DIR`. Alguns alojamentos bloqueiam ligações a outros sites: se as cotações não vierem, pede para permitir `query1.finance.yahoo.com`, `query2.finance.yahoo.com` e `fc.yahoo.com`.
+Se a aplicação não arrancar, a página mostra o motivo (por exemplo, uma dependência em falta) em vez do erro genérico do Passenger. Para atualizar: em **Git™ Version Control**, carrega em **Manage** no repositório e, no separador *Pull or Deploy*, em **Update from Remote** (ou carrega o ZIP novo). Se o `requirements.txt` mudou, carrega outra vez em **Run Pip Install**. Depois carrega em **Restart** no Setup Python App. Os dados ficam na pasta de `PORTFOLIO_DATA_DIR`. Alguns alojamentos bloqueiam ligações a outros sites: se as cotações não vierem, pede para permitir `query1.finance.yahoo.com`, `query2.finance.yahoo.com` e `fc.yahoo.com`.
 
 ### Opções da linha de comandos
 
