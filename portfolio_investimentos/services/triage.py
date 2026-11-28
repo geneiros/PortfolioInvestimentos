@@ -10,6 +10,7 @@ Tudo fica guardado (Settings «triage:universe» e «triage:info»): a página a
 import json
 import time
 from datetime import datetime, timedelta
+from math import isfinite
 
 from ..models import Setting
 from . import lenses, screener
@@ -253,8 +254,8 @@ def metrics(row, info):
     return m
 
 
-def table():
-    """As linhas da página: cada ação com os indicadores e o estado em cada lente."""
+def table(include_valuation=False):
+    """As linhas da página: cada ação com indicadores e estados; pode incluir a comparação de avaliações."""
     u = universe()
     if not u:
         return None
@@ -265,7 +266,11 @@ def table():
             continue  # (universos guardados antes de uma regra nova)
         info = (data.get(r["ticker"]) or {}).get("info")
         m = metrics(r, info)
-        rows.append({"r": r, "m": m, "info": bool(info)})
+        rows.append({"r": r, "m": m, "info": bool(info), "info_data": info})
+    fundamentals = {}
+    if include_valuation and rows:
+        from ..models import Fundamental
+        fundamentals = {f.ticker: f for f in Fundamental.query.all()}
     # Greenblatt: em todo o universo, posição na rentabilidade (ROE) + posição no earnings yield (1 ÷ P/L)
     cand = [x for x in rows if x["m"].get("pe") and x["m"].get("roe") is not None]
     by_q = sorted(cand, key=lambda x: -x["m"]["roe"])
@@ -292,7 +297,9 @@ def table():
                     "s": m["sector"] or "", "cur": m["currency"], "p": m["price"], "cap": m["cap_usd"],
                     "pe": m["pe"], "pb": m["pb"], "roe": m["roe"], "rg": m["rev_growth"], "dv": m["div"],
                     "de": m["de"], "st": st, "k": len(enters), "full": x["info"], "mq": m.get("magic_q"),
-                    "cv": lenses.criterion_values(m)})
+                    "cv": lenses.criterion_values(m),
+                    "vr": valuation_ratio(x["r"]["ticker"], m, x["info_data"],
+                                          fundamentals.get(x["r"]["ticker"])) if include_valuation else None})
     return {"at": u["at"], "rows": out, "errors": u.get("errors") or [],
             "stale": datetime.now() - datetime.fromisoformat(u["at"]) > STALE,
             "missing": sum(1 for x in out if not x["full"])}
@@ -342,7 +349,29 @@ def save_answers(ticker, values):
     return clean
 
 
-def valuation_of(ticker, m, info):
+def valuation_ratio(ticker, m, info, fundamental=None):
+    """Cotação face ao menor valor positivo da ficha lateral, em múltiplos de 100%."""
+    price = m.get("price")
+    if not isinstance(price, (int, float)) or not isfinite(price) or price <= 0:
+        return None
+    values = [lenses.graham_number(m), lenses.bazin_ceiling(m)]
+    v = valuation_of(ticker, m, info, fundamental=fundamental)
+    if v:
+        values.extend(method.get("low") for method in v["methods"])
+        if v.get("peg"):
+            values.append(v["peg"].get("fair"))
+    valid = [value for value in values
+             if isinstance(value, (int, float)) and isfinite(value) and value > 0]
+    if not valid:
+        return None
+    ratio = price / min(valid)
+    return ratio if isfinite(ratio) else None
+
+
+_FUNDAMENTAL_UNSET = object()
+
+
+def valuation_of(ticker, m, info, fundamental=_FUNDAMENTAL_UNSET):
     """O valor da ação pelos vários métodos (os mesmos de «O valor de cada ação», na Carteira). Com os dados
     fundamentais da Carteira (e as correções que lá fizeste) quando a ação é tua; senão, pelos dados do Yahoo,
     tudo por ação e na moeda da cotação."""
@@ -351,7 +380,7 @@ def valuation_of(ticker, m, info):
     price = m.get("price")
     if not price:
         return None
-    f = db.session.get(Fundamental, ticker)
+    f = db.session.get(Fundamental, ticker) if fundamental is _FUNDAMENTAL_UNSET else fundamental
 
     def pick(name):
         manual = getattr(f, "manual_" + name, None) if f else None
