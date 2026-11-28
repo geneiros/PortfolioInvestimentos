@@ -119,6 +119,10 @@ def _m009_watch_board(conn):
     conn.execute("UPDATE watch_item SET priority = 'media' WHERE priority IS NULL")
 
 
+def _m010_broker_country(conn):
+    _add_column(conn, "broker", "country", "VARCHAR(2)")
+
+
 MIGRATIONS = [
     (1, "Resultado indicado pela corretora em cada venda", _m001_transaction_result),
     (2, "Data da última cotação obtida de cada ativo", _m002_instrument_last_quote),
@@ -129,6 +133,7 @@ MIGRATIONS = [
     (7, "Acompanhamento: parâmetros e alertas de cada ação (os alertas de preço passam para lá)", _m007_watch_rules),
     (8, "Prospeção: várias listas de acompanhamento e as lentes da triagem", _m008_watch_lists),
     (9, "Prospeção: as listas em quadro (estados, prioridade, notas)", _m009_watch_board),
+    (10, "Fiscal: país da fonte dos juros por corretora", _m010_broker_country),
 ]
 LATEST = MIGRATIONS[-1][0]
 

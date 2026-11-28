@@ -40,6 +40,7 @@ class Broker(NameMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     broker_name = db.Column(db.String(120), nullable=False, unique=True)
     color = db.Column(db.String(9), default="#3b82f6")
+    country = db.Column(db.String(2))
 
 
 class Instrument(db.Model):

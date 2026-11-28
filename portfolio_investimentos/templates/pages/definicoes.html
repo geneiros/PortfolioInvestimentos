@@ -17,20 +17,29 @@
     <div class="pm-card mb-3">
       <div class="pm-label mb-3">Corretoras</div>
       {% for b in brokers %}
-      <form class="d-flex gap-2 mb-2" data-pm-method="save_broker" data-pm-success="Guardado.">
+      <form class="d-flex gap-2 mb-2 flex-wrap" data-pm-method="save_broker" data-pm-success="Guardado.">
         <input type="hidden" name="name" value="{{ b.name }}">
         <input type="color" name="color" value="{{ b.color or '#3b82f6' }}" class="form-control form-control-color form-control-sm">
         <input name="broker_name" value="{{ b.broker_name }}" class="form-control form-control-sm">
+        <select name="country" class="form-select form-select-sm" style="max-width: 190px">
+          <option value="">País da fonte dos juros</option>
+          {% for code, label in broker_countries %}<option value="{{ code }}" {{ 'selected' if b.country == code }}>{{ label }}</option>{% endfor %}
+        </select>
         <span class="small text-body-secondary text-nowrap align-self-center">{{ b.positions }} pos.</span>
         <button class="btn btn-sm btn-outline-secondary" type="submit" title="Guardar"><i class="bi bi-check"></i></button>
         <button class="btn btn-sm btn-outline-danger" type="button" data-pm-action="delete_broker" data-args='{"name": "{{ b.name }}"}' data-confirm="Apagar corretora?"><i class="bi bi-trash"></i></button>
       </form>
       {% else %}<p class="text-body-secondary small">Ainda não tens corretoras. São criadas automaticamente ao importar um extrato.</p>{% endfor %}
-      <form class="d-flex gap-2 mt-3" data-pm-method="save_broker" data-pm-success="Corretora criada.">
+      <form class="d-flex gap-2 mt-3 flex-wrap" data-pm-method="save_broker" data-pm-success="Corretora criada.">
         <input type="color" name="color" value="#3b82f6" class="form-control form-control-color form-control-sm">
         <input name="broker_name" class="form-control form-control-sm" placeholder="Nova corretora" required>
+        <select name="country" class="form-select form-select-sm" style="max-width: 190px">
+          <option value="">País da fonte dos juros</option>
+          {% for code, label in broker_countries %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+        </select>
         <button class="btn btn-sm btn-primary" type="submit">Adicionar</button>
       </form>
+      <p class="small text-body-secondary mt-2 mb-0">O país é usado como país da fonte dos juros para o Anexo J; não é inferido a partir do nome da corretora.</p>
     </div>
 
     <div class="pm-card mb-3">

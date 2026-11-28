@@ -258,7 +258,7 @@ def brokers():
     """
     since = dict(db.session.query(Transaction.broker, func.min(Transaction.date)).group_by(Transaction.broker))
     counts = open_position_counts()
-    return [SimpleNamespace(name=str(b.id), id=b.id, broker_name=b.broker_name, color=b.color,
+    return [SimpleNamespace(name=str(b.id), id=b.id, broker_name=b.broker_name, color=b.color, country=b.country,
                             since=since.get(b.id), positions=counts.get(b.id, 0))
             for b in Broker.query.order_by(Broker.id).all()]
 

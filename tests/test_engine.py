@@ -282,12 +282,14 @@ def test_fire_historical_probability():
 
 
 def test_fiscal_dividend_credit_is_limited_per_dividend():
-    """A retenção a mais num dividendo (30% nos EUA) não abate o imposto de outro dividendo do mesmo ano."""
+    """A retenção estrangeira acima de 28% não cria reembolso nem abate o imposto de outro dividendo."""
     d0 = date(2024, 1, 2)
     prices = book_linear("ACME", d0, date(2024, 12, 31), 10, 10)
     txs = [Tx(d0, "BUY", ACME, quantity=100, price=10),
-           Tx(date(2024, 3, 15), "DIVIDEND", ACME, quantity=100, amount=100, tax=30),
+           Tx(date(2024, 3, 15), "DIVIDEND", ACME, quantity=100, amount=100, tax=35),
            Tx(date(2024, 9, 15), "DIVIDEND", ACME, quantity=100, amount=100, tax=0)]
+    over_withheld = Portfolio(txs[:2], PriceBook(prices), as_of=date(2024, 12, 31))
+    assert over_withheld.fiscal_years()[2024]["tax_dividends"] == pytest.approx(0.0)
     p = Portfolio(txs, PriceBook(prices), as_of=date(2024, 12, 31))
     assert p.fiscal_years()[2024]["tax_dividends"] == pytest.approx(28.0)  # e não 26
 

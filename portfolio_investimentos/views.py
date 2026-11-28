@@ -1,5 +1,7 @@
 """Páginas da aplicação."""
+import csv
 from datetime import date, timedelta
+from io import StringIO
 from types import SimpleNamespace
 
 from flask import Blueprint, Response, abort, current_app, render_template, request
@@ -10,7 +12,7 @@ from .models import (LIQUIDITY, OTHER_CATEGORIES, Broker, DividendHistory, Event
                      Instrument, Price, Setting, Transaction, WatchItem, WatchRule, db)
 from . import auth, is_portable
 from .services import context as ctx
-from .services import backups, data, insights, market, networth, portfolio_alerts, report, sale_sim, widgets
+from .services import annex_j, backups, data, insights, market, networth, portfolio_alerts, report, sale_sim, widgets
 from .services import news as news_svc
 from .services import ai as ai_svc
 from .services.importer import BROKERS, INSTRUCTIONS
@@ -434,7 +436,9 @@ def fiscal():
              n_lots=len(y["sales"]) if y else 0, sim_positions=sale_sim.positions() if c["p"].transactions else [],
              year_balance=sale_sim.year_balance() if c["p"].transactions else 0.0,
              harvest_rows=sale_sim.harvest(sale_sim.year_balance()) if c["p"].transactions else [],
-             this_year=date.today().year)
+             this_year=date.today().year,
+             annex_j=annex_j.build(c["p"], c["broker_doc"], year) if y else
+             {"dividends": [], "interest": [], "sales": [], "warnings": []})
     return render_template("pages/fiscal.html", **c)
 
 
@@ -469,6 +473,39 @@ def fiscal_csv():
                              repr(round(sl.gain_eur, 2))]))
     return Response("\ufeff" + "\n".join(out), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename=mais-valias-{year}.csv"})
+
+
+@bp.route("/fiscal/anexo-j.csv")
+def fiscal_annex_j_csv():
+    year, quadro = _int(request.args.get("ano")), request.args.get("quadro")
+    if quadro not in ("8A", "9.2A"):
+        abort(400)
+    broker_name = data.selected_broker()
+    p = data.load_portfolio(broker_name)
+    if year not in p.fiscal_years():
+        abort(404)
+    broker = next((b for b in data.brokers() if b.name == broker_name), None)
+    rows = annex_j.build(p, broker, year)
+    out = StringIO()
+    writer = csv.writer(out, delimiter=";", lineterminator="\n")
+    if quadro == "8A":
+        writer.writerow(["Código de rendimento", "País da fonte", "Rendimento bruto",
+                         "Imposto pago no estrangeiro", "Ativo(s) (referência)"])
+        for row in rows["dividends"] + rows["interest"]:
+            writer.writerow([row.code, row.country_code, f"{row.gross:.2f}", f"{row.tax:.2f}",
+                             getattr(row, "assets", "Juros")])
+        filename = f"anexo-j-8a-{year}.csv"
+    else:
+        writer.writerow(["País da contraparte", "Data de realização", "Valor de realização",
+                         "Data de aquisição", "Valor de aquisição", "Despesas e encargos", "Ativo (referência)"])
+        for row in rows["sales"]:
+            sale = row.sale
+            writer.writerow(["", sale.date.isoformat(), f"{row.realization:.2f}",
+                             sale.acquired.isoformat() if sale.acquired else "",
+                             f"{row.acquisition:.2f}", f"{row.expenses:.2f}", sale.asset.ticker])
+        filename = f"anexo-j-92a-{year}.csv"
+    return Response("\ufeff" + out.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
 @bp.route("/relatorio")
@@ -752,7 +789,8 @@ def definicoes():
              finnhub_env=news_svc.key_from_env(), finnhub_saved=bool(Setting.get("finnhub_key")),
              marketaux_env=news_svc.marketaux_from_env(), marketaux_saved=bool(Setting.get("marketaux_key")),
              news_providers=news_svc.PROVIDERS, news_sources=_news_sources(), news_stats=news_svc.stats(), news_last=news_svc.last_results(),
-             password_env=bool(auth.env_password()), ai_cfg=ai_svc.settings_view())
+             password_env=bool(auth.env_password()), ai_cfg=ai_svc.settings_view(),
+             broker_countries=annex_j.COUNTRY_OPTIONS)
     return render_template("pages/definicoes.html", **c)
 
 
