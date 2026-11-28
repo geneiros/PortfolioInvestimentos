@@ -3779,6 +3779,12 @@ def test_triage_universe_page_and_profile(app, client, monkeypatch):
                  'data-save-lens="buffett"', "O valor da ação", 'data-method="dcf"', 'data-method="gordon"',
                  "Mais métodos", "PEG de Peter Lynch"):
         assert text in html, text
+    for tip in ("Cotação atual da ação, na moeda indicada.",
+                "Valor de mercado da empresa: preço da ação × número de ações em circulação, aproximado em dólares.",
+                "Preço atual ÷ lucro por ação previsto para os próximos 12 meses.",
+                "(Caixa + contas a receber) ÷ passivo corrente; exclui inventários.",
+                "Intervalo entre a cotação mínima e máxima dos últimos 12 meses"):
+        assert f'title="{tip}' in html, tip
     r = post(client, "save_triage_notes", token, ticker="KO", answers=json.dumps({"negocio": "Bebidas"}))
     assert r.status_code == 200 and "Bebidas" in client.get("/radar/acao/KO").get_data(as_text=True)
 
