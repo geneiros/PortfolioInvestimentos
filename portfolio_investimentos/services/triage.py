@@ -298,8 +298,8 @@ def table(include_valuation=False):
                     "pe": m["pe"], "pb": m["pb"], "roe": m["roe"], "rg": m["rev_growth"], "dv": m["div"],
                     "de": m["de"], "st": st, "k": len(enters), "full": x["info"], "mq": m.get("magic_q"),
                     "cv": lenses.criterion_values(m),
-                    "vr": valuation_ratio(x["r"]["ticker"], m, x["info_data"],
-                                          fundamentals.get(x["r"]["ticker"])) if include_valuation else None})
+                    "vg": valuation_gap(x["r"]["ticker"], m, x["info_data"],
+                                        fundamentals.get(x["r"]["ticker"])) if include_valuation else None})
     return {"at": u["at"], "rows": out, "errors": u.get("errors") or [],
             "stale": datetime.now() - datetime.fromisoformat(u["at"]) > STALE,
             "missing": sum(1 for x in out if not x["full"])}
@@ -349,8 +349,8 @@ def save_answers(ticker, values):
     return clean
 
 
-def valuation_ratio(ticker, m, info, fundamental=None):
-    """Cotação face ao menor valor positivo da ficha lateral, em múltiplos de 100%."""
+def valuation_gap(ticker, m, info, fundamental=None):
+    """Diferença relativa entre a cotação e o menor valor positivo da ficha lateral."""
     price = m.get("price")
     if not isinstance(price, (int, float)) or not isfinite(price) or price <= 0:
         return None
@@ -364,8 +364,8 @@ def valuation_ratio(ticker, m, info, fundamental=None):
              if isinstance(value, (int, float)) and isfinite(value) and value > 0]
     if not valid:
         return None
-    ratio = price / min(valid)
-    return ratio if isfinite(ratio) else None
+    gap = price / min(valid) - 1
+    return gap if isfinite(gap) else None
 
 
 _FUNDAMENTAL_UNSET = object()

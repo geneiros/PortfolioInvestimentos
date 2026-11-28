@@ -3766,11 +3766,11 @@ def test_triage_universe_page_and_profile(app, client, monkeypatch):
         ko = next(r for r in tab["rows"] if r["t"] == "KO")
         assert ko["st"]["graham_def"] == "entra" and ko["c"] == "EUA" and ko["g"] == "América do Norte"
         assert ko["s"] == "Consumo básico" and ko["st"]["varias"] == "entra" and ko["k"] >= 2
-        assert ko["vr"] == pytest.approx(50 / 18.75)
+        assert ko["vg"] == pytest.approx(50 / 18.75 - 1)
         assert next(r for r in tab["rows"] if r["t"] == "NESN.SW")["c"] == "Suíça"
     html = client.get("/radar").get_data(as_text=True)
     assert ('data-missing="0"' in html and "Só as que entram" in html and "Melhor nesta lente" in html
-            and "Preço / mín." in html and "Maior cotação face ao valor mínimo" in html)
+            and "Dif. vs mín." in html and "Maior diferença face ao valor mínimo" in html)
     # a ficha completa
     html = client.get("/radar/acao/KO?lente=buffett").get_data(as_text=True)
     for text in ("The Coca-Cola Company", "Número de Graham", "Tecto de Bazin", "Várias lentes", "Graham defensivo",
@@ -3796,20 +3796,21 @@ def test_triage_universe_page_and_profile(app, client, monkeypatch):
     ("metrics", "valuation", "expected"),
     [
         ({"price": 60, "eps": 2, "bvps": 10}, {"methods": [{"low": 30}], "peg": None},
-         60 / (22.5 * 2 * 10) ** 0.5),
-        ({"price": 60, "dps": 1}, {"methods": [{"low": 30}], "peg": None}, 60 / (1 / 0.06)),
-        ({"price": 60}, {"methods": [{"low": 8}], "peg": {"fair": 3}}, 20),
+         60 / (22.5 * 2 * 10) ** 0.5 - 1),
+        ({"price": 60, "dps": 1}, {"methods": [{"low": 30}], "peg": None}, 60 / (1 / 0.06) - 1),
+        ({"price": 60}, {"methods": [{"low": 8}], "peg": {"fair": 3}}, 60 / 3 - 1),
+        ({"price": 53}, {"methods": [{"low": 100}], "peg": None}, -0.47),
         ({"price": 60}, {"methods": [{"low": None}, {"low": 0}], "peg": None}, None),
     ],
 )
-def test_triage_valuation_ratio_uses_lowest_visible_value(monkeypatch, metrics, valuation, expected):
+def test_triage_valuation_gap_uses_lowest_visible_value(monkeypatch, metrics, valuation, expected):
     from portfolio_investimentos.services import triage
     monkeypatch.setattr(triage, "valuation_of", lambda *args, **kwargs: valuation)
-    ratio = triage.valuation_ratio("TEST", metrics, {}, fundamental=None)
+    gap = triage.valuation_gap("TEST", metrics, {}, fundamental=None)
     if expected is None:
-        assert ratio is None
+        assert gap is None
     else:
-        assert ratio == pytest.approx(expected)
+        assert gap == pytest.approx(expected)
 
 
 def test_carteira_rows_open_ficha_and_empty_info_not_cached(app, client, monkeypatch):

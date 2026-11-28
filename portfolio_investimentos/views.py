@@ -601,7 +601,7 @@ def triagem():
         rows.append([r["t"], r["n"], r["c"], r["g"], r["s"], r["cur"], _short(r["p"]), _short(r["cap"], 3),
                      _short(r["pe"], 3), _short(r["pb"], 3), _short(r["roe"], 3), _short(r["rg"], 3),
                      _short(r["dv"], 3), _short(r["de"], 3), "".join(code[r["st"][k]] for k in order), r["k"],
-                     1 if r["full"] else 0, [_short(v, 4) for v in r["cv"]], _short(r["vr"], 6)])
+                     1 if r["full"] else 0, [_short(v, 4) for v in r["cv"]], _short(r["vg"], 6)])
     watched = {}
     for w in WatchItem.query.all():
         watched.setdefault(w.instrument, []).append(w.list_id)
