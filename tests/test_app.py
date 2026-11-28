@@ -1598,6 +1598,35 @@ def test_automatic_backups_before_destructive_actions_and_restore(app, client):
     assert post(client, "restore_backup", token, name="portfolio-20200101-000000-x.db").status_code == 400
 
 
+def test_newer_schema_backup_is_visible_but_cannot_be_restored(app, client):
+    import sqlite3
+    from portfolio_investimentos import migrations
+    from portfolio_investimentos.services import backups
+
+    path = app.config["DB_PATH"]
+    with app.app_context():
+        db.session.add(Transaction(date=date(2026, 1, 2), type="DEPOSIT", amount=111.0, currency="EUR"))
+        db.session.commit()
+    backup = backups.make_backup(path, "manual")
+    conn = sqlite3.connect(backup)
+    conn.execute(f"PRAGMA user_version = {migrations.LATEST + 1}")
+    conn.commit()
+    conn.close()
+
+    listed = backups.list_backups(path)[0]
+    assert not listed.compatible and listed.schema_version == migrations.LATEST + 1
+    html = client.get("/definicoes").get_data(as_text=True)
+    assert "Restauro indisponível" in html and 'data-pm-action="restore_backup"' not in html
+
+    response = post(client, "restore_backup", csrf(client), name=backup.name)
+    assert response.status_code == 400
+    assert "mais recente do que o suportado" in response.get_json()["error"]
+    assert len(backups.list_backups(path)) == 1
+    conn = sqlite3.connect(path)
+    assert conn.execute('SELECT amount FROM "transaction"').fetchone()[0] == 111.0
+    conn.close()
+
+
 def test_backups_keep_only_the_latest_two(tmp_path):
     import sqlite3
     from portfolio_investimentos.services import backups

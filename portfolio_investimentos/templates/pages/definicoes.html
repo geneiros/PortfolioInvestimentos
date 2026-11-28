@@ -269,7 +269,9 @@
       {% for b in backups %}
         <div class="d-flex align-items-center gap-2 small py-1 border-bottom">
           <span class="flex-grow-1"><b>{{ b.when.strftime('%d/%m/%Y %H:%M') }}</b> · {{ b.label }} <span class="text-body-secondary">({{ (b.size / 1024)|round|int }} KB)</span></span>
+          {% if b.compatible %}
           <button class="btn btn-sm btn-outline-secondary" data-pm-action="restore_backup" data-args='{"name": "{{ b.name }}"}' data-confirm="Restaurar a cópia de {{ b.when.strftime('%d/%m/%Y %H:%M') }}? Os dados atuais são substituídos (fica antes uma cópia do estado atual)."><i class="bi bi-arrow-counterclockwise"></i> Restaurar</button>
+          {% else %}<span class="badge text-bg-warning" title="{{ b.incompatibility }}">Restauro indisponível: {{ b.incompatibility }}</span>{% endif %}
           <button class="btn btn-sm btn-outline-danger" data-pm-action="delete_backup" data-args='{"name": "{{ b.name }}"}' data-confirm="Eliminar a cópia de {{ b.when.strftime('%d/%m/%Y %H:%M') }}? Não pode ser desfeito."><i class="bi bi-trash"></i> Eliminar</button>
         </div>
       {% else %}<p class="small text-body-secondary mb-2">Ainda não há cópias automáticas.</p>{% endfor %}
