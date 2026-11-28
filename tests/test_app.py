@@ -3770,7 +3770,7 @@ def test_triage_universe_page_and_profile(app, client, monkeypatch):
         assert next(r for r in tab["rows"] if r["t"] == "NESN.SW")["c"] == "Suíça"
     html = client.get("/radar").get_data(as_text=True)
     assert ('data-missing="0"' in html and "Só as que entram" in html and "Melhor nesta lente" in html
-            and "Dif. vs mín." in html and "Maior diferença face ao valor mínimo" in html)
+            and "Dif. vs mín." in html and "Menor diferença face ao valor mínimo" in html)
     # a ficha completa
     html = client.get("/radar/acao/KO?lente=buffett").get_data(as_text=True)
     for text in ("The Coca-Cola Company", "Número de Graham", "Tecto de Bazin", "Várias lentes", "Graham defensivo",

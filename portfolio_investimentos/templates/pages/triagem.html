@@ -55,7 +55,7 @@
         <div class="col-6 col-md-auto"><select class="form-select form-select-sm" id="fSort" aria-label="Ordenação">
           <option value="best">Melhor nesta lente</option><option value="cap">Maior capitalização</option><option value="pe">P/L mais baixo</option>
           <option value="roe">ROE mais alto</option><option value="rg">Vendas a crescer mais</option><option value="dv">Dividendo mais alto</option>
-          <option value="valuation">Maior diferença face ao valor mínimo</option><option value="name">Nome</option>
+          <option value="valuation">Menor diferença face ao valor mínimo</option><option value="name">Nome</option>
           <option value="k">Mais lentes</option>
           <optgroup label="Por lente (as que entram primeiro)">{% for l in lens_list if l.key != 'varias' %}<option value="lens:{{ l.key }}">{{ l.name }}</option>{% endfor %}</optgroup></select></div>
         <div class="col-6 col-md-auto"><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" id="fOnly" checked><label class="form-check-label" for="fOnly">Só as que entram</label></div></div>

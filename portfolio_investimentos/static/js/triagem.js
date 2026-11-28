@@ -162,7 +162,7 @@
       best: (r) => [RANK[st(r, lens)], SORTS[lens](r)], cap: (r) => [-(r.cap || 0)], pe: (r) => [r.pe ?? 1e9],
       roe: (r) => [-(r.roe ?? -1e9)], rg: (r) => [-(r.rg ?? -1e9)], dv: (r) => [-(r.dv ?? 0)], name: (r) => [r.n.toLowerCase()],
       k: (r) => [-enters(r), SORTS.varias(r)],
-      valuation: (r) => [r.vg === null ? 1 : 0, -(r.vg ?? 0)],
+      valuation: (r) => [r.vg === null ? 1 : 0, r.vg ?? 0],
     }[key] || (key.startsWith("lens:") ? ((k) => (r) => [RANK[st(r, k)], SORTS[k](r)])(key.slice(5)) : (r) => [RANK[st(r, lens)], SORTS[lens](r)]);
     rows = rows.map((r) => [by(r), r]).sort((a, b) => {
       for (let i = 0; i < a[0].length; i++) { if (a[0][i] < b[0][i]) return -1; if (a[0][i] > b[0][i]) return 1; }
