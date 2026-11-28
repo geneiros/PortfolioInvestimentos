@@ -118,6 +118,7 @@ class Lot:
     cost_eur: float
     fx: float
     opening: bool = False
+    acquisition_fees_eur: float = 0.0
 
 
 @dataclass
@@ -184,10 +185,24 @@ class Sale:
     proceeds_eur: float
     cost_eur: float
     acquired: date           # None quando a compra é anterior ao histórico importado
+    acquisition_fees_eur: float = 0.0
+    sale_fees_eur: float = 0.0
 
     @property
     def gain_eur(self):
         return self.proceeds_eur - self.cost_eur
+
+    @property
+    def realization_eur(self):
+        return self.proceeds_eur + self.sale_fees_eur
+
+    @property
+    def acquisition_value_eur(self):
+        return self.cost_eur - self.acquisition_fees_eur
+
+    @property
+    def expenses_eur(self):
+        return self.acquisition_fees_eur + self.sale_fees_eur
 
 
 @dataclass
@@ -422,16 +437,18 @@ class Portfolio:
         return out
 
     def _take_lots(self, pos, qty):
-        """Retira `qty` unidades dos lotes (FIFO); devolve [(lote, quantidade, custo EUR, custo local)]."""
+        """Retira `qty` unidades dos lotes (FIFO), incluindo a comissão de aquisição proporcional."""
         taken, remaining = [], qty
         while remaining > 1e-9 and pos.lots:
             lot = pos.lots[0]
             take = min(lot.qty, remaining)
             frac = take / lot.qty
             cost_eur, cost_local = lot.cost_eur * frac, lot.cost_local * frac
-            taken.append((lot, take, cost_eur, cost_local))
+            acquisition_fees_eur = lot.acquisition_fees_eur * frac
+            taken.append((lot, take, cost_eur, cost_local, acquisition_fees_eur))
             lot.cost_eur -= cost_eur
             lot.cost_local -= cost_local
+            lot.acquisition_fees_eur -= acquisition_fees_eur
             lot.qty -= take
             remaining -= take
             if lot.qty <= 1e-9:
@@ -455,7 +472,7 @@ class Portfolio:
             pos = self._position(t.asset)
             cost_local = t.quantity * t.price + (t.fees or 0.0)
             cost_eur = cost_local / fx
-            pos.lots.append(Lot(d, t.quantity, cost_local, cost_eur, fx, t.opening))
+            pos.lots.append(Lot(d, t.quantity, cost_local, cost_eur, fx, t.opening, fees_eur))
             pos.fees_eur += fees_eur
             pos.bought_eur += cost_eur
             pos.first_date = pos.first_date or d
@@ -465,9 +482,11 @@ class Portfolio:
         elif t.type == "SELL":
             pos = self._position(t.asset)
             proceeds_eur = (t.quantity * t.price - (t.fees or 0.0)) / fx
-            for lot, take, cost_eur, _ in self._take_lots(pos, t.quantity):
+            for lot, take, cost_eur, _, acquisition_fees_eur in self._take_lots(pos, t.quantity):
                 share = proceeds_eur * take / t.quantity
-                self.sales.append(Sale(d, pos.asset, take, share, cost_eur, None if lot.opening else lot.date))
+                sale_fees_eur = fees_eur * take / t.quantity
+                self.sales.append(Sale(d, pos.asset, take, share, cost_eur, None if lot.opening else lot.date,
+                                       acquisition_fees_eur, sale_fees_eur))
                 pos.realized_eur += share - cost_eur
             pos.fees_eur += fees_eur
             pos.last_date = d
@@ -476,8 +495,9 @@ class Portfolio:
         elif t.type == "CONVERT_OUT":
             # conversão, fusão ou split: as unidades saem deste ativo com o custo e as datas de compra
             pos = self._position(t.asset)
-            self._converting += [(d, lot, take, cost_eur, cost_local)
-                                 for lot, take, cost_eur, cost_local in self._take_lots(pos, t.quantity)]
+            self._converting += [(d, lot, take, cost_eur, cost_local, acquisition_fees_eur)
+                                 for lot, take, cost_eur, cost_local, acquisition_fees_eur
+                                 in self._take_lots(pos, t.quantity)]
             pos.last_date = d
         elif t.type == "CONVERT_IN":
             pos = self._position(t.asset)
@@ -486,8 +506,9 @@ class Portfolio:
             total = sum(c[2] for c in moved)
             if total > 1e-12:
                 factor = t.quantity / total
-                for _, lot, take, cost_eur, cost_local in moved:
-                    pos.lots.append(Lot(lot.date, take * factor, cost_local, cost_eur, lot.fx, lot.opening))
+                for _, lot, take, cost_eur, cost_local, acquisition_fees_eur in moved:
+                    pos.lots.append(Lot(lot.date, take * factor, cost_local, cost_eur, lot.fx, lot.opening,
+                                        acquisition_fees_eur))
                     pos.bought_eur += cost_eur
                 pos.lots.sort(key=lambda lot_: lot_.date)
             else:  # sem saída correspondente (ex.: ações oferecidas): unidades sem custo

@@ -655,7 +655,8 @@ def test_fiscal_groups_by_asset_with_lots_on_demand_and_full_csv(app, client):
         db.session.commit()
     html = client.get("/fiscal?ano=2024").get_data(as_text=True)
     assert "2 ativos · 41 linhas FIFO" in html
-    assert html.count("data-lots=") == 2 and html.count("<tr>") < 10  # uma linha por ativo, não por lote
+    sales_table = html.split('id="salesTable"', 1)[1].split("</table>", 1)[0]
+    assert html.count("data-lots=") == 2 and sales_table.count("<tr>") < 10  # uma linha por ativo, não por lote
     frag = client.get("/fiscal/lotes?ano=2024&ativo=AAA").get_data(as_text=True)
     assert frag.count("<tr>") == 41  # cabeçalho + 40 lotes
     assert client.get("/fiscal/lotes?ano=2024&ativo=NAO").status_code == 404
@@ -665,6 +666,52 @@ def test_fiscal_groups_by_asset_with_lots_on_demand_and_full_csv(app, client):
     lines = csv.get_data(as_text=True).lstrip("\ufeff").splitlines()
     assert len(lines) == 1 + 41 and lines[0].startswith("Data venda;Ativo;")
     assert lines[1].split(";")[:2] == ["2024-06-01", '"AAA"'] and lines[1].split(";")[4] == "12.0"
+
+
+def test_anexo_j_exports_gross_income_and_separates_fifo_expenses(app, client):
+    from portfolio_investimentos.models import Broker, Instrument, Setting
+
+    with app.app_context():
+        broker = Broker(broker_name="Corretora teste")
+        db.session.add(broker)
+        db.session.flush()
+        token = csrf(client)
+        saved = post(client, "save_broker", token, broker_name=broker.broker_name, name=str(broker.id), country="IE")
+        assert saved.status_code == 200
+        assert post(client, "save_broker", token, broker_name=broker.broker_name, name=str(broker.id),
+                    country="ZZ").status_code == 400
+        Setting.set("broker", str(broker.id))
+        db.session.add(Instrument(ticker="AAA", currency="EUR", isin="US0000000001"))
+        db.session.add_all([
+            Transaction(broker=broker.id, date=date(2024, 1, 2), type="BUY", instrument="AAA",
+                        quantity=10, price=10, fees=2, currency="EUR"),
+            Transaction(broker=broker.id, date=date(2024, 2, 2), type="SELL", instrument="AAA",
+                        quantity=5, price=15, fees=3, currency="EUR"),
+            Transaction(broker=broker.id, date=date(2024, 2, 3), type="SELL", instrument="AAA",
+                        quantity=5, price=16, fees=1, currency="EUR"),
+            Transaction(broker=broker.id, date=date(2024, 3, 2), type="DIVIDEND", instrument="AAA",
+                        amount=100, tax=35, currency="EUR"),
+            Transaction(broker=broker.id, date=date(2024, 4, 2), type="INTEREST",
+                        amount=100, tax=35, currency="EUR"),
+        ])
+        db.session.commit()
+
+    response = client.get("/fiscal/anexo-j.csv?ano=2024&quadro=8A")
+    assert response.status_code == 200
+    rows = [line.split(";") for line in response.get_data(as_text=True).lstrip("\ufeff").splitlines()]
+    assert rows[0][:4] == ["Código de rendimento", "País da fonte", "Rendimento bruto",
+                           "Imposto pago no estrangeiro"]
+    assert ["E11", "840", "100.00", "35.00", "AAA"] in rows
+    assert ["E99", "372", "100.00", "35.00", "Juros"] in rows
+
+    response = client.get("/fiscal/anexo-j.csv?ano=2024&quadro=9.2A")
+    rows = [line.split(";") for line in response.get_data(as_text=True).lstrip("\ufeff").splitlines()]
+    assert rows[0][0:6] == ["País da contraparte", "Data de realização", "Valor de realização",
+                            "Data de aquisição", "Valor de aquisição", "Despesas e encargos"]
+    assert rows[1][:7] == ["", "2024-02-02", "75.00", "2024-01-02", "50.00", "4.00", "AAA"]
+    assert rows[2][:7] == ["", "2024-02-03", "80.00", "2024-01-02", "50.00", "2.00", "AAA"]
+    assert "contraparte compradora" in client.get("/fiscal?ano=2024").get_data(as_text=True)
+    assert client.get("/fiscal/anexo-j.csv?ano=2024&quadro=invalid").status_code == 400
 
 
 def test_background_refresh_retries_when_database_is_locked(app, monkeypatch):
@@ -1458,6 +1505,7 @@ def _legacy_db(folder, monkeypatch):
     conn = sqlite3.connect(folder / "portfolio.db")
     conn.execute('ALTER TABLE "transaction" DROP COLUMN result')
     conn.execute("ALTER TABLE instrument DROP COLUMN last_quote")
+    conn.execute("ALTER TABLE broker DROP COLUMN country")
     conn.execute("PRAGMA user_version = 0")
     conn.commit()
     conn.close()
@@ -1479,6 +1527,7 @@ def test_old_database_is_migrated_with_backup(tmp_path, monkeypatch):
     conn = sqlite3.connect(path)
     assert "result" in {r[1] for r in conn.execute('PRAGMA table_info("transaction")')}
     assert "last_quote" in {r[1] for r in conn.execute("PRAGMA table_info(instrument)")}
+    assert "country" in {r[1] for r in conn.execute("PRAGMA table_info(broker)")}
     assert conn.execute('SELECT count(*) FROM "transaction"').fetchone()[0] == 1  # os dados seguem lá
     conn.close()
     copies = list((tmp_path / "copias").glob(f"portfolio-*-migracao-v0-v{migrations.LATEST}.db"))

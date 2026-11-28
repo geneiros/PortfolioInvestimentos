@@ -237,18 +237,27 @@ def delete_import(name):
 
 # ---------------------------------------------------------- corretoras/ativos
 @action
-def save_broker(broker_name, color=None, name=None):
+def save_broker(broker_name, color=None, name=None, country=None):
     broker_name = (broker_name or "").strip()
     if not broker_name:
         raise ApiError("Indica o nome da corretora.")
+    if country is not None:
+        country = country.strip().upper()
+        from .services.annex_j import COUNTRIES
+        if country and country not in COUNTRIES:
+            raise ApiError("Escolhe um país válido para a corretora.")
     if name:
         b = _get(Broker, name)
         if Broker.query.filter(Broker.broker_name == broker_name, Broker.id != b.id).first():
             raise ApiError("Já existe uma corretora com esse nome.")
         b.broker_name, b.color = broker_name, color or b.color
+        if country is not None:
+            b.country = country or None
         db.session.commit()
         return b.id
     bid = importer.get_or_create_broker(broker_name, color or "#3b82f6")
+    if country is not None:
+        db.session.get(Broker, bid).country = country or None
     db.session.commit()
     return bid
 

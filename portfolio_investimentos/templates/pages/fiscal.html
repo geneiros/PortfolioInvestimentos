@@ -59,6 +59,47 @@
   {% else %}<p class="text-secondary">Sem vendas neste ano.</p>{% endif %}
 </div>
 
+<div class="pm-card mt-3">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <div class="pm-label m-0">Anexo J · Quadro 8A · Rendimentos de capitais</div>
+    <a class="btn btn-pm btn-sm ms-auto" href="/fiscal/anexo-j.csv?ano={{ year }}&quadro=8A"><i class="bi bi-download"></i> Exportar CSV</a>
+  </div>
+  <p class="small text-secondary">Valores brutos e imposto efetivamente retido no estrangeiro, convertidos para EUR. O crédito de imposto em Portugal pode estar limitado ao imposto português atribuível ao rendimento; retenção excedente não significa reembolso automático.</p>
+  {% if annex_j.dividends or annex_j.interest %}
+  <div class="pm-table-wrap"><table class="table pm-table">
+    <thead><tr><th>Código</th><th>País da fonte</th><th class="text-end">Rendimento bruto</th><th class="text-end">Imposto pago no estrangeiro</th><th>Ativo(s)</th></tr></thead>
+    <tbody>{% for row in annex_j.dividends + annex_j.interest %}
+      <tr><td>{{ row.code }}</td>
+        <td>{{ row.country_code }}{% if row.country_name %} · {{ row.country_name }}{% else %}<span class="text-warning">Não identificado</span>{% endif %}</td>
+        <td class="text-end money">{{ row.gross|money(2) }}</td><td class="text-end money">{{ row.tax|money(2) }}</td>
+        <td>{{ row.assets if row.assets is defined else "Juros" }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="text-secondary">Sem dividendos ou juros neste quadro.</p>{% endif %}
+</div>
+
+<div class="pm-card mt-3">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <div class="pm-label m-0">Anexo J · Quadro 9.2A · Alienação de valores mobiliários</div>
+    <a class="btn btn-pm btn-sm ms-auto" href="/fiscal/anexo-j.csv?ano={{ year }}&quadro=9.2A"><i class="bi bi-download"></i> Exportar CSV</a>
+  </div>
+  {% if annex_j.sales %}
+  <div class="pm-table-wrap"><table class="table pm-table">
+    <thead><tr><th>País da contraparte</th><th>Data realização</th><th class="text-end">Valor realização</th><th>Data aquisição</th><th class="text-end">Valor aquisição</th><th class="text-end">Despesas e encargos</th><th>Ativo</th></tr></thead>
+    <tbody>{% for row in annex_j.sales %}{% set sale = row.sale %}
+      <tr><td class="text-secondary">—</td><td>{{ sale.date|ddmmyyyy }}</td><td class="text-end money">{{ row.realization|money(2) }}</td>
+        <td>{{ sale.acquired|ddmmyyyy if sale.acquired else "anterior ao histórico" }}</td>
+        <td class="text-end money">{{ row.acquisition|money(2) }}</td><td class="text-end money">{{ row.expenses|money(2) }}</td><td>{{ sale.asset.ticker }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="text-secondary">Sem vendas neste quadro.</p>{% endif %}
+</div>
+
+{% if annex_j.warnings %}<div class="alert alert-warning small mt-3 mb-0">
+  <b>Dados a confirmar antes de preencher a declaração:</b>
+  <ul class="mb-0 mt-1">{% for warning in annex_j.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+</div>{% endif %}
+
 <div class="modal fade" id="lotsModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
     <div class="modal-header"><h6 class="modal-title" id="lotsTitle"></h6><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
