@@ -17,8 +17,8 @@
     <button class="btn-close" type="button" data-panel-close aria-label="Fechar"></button>
   </div>
   <div class="d-flex flex-wrap align-items-baseline gap-3 mb-2">
-    <span class="fs-4 fw-bold">{{ m.price|number(2) if m.price else dash }} <small class="fs-6 text-secondary">{{ m.currency or "" }}</small></span>
-    {% if m.cap_usd %}<span class="text-secondary">Capitalização <b class="text-body">{{ (m.cap_usd / 1e9)|number(0 if m.cap_usd >= 1e11 else 1) }} mM$</b></span>{% endif %}
+    <span class="fs-4 fw-bold"><small class="fs-6 text-secondary">Preço {{ help("Cotação atual da ação, na moeda indicada.") }}</small> {{ m.price|number(2) if m.price else dash }} <small class="fs-6 text-secondary">{{ m.currency or "" }}</small></span>
+    {% if m.cap_usd %}<span class="text-secondary">Capitalização {{ help("Valor de mercado da empresa: preço da ação × número de ações em circulação, aproximado em dólares.") }} <b class="text-body">{{ (m.cap_usd / 1e9)|number(0 if m.cap_usd >= 1e11 else 1) }} mM$</b></span>{% endif %}
   </div>
   {% if d.blurb %}<p class="mb-2">{{ d.blurb }}</p>{% endif %}
   {% if d.tags %}<div class="d-flex flex-wrap gap-1 mb-3">{% for t, kind in d.tags %}<span class="badge pm-tag pm-tag-{{ kind }}">{{ t }}</span>{% endfor %}</div>{% endif %}
@@ -92,7 +92,7 @@
     </div>
     {% for r in pr.rows %}
     <div class="pm-peer-row" data-peer="{{ r.key }}">
-      <div class="pm-peer-name"><b>{{ r.name }}</b><div class="small text-secondary">{{ r.sub }}</div></div>
+      <div class="pm-peer-name"><b>{{ r.name }} {{ help(r.sub) }}</b></div>
       <div class="pm-peer-value text-end">
         {% if r.value is none %}<b class="text-secondary">—</b>
         {% elif r.pct %}<b class="{{ ('text-up' if r.value > 0 else 'text-down') if r.key == 'rev_growth' else '' }}">{{ r.value|pct(1 if r.key in ('div', 'rev_growth') else 0, sign=(r.key == 'rev_growth')) }}</b>
@@ -140,45 +140,45 @@
     <div class="col-12">
       <div class="pm-label mb-1">Avaliação</div>
       {{ row("P/L", m.pe|number(1) if m.pe else dash, "Preço ÷ lucro por ação dos últimos 12 meses.") }}
-      {{ row("P/L previsto", m.fpe|number(1) if m.fpe else dash) }}
+      {{ row("P/L previsto", m.fpe|number(1) if m.fpe else dash, "Preço atual ÷ lucro por ação previsto para os próximos 12 meses.") }}
       {{ row("P/VP", m.pb|number(2) if m.pb else dash, "Preço ÷ valor contabilístico por ação.") }}
-      {{ row("P/Vendas", m.ps|number(2) if m.ps else dash) }}
-      {{ row("EV/EBITDA", m.ev_ebitda|number(1) if m.ev_ebitda else dash) }}
+      {{ row("P/Vendas", m.ps|number(2) if m.ps else dash, "Capitalização bolsista ÷ vendas anuais; compara o preço da empresa com as receitas.") }}
+      {{ row("EV/EBITDA", m.ev_ebitda|number(1) if m.ev_ebitda else dash, "Valor da empresa (capitalização + dívida − caixa) ÷ EBITDA, uma medida do resultado operacional antes de juros, impostos, depreciações e amortizações.") }}
       {{ row("PEG", m.peg|number(2) if m.peg else dash, "P/L ÷ crescimento esperado do lucro (5 anos).") }}
     </div>
     <div class="col-12">
       <div class="pm-label mb-1">Resultados</div>
       {{ row("ROE", m.roe|pct(1, sign=False) if m.roe is not none else dash, "Lucro ÷ capital próprio.") }}
-      {{ row("ROA", m.roa|pct(1, sign=False) if m.roa is not none else dash) }}
-      {{ row("Margem bruta", m.gross_margin|pct(1, sign=False) if m.gross_margin is not none else dash) }}
-      {{ row("Margem operacional", m.op_margin|pct(1, sign=False) if m.op_margin is not none else dash) }}
-      {{ row("Margem líquida", m.net_margin|pct(1, sign=False) if m.net_margin is not none else dash) }}
-      {{ row("Lucro por ação", (m.eps|number(2) ~ " " ~ (m.currency or "")) if m.eps is not none else dash) }}
+      {{ row("ROA", m.roa|pct(1, sign=False) if m.roa is not none else dash, "Lucro líquido ÷ ativos totais; mede a rentabilidade dos ativos.") }}
+      {{ row("Margem bruta", m.gross_margin|pct(1, sign=False) if m.gross_margin is not none else dash, "(Vendas − custo das vendas) ÷ vendas.") }}
+      {{ row("Margem operacional", m.op_margin|pct(1, sign=False) if m.op_margin is not none else dash, "Resultado operacional ÷ vendas, antes de juros e impostos.") }}
+      {{ row("Margem líquida", m.net_margin|pct(1, sign=False) if m.net_margin is not none else dash, "Lucro líquido ÷ vendas; mostra quanto fica de lucro por cada unidade monetária vendida.") }}
+      {{ row("Lucro por ação", (m.eps|number(2) ~ " " ~ (m.currency or "")) if m.eps is not none else dash, "Lucro atribuível aos acionistas dividido pelo número de ações.") }}
     </div>
     <div class="col-12">
       <div class="pm-label mb-1">Crescimento</div>
-      {{ row("Vendas (último ano)", m.rev_growth|pct(1) if m.rev_growth is not none else dash) }}
-      {{ row("Lucro (último ano)", m.eps_growth|pct(1) if m.eps_growth is not none else dash) }}
-      {{ row("Lucro previsto por ação", (m.fwd_eps|number(2)) if m.fwd_eps is not none else dash) }}
-      {% if i.targetMeanPrice %}{{ row("Preço-alvo dos analistas", i.targetMeanPrice|number(2) ~ (" (" ~ i.numberOfAnalystOpinions ~ ")" if i.numberOfAnalystOpinions else "")) }}{% endif %}
+      {{ row("Vendas (último ano)", m.rev_growth|pct(1) if m.rev_growth is not none else dash, "Variação percentual das vendas face ao período homólogo.") }}
+      {{ row("Lucro (último ano)", m.eps_growth|pct(1) if m.eps_growth is not none else dash, "Variação percentual do lucro face ao período homólogo.") }}
+      {{ row("Lucro previsto por ação", (m.fwd_eps|number(2)) if m.fwd_eps is not none else dash, "Estimativa do lucro por ação para os próximos 12 meses.") }}
+      {% if i.targetMeanPrice %}{{ row("Preço-alvo dos analistas", i.targetMeanPrice|number(2) ~ (" (" ~ i.numberOfAnalystOpinions ~ ")" if i.numberOfAnalystOpinions else ""), "Média dos preços-alvo publicados por analistas; é uma estimativa, não uma garantia.") }}{% endif %}
     </div>
     <div class="col-12">
       <div class="pm-label mb-1">Balanço</div>
-      {{ row("Dívida / capital", m.de|number(2) if m.de is not none else dash) }}
-      {{ row("Dívida líquida / EBITDA", m.net_debt_ebitda|number(1) if m.net_debt_ebitda is not none else dash) }}
+      {{ row("Dívida / capital", m.de|number(2) if m.de is not none else dash, "Dívida total ÷ capital próprio; indica o nível de endividamento face aos recursos dos acionistas.") }}
+      {{ row("Dívida líquida / EBITDA", m.net_debt_ebitda|number(1) if m.net_debt_ebitda is not none else dash, "(Dívida total − caixa) ÷ EBITDA; aproxima quantos anos de EBITDA seriam necessários para pagar a dívida líquida.") }}
       {{ row("Liquidez corrente", m.current|number(2) if m.current is not none else dash, "Ativo corrente ÷ passivo corrente.") }}
-      {{ row("Liquidez reduzida", m.quick|number(2) if m.quick is not none else dash) }}
-      {{ row("Caixa livre (FCF)", ((m.fcf / 1e9)|number(2) ~ " mM " ~ (m.fin_currency or m.currency or "")) if m.fcf is not none else dash) }}
+      {{ row("Liquidez reduzida", m.quick|number(2) if m.quick is not none else dash, "(Caixa + contas a receber) ÷ passivo corrente; exclui inventários.") }}
+      {{ row("Caixa livre (FCF)", ((m.fcf / 1e9)|number(2) ~ " mM " ~ (m.fin_currency or m.currency or "")) if m.fcf is not none else dash, "Caixa gerada depois das despesas de capital (CAPEX), disponível para reduzir dívida, distribuir ou reinvestir.") }}
     </div>
     <div class="col-12">
       <div class="pm-label mb-1">Acionista</div>
-      {{ row("Dividendo", m.div|pct(2, sign=False) if m.div else dash) }}
-      {{ row("Dividendo por ação", (m.dps|number(2) ~ " " ~ (m.currency or "")) if m.dps else dash) }}
+      {{ row("Dividendo", m.div|pct(2, sign=False) if m.div else dash, "Dividendos anuais por ação ÷ cotação atual.") }}
+      {{ row("Dividendo por ação", (m.dps|number(2) ~ " " ~ (m.currency or "")) if m.dps else dash, "Valor anual de dividendos estimado para cada ação, na moeda da cotação.") }}
       {{ row("Payout", m.payout|pct(0, sign=False) if m.payout is not none else dash, "Parte do lucro paga em dividendos.") }}
       {{ row("Beta", m.beta|number(2) if m.beta is not none else dash, "Quanto a ação costuma mexer face ao mercado (1 = igual).") }}
     </div>
     <div class="col-12">
-      <div class="pm-label mb-1">52 semanas</div>
+      <div class="pm-label mb-1">52 semanas {{ help("Intervalo entre a cotação mínima e máxima dos últimos 12 meses; a posição indica onde a cotação atual fica dentro desse intervalo.") }}</div>
       {% if m.high and m.low and m.price and m.high > m.low %}{% set pos = ((m.price - m.low) / (m.high - m.low) * 100)|round(0) %}
       <div class="pm-range my-2" title="{{ pos|int }}% do intervalo"><span style="left: {{ [[pos, 0]|max, 100]|min }}%"></span></div>
       <div class="d-flex justify-content-between small text-secondary"><span>{{ m.low|number(2) }}</span><span>{{ (m.price / m.high - 1)|pct(0) }} do máximo</span><span>{{ m.high|number(2) }}</span></div>

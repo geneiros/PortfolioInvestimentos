@@ -55,7 +55,7 @@
   const ORDER = T.order;  // as lentes reais e, no fim, «varias»
   const REAL = ORDER.filter((k) => k !== "varias");
   const R = T.rows.map((r) => ({ t: r[0], n: r[1], c: r[2], g: r[3], s: r[4], cur: r[5], p: r[6], cap: r[7], pe: r[8], pb: r[9],
-    roe: r[10], rg: r[11], dv: r[12], de: r[13], st: r[14], k: r[15], full: r[16], cv: r[17] || [] }));
+    roe: r[10], rg: r[11], dv: r[12], de: r[13], st: r[14], k: r[15], full: r[16], cv: r[17] || [], vg: r[18] ?? null }));
   // ---- os critérios de cada lente, que se podem mudar (temporariamente, só nesta página)
   const SPEC = T.spec || { lenses: [], keys: [] };
   const KIDX = Object.fromEntries(SPEC.keys.map((k, i) => [k, i]));
@@ -100,6 +100,7 @@
   const nf = (d) => new Intl.NumberFormat("pt-PT", { minimumFractionDigits: d, maximumFractionDigits: d });
   const num = (v, d = 1) => (v === null || v === undefined ? "—" : nf(d).format(v));
   const pct = (v, d = 0) => (v === null || v === undefined ? "—" : nf(d).format(v * 100) + "%");
+  const signedPct = (v) => (v === null || v === undefined ? "—" : `${v > 0 ? "+" : ""}${pct(v)}`);
   const cap = (v) => (v ? nf(v >= 1e11 ? 0 : 1).format(v / 1e9) : "—");
   const tone = (v, good, bad) => (v === null || v === undefined ? "" : v >= good ? "text-success" : v <= bad ? "text-danger" : "");
   const BADGE = { e: ['pm-in', "Entra"], q: ['pm-near', "Quase"], f: ['pm-out', "Falha"], "-": ['pm-none', "Sem dados"] };
@@ -144,6 +145,7 @@
       <td class="text-nowrap">${dots(r)}</td>
       <td><span class="badge ${BADGE[s][0]}">${BADGE[s][1]}</span></td>
       <td class="text-end">${num(r.pe)}</td><td class="text-end">${num(r.pb)}</td>
+      <td class="text-end ${r.vg === null ? "text-secondary" : r.vg > 0 ? "text-danger" : r.vg < 0 ? "text-success" : "text-secondary"}">${signedPct(r.vg)}</td>
       <td class="text-end ${tone(r.roe, 0.15, 0)}">${pct(r.roe)}</td><td class="text-end ${tone(r.rg, 0.1, -0.0001)}">${r.rg === null ? "—" : (r.rg > 0 ? "+" : "") + pct(r.rg)}</td>
       <td class="text-end">${r.dv ? pct(r.dv, 1) : "—"}</td><td class="text-end ${r.de === null ? "" : r.de > 1.5 ? "text-danger" : ""}">${num(r.de, 2)}</td>
       <td class="text-end">${cap(r.cap)}</td>
@@ -160,6 +162,7 @@
       best: (r) => [RANK[st(r, lens)], SORTS[lens](r)], cap: (r) => [-(r.cap || 0)], pe: (r) => [r.pe ?? 1e9],
       roe: (r) => [-(r.roe ?? -1e9)], rg: (r) => [-(r.rg ?? -1e9)], dv: (r) => [-(r.dv ?? 0)], name: (r) => [r.n.toLowerCase()],
       k: (r) => [-enters(r), SORTS.varias(r)],
+      valuation: (r) => [r.vg === null ? 1 : 0, r.vg ?? 0],
     }[key] || (key.startsWith("lens:") ? ((k) => (r) => [RANK[st(r, k)], SORTS[k](r)])(key.slice(5)) : (r) => [RANK[st(r, lens)], SORTS[lens](r)]);
     rows = rows.map((r) => [by(r), r]).sort((a, b) => {
       for (let i = 0; i < a[0].length; i++) { if (a[0][i] < b[0][i]) return -1; if (a[0][i] > b[0][i]) return 1; }
@@ -173,7 +176,7 @@
     document.getElementById("lensText").textContent = L[lens].text;
     document.getElementById("lensSummary").innerHTML = `<b>${n}</b> entram · ${nq} quase · ${rows0.length} na lista`;
     document.getElementById("triageBody").innerHTML = rows.slice(0, shown).map(rowHtml).join("")
-      || `<tr><td colspan="11" class="text-center text-secondary py-4">Nenhuma ação ${f.only.checked ? "entra nesta lente com estes filtros. Desliga «Só as que entram» para veres as que ficam perto." : "com estes filtros."}</td></tr>`;
+      || `<tr><td colspan="12" class="text-center text-secondary py-4">Nenhuma ação ${f.only.checked ? "entra nesta lente com estes filtros. Desliga «Só as que entram» para veres as que ficam perto." : "com estes filtros."}</td></tr>`;
     const more = document.getElementById("triageMore");
     more.innerHTML = rows.length > shown ? `A mostrar ${shown} de ${rows.length} · <a href="#" data-more>mostrar mais</a>` : (rows.length ? `${rows.length} ${rows.length === 1 ? "ação" : "ações"}` : "");
   };

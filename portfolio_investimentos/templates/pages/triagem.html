@@ -54,7 +54,8 @@
         <div class="col-6 col-md-auto"><select class="form-select form-select-sm" id="fSector" aria-label="Setor"><option value="">Todos os setores</option>{% for s in sectors %}<option>{{ s }}</option>{% endfor %}</select></div>
         <div class="col-6 col-md-auto"><select class="form-select form-select-sm" id="fSort" aria-label="Ordenação">
           <option value="best">Melhor nesta lente</option><option value="cap">Maior capitalização</option><option value="pe">P/L mais baixo</option>
-          <option value="roe">ROE mais alto</option><option value="rg">Vendas a crescer mais</option><option value="dv">Dividendo mais alto</option><option value="name">Nome</option>
+          <option value="roe">ROE mais alto</option><option value="rg">Vendas a crescer mais</option><option value="dv">Dividendo mais alto</option>
+          <option value="valuation">Menor diferença face ao valor mínimo</option><option value="name">Nome</option>
           <option value="k">Mais lentes</option>
           <optgroup label="Por lente (as que entram primeiro)">{% for l in lens_list if l.key != 'varias' %}<option value="lens:{{ l.key }}">{{ l.name }}</option>{% endfor %}</optgroup></select></div>
         <div class="col-6 col-md-auto"><div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" id="fOnly" checked><label class="form-check-label" for="fOnly">Só as que entram</label></div></div>
@@ -66,7 +67,9 @@
           <th>Empresa {{ help("Nome da empresa, ticker e país da bolsa onde é negociada. A ampulheta indica que os dados ainda estão a ser completados.") }}</th>
           <th>Lentes {{ help("Um ponto por lente, pela ordem da lista à esquerda: cheio = entra, meio = quase, vazio = falha, tracejado = sem dados.") }}</th>
           <th>Nesta {{ help("Como a ação fica na lente escolhida à esquerda: entra (passa em todos os critérios com dados), quase (o que falta está perto do limite), falha ou sem dados.") }}</th>
-          <th class="text-end">P/L {{ help("Preço ÷ lucro por ação: quantos anos de lucros atuais pagas pela ação. Mais baixo = mais barata face ao que ganha.") }}</th><th class="text-end">P/VP {{ help("Preço ÷ valor patrimonial (capital próprio) por ação. Abaixo de 1 = cotada abaixo do valor contabilístico.") }}</th><th class="text-end">ROE {{ help("Rentabilidade do capital próprio: lucro em % do capital dos acionistas. Verde a partir de 15%.") }}</th>
+          <th class="text-end">P/L {{ help("Preço ÷ lucro por ação: quantos anos de lucros atuais pagas pela ação. Mais baixo = mais barata face ao que ganha.") }}</th><th class="text-end">P/VP {{ help("Preço ÷ valor patrimonial (capital próprio) por ação. Abaixo de 1 = cotada abaixo do valor contabilístico.") }}</th>
+          <th class="text-end">Dif. vs mín. {{ help("Diferença percentual entre a cotação e o menor valor de avaliação válido da ficha lateral: (cotação ÷ valor mínimo − 1) × 100. Ex.: −47% significa cotação 47% abaixo do mínimo; 0% significa igual; valor positivo significa acima. Inclui Graham, Bazin e os restantes métodos (nos intervalos, o limite inferior); o PEG usa o preço justo de PEG 1.") }}</th>
+          <th class="text-end">ROE {{ help("Rentabilidade do capital próprio: lucro em % do capital dos acionistas. Verde a partir de 15%.") }}</th>
           <th class="text-end">Vendas {{ help("Crescimento das vendas no último ano.") }}</th><th class="text-end">Div. {{ help("Dividend yield: dividendos pagos por ano, em % do preço atual.") }}</th>
           <th class="text-end">D/E {{ help("Dívida ÷ capital próprio: quanto a empresa deve por cada euro dos acionistas. Vermelho acima de 1,5.") }}</th><th class="text-end">Cap. {{ help("Capitalização em milhares de milhões de dólares (aproximado).") }}</th>
           <th class="text-center">Guardar {{ help("Guarda a ação numa lista de acompanhamento. O marcador cheio indica que já está numa lista.") }}</th>
