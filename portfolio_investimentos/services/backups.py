@@ -55,15 +55,39 @@ def _ordered(dest_dir):
     return sorted(files, key=lambda p: (_NAME.match(p.name).group(1, 2), p.stat().st_mtime_ns))
 
 
+def _backup_schema_version(path):
+    probe = None
+    try:
+        probe = sqlite3.connect(path)
+        return probe.execute("PRAGMA user_version").fetchone()[0], None
+    except sqlite3.Error as exc:
+        return None, str(exc)
+    finally:
+        if probe is not None:
+            probe.close()
+
+
 def list_backups(db_path):
     """As cópias existentes, da mais recente para a mais antiga."""
+    from .. import migrations
+
     out = []
     for p in reversed(_ordered(folder(db_path))):
         m = _NAME.match(p.name)
         when = datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S")
         reason = re.sub(r"-\d+$", "", m.group(3))
         label = REASONS.get(reason) or ("Antes de atualizar a base de dados" if reason.startswith("migracao") else reason)
-        out.append(SimpleNamespace(name=p.name, when=when, label=label, size=p.stat().st_size))
+        version, error = _backup_schema_version(p)
+        incompatibility = None
+        compatible = error is None and version <= migrations.LATEST
+        if error:
+            incompatibility = f"Cópia inválida: {error}"
+        elif not compatible:
+            incompatibility = (f"Esquema {version}; esta aplicação suporta até {migrations.LATEST}. "
+                               "Atualiza a aplicação para restaurar.")
+        out.append(SimpleNamespace(name=p.name, when=when, label=label, size=p.stat().st_size,
+                                   schema_version=version, compatible=compatible,
+                                   incompatibility=incompatibility))
     return out
 
 
@@ -82,7 +106,16 @@ def delete(db_path, name):
 
 def restore(db_path, name):
     """Substitui o conteúdo da base de dados pela cópia (feita uma cópia do estado atual antes)."""
+    from .. import migrations
+
     src_path = backup_path(db_path, name)
+    version, error = _backup_schema_version(src_path)
+    if error:
+        raise ValueError(error)
+    if version > migrations.LATEST:
+        raise ValueError(
+            f"a cópia usa o esquema {version}, mais recente do que o suportado ({migrations.LATEST}); "
+            "atualiza a aplicação")
     probe = sqlite3.connect(src_path)
     try:
         if probe.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
