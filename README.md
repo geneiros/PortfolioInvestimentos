@@ -15,7 +15,7 @@ Tracker de carteira de investimentos local: desempenho, dividendos, património,
 
 ## Como usar
 
-Sem Python, usa o **executável único** (abaixo). Com Python, precisas apenas do **Python 3.10 ou superior** ([python.org/downloads](https://www.python.org/downloads/); no Windows marca a opção *Add Python to PATH*).
+Sem Python, usa o **executável único** (abaixo). Com Python, precisas apenas do **Python 3.10 ou superior** ([python.org/downloads](https://www.python.org/downloads/); no Windows marca a opção *Add Python to PATH*). No Windows, se o Python não estiver instalado, o `iniciar.bat` instala o Python 3.12 com o `winget` (quando existe; nas edições LTSC normalmente não vem instalado).
 
 1. Descarrega o projeto: botão **Code → Download ZIP** no GitHub, ou `git clone https://github.com/geneiros/PortfolioInvestimentos`.
 2. Abre a pasta e inicia a aplicação:
